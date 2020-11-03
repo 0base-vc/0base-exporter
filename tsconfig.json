@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/@types"
+    ],
+    "baseUrl": "./",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "target": "es6",
+    "sourceMap": true,
+    "inlineSources": true,
+    "pretty": true,
+    "outDir": "./dist",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": false,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "suppressImplicitAnyIndexErrors": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "incremental": true,
+    "resolveJsonModule": true
+  },
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "./dist",
+    "./bin"
+  ]
+}
+
