@@ -13,23 +13,30 @@ export default class Target extends TargetAbstract {
     private readonly metricPrefix = 'tendermint';
 
     public async makeMetrics(): Promise<string> {
-        const registry = new Registry();
-        registry.registerMetric(await this.getAddressBalance(this.address));
-        registry.registerMetric(await this.getRank(this.validatorAddress));
+        let customMetrics = '';
+        try {
+            const registry = new Registry();
+            registry.registerMetric(await this.getAddressBalance(this.address));
+            registry.registerMetric(await this.getRank(this.validatorAddress));
 
-        const parameterMetrics = await this.jsonToMetrics(`${this.lcdUrl}/staking/parameters`, 'staking_parameters');
-        parameterMetrics.forEach((metric) => {
-            registry.registerMetric(metric);
-        });
+            const parameterMetrics = await this.jsonToMetrics(`${this.lcdUrl}/staking/parameters`, 'staking_parameters');
+            parameterMetrics.forEach((metric) => {
+                registry.registerMetric(metric);
+            });
 
-        const poolMetrics = await this.jsonToMetrics(`${this.lcdUrl}/staking/pool`, 'staking_pool');
-        poolMetrics.forEach((metric) => {
-            registry.registerMetric(metric);
-        });
+            const poolMetrics = await this.jsonToMetrics(`${this.lcdUrl}/staking/pool`, 'staking_pool');
+            poolMetrics.forEach((metric) => {
+                registry.registerMetric(metric);
+            });
 
-        registry.registerMetric(await this.getVotingPeriodCount());
+            registry.registerMetric(await this.getVotingPeriodCount());
+            customMetrics = registry.metrics();
+        } catch (e) {
+            console.error(e);
+        }
 
-        return registry.metrics() + '\n' + await this.loadExistMetrics();
+
+        return customMetrics + '\n' + await this.loadExistMetrics();
     }
 
     private async getAddressBalance(address: string): Promise<Gauge<string>> {
@@ -137,7 +144,10 @@ export default class Target extends TargetAbstract {
     private async loadExistMetrics(): Promise<string> {
         return axios.get(this.existMetricUrl).then(response => {
             return response.data;
-        }).catch(() => '');
+        }).catch((e) => {
+            console.error(e);
+            return ''
+        });
     }
 }
 
