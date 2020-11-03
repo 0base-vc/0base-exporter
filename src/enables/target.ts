@@ -29,7 +29,7 @@ export default class Target extends TargetAbstract {
                 registry.registerMetric(metric);
             });
 
-            registry.registerMetric(await this.getVotingPeriodCount());
+            registry.registerMetric(await this.getProposalsCount());
             customMetrics = registry.metrics();
         } catch (e) {
             console.error(e);
@@ -115,13 +115,14 @@ export default class Target extends TargetAbstract {
         });
     }
 
-    private async getVotingPeriodCount(): Promise<Gauge<string>> {
-        const url = `${this.lcdUrl}/gov/proposals?status=voting_period`;
+    private async getProposalsCount(): Promise<Gauge<string>> {
+        // aggr status's count
+        const url = `${this.lcdUrl}/gov/proposals`;
         return axios.get(url).then(response => {
             const count = response.data.result.length;
             const gauge = new Gauge({
-                name: `${this.metricPrefix}_gov_proposals_voting_period_count`,
-                help: 'Gov proposals voting period count'
+                name: `${this.metricPrefix}_gov_proposals_count`,
+                help: 'Gov proposals count'
             });
 
             gauge.set(count);
