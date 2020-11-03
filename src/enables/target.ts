@@ -59,7 +59,15 @@ export default class Target extends TargetAbstract {
             },
             {
                 url: `${this.lcdUrl}/distribution/validators/${this.validatorAddress}`,
-                selector: (json: any) => json.result.val_commission.reduce((s: number, i: any) => s + i.amount, 0)
+                selector: (json: any) => {
+                    const commissionTop = json.result.val_commission;
+                    if('commission' in commissionTop) {
+                        return commissionTop.commission.reduce((s: number, i: any) => s + i.amount, 0)
+                    } else {
+                        return commissionTop.reduce((s: number, i: any) => s + i.amount, 0)
+                    }
+
+                }
             },
         ];
 
