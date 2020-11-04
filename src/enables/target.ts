@@ -9,6 +9,7 @@ export default class Target extends TargetAbstract {
     private readonly address = process.env.METRIC_ADDRESS;
     private readonly validatorAddress = process.env.METRIC_VALIDATOR_ADDRESS;
 
+    private readonly cache = {};
     private readonly digit = 6;
     private readonly metricPrefix = 'tendermint';
 
@@ -19,6 +20,38 @@ export default class Target extends TargetAbstract {
         help: 'Total balance of address',
         labelNames: ['address']
     });
+
+
+    private readonly availableGauge = new Gauge({
+        name: `${this.metricPrefix}_address_available`,
+        help: 'Available balance of address',
+        labelNames: ['address']
+    });
+
+    private readonly delegatedGauge = new Gauge({
+        name: `${this.metricPrefix}_address_delegated`,
+        help: 'Delegated balance of address',
+        labelNames: ['address']
+    });
+
+    private readonly unbondingGauge = new Gauge({
+        name: `${this.metricPrefix}_address_unbonding`,
+        help: 'Unbonding balance of address',
+        labelNames: ['address']
+    });
+
+    private readonly rewardsGauge = new Gauge({
+        name: `${this.metricPrefix}_address_rewards`,
+        help: 'Rewards of address',
+        labelNames: ['address']
+    });
+
+    private readonly commissionGauge = new Gauge({
+        name: `${this.metricPrefix}_address_commission`,
+        help: 'Commission of address',
+        labelNames: ['address']
+    });
+
     private readonly rankGauge = new Gauge({
         name: `${this.metricPrefix}_validator_rank`,
         help: 'Rank of validators',
@@ -37,6 +70,12 @@ export default class Target extends TargetAbstract {
         super();
 
         this.registry.registerMetric(this.balanceGauge);
+        this.registry.registerMetric(this.availableGauge);
+        this.registry.registerMetric(this.delegatedGauge);
+        this.registry.registerMetric(this.unbondingGauge);
+        this.registry.registerMetric(this.rewardsGauge);
+        this.registry.registerMetric(this.commissionGauge);
+
         this.registry.registerMetric(this.rankGauge);
         this.registry.registerMetric(this.maxValidatorGauge);
         this.registry.registerMetric(this.proposalsGauge);
@@ -55,7 +94,7 @@ export default class Target extends TargetAbstract {
             customMetrics = this.registry.metrics();
 
         } catch (e) {
-            console.error(e);
+            console.error(e.message);
         }
 
 
@@ -63,6 +102,7 @@ export default class Target extends TargetAbstract {
     }
 
     private async updateAddressBalance(address: string): Promise<void> {
+
         const balances = [
             {
                 url: `${this.lcdUrl}/bank/balances/${address}`,
@@ -94,22 +134,34 @@ export default class Target extends TargetAbstract {
             },
         ];
 
-        const balance = (await Promise.all(
-                balances.map(i => this.getAmount(i.url, i.selector, this.digit)))
-        ).reduce((s, i) => s + i, 0);
+        const available = await this.getAmount(balances[0].url, balances[0].selector, this.digit);
+        this.availableGauge.labels(address).set(available);
 
-        this.balanceGauge.labels(address).set(balance);
+        const delegated = await this.getAmount(balances[1].url, balances[1].selector, this.digit);
+        this.delegatedGauge.labels(address).set(delegated);
+
+        const unbonding = await this.getAmount(balances[2].url, balances[2].selector, this.digit);
+        this.unbondingGauge.labels(address).set(unbonding);
+
+        const rewards = await this.getAmount(balances[3].url, balances[3].selector, this.digit);
+        this.rewardsGauge.labels(address).set(rewards);
+
+        const commission = await this.getAmount(balances[4].url, balances[4].selector, this.digit);
+        this.commissionGauge.labels(address).set(commission);
+
+        this.balanceGauge.labels(address).set(available + delegated + unbonding + rewards + commission);
     }
 
     private async getAmount(url: string, selector: (json: {}) => number, decimal: number): Promise<number> {
-        return axios.get(url).then(response => {
+        return this.get(url, response => {
             return selector(response.data) / Math.pow(10, decimal);
         });
     }
 
     private async updateRank(validator: string): Promise<void> {
         const url = `${this.lcdUrl}/staking/validators?status=bonded&page=1&limit=128`;
-        return axios.get(url).then(response => {
+
+        return this.get(url, response => {
             const sorted = _.sortBy(response.data.result, (o) => {
                 return parseInt(o.tokens);
             }).reverse();
@@ -124,7 +176,8 @@ export default class Target extends TargetAbstract {
 
     private async updateMaxValidator(): Promise<void> {
         const url = `${this.lcdUrl}/staking/parameters`;
-        return axios.get(url).then(response => {
+
+        return this.get(url, response => {
             const limit = response.data.result.max_validators;
             this.maxValidatorGauge.set(limit);
         });
@@ -133,7 +186,8 @@ export default class Target extends TargetAbstract {
     private async updateProposalsCount(): Promise<void> {
         // aggr status's count
         const url = `${this.lcdUrl}/gov/proposals`;
-        return axios.get(url).then(response => {
+
+        return this.get(url, response => {
             const count = response.data.result.length;
             this.proposalsGauge.set(count);
         });
@@ -159,11 +213,24 @@ export default class Target extends TargetAbstract {
     // }
 
     private async loadExistMetrics(): Promise<string> {
-        return axios.get(this.existMetricUrl).then(response => {
+        return this.get(this.existMetricUrl, response => {
             return response.data;
+        });
+    }
+
+    private async get(url: string, process: (response: { data: any }) => string | number | void) {
+        return axios.get(url).then(response => {
+            const result = process(response);
+            this.cache[url] = result;
+            return result;
         }).catch((e) => {
-            console.error(e);
-            return ''
+            console.error(e.message);
+
+            const result = this.cache[url];
+            if (result === undefined)
+                return '';
+            else
+                return result;
         });
     }
 }
