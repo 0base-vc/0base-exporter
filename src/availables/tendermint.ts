@@ -1,15 +1,9 @@
 import TargetAbstract from "../target.abstract";
-import axios from 'axios';
-import {Registry, Gauge} from 'prom-client';
+import {Gauge, Registry} from 'prom-client';
 import * as _ from 'lodash';
 
-export default class Target extends TargetAbstract {
-    private readonly existMetricUrl = process.env.METRIC_EXIST_URL;
-    private readonly lcdUrl = process.env.METRIC_LCD_URL;
-    private readonly address = process.env.METRIC_ADDRESS;
-    private readonly validatorAddress = process.env.METRIC_VALIDATOR_ADDRESS;
+export default class Tendermint extends TargetAbstract {
 
-    private readonly cache = {};
     private readonly digit = 6;
     private readonly metricPrefix = 'tendermint';
 
@@ -48,13 +42,13 @@ export default class Target extends TargetAbstract {
 
     private readonly commissionGauge = new Gauge({
         name: `${this.metricPrefix}_address_commission`,
-        help: 'Commission of address',
+        help: 'Commission balance of address',
         labelNames: ['address']
     });
 
     private readonly rankGauge = new Gauge({
         name: `${this.metricPrefix}_validator_rank`,
-        help: 'Rank of validators',
+        help: 'Your rank of validators',
         labelNames: ['validator']
     });
     private readonly maxValidatorGauge = new Gauge({
@@ -66,8 +60,11 @@ export default class Target extends TargetAbstract {
         help: 'Gov proposals count',
     });
 
-    public constructor() {
-        super();
+    public constructor(protected readonly existMetrics: string,
+                       protected readonly apiUrl: string,
+                       protected readonly address: string,
+                       protected readonly validator: string) {
+        super(existMetrics, apiUrl, address, validator);
 
         this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
@@ -86,7 +83,7 @@ export default class Target extends TargetAbstract {
         try {
             await Promise.all([
                 await this.updateAddressBalance(this.address),
-                await this.updateRank(this.validatorAddress),
+                await this.updateRank(this.validator),
                 await this.updateMaxValidator(),
                 await this.updateProposalsCount()
             ]);
@@ -94,7 +91,7 @@ export default class Target extends TargetAbstract {
             customMetrics = this.registry.metrics();
 
         } catch (e) {
-            console.error(e.message);
+            console.error('makeMetrics', e.message);
         }
 
 
@@ -105,23 +102,23 @@ export default class Target extends TargetAbstract {
 
         const balances = [
             {
-                url: `${this.lcdUrl}/bank/balances/${address}`,
+                url: `${this.apiUrl}/bank/balances/${address}`,
                 selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.amount, 0)
             },
             {
-                url: `${this.lcdUrl}/staking/delegators/${address}/delegations`,
+                url: `${this.apiUrl}/staking/delegators/${address}/delegations`,
                 selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.balance.amount, 0)
             },
             {
-                url: `${this.lcdUrl}/staking/delegators/${address}/unbonding_delegations`,
+                url: `${this.apiUrl}/staking/delegators/${address}/unbonding_delegations`,
                 selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.balance.amount, 0)
             },
             {
-                url: `${this.lcdUrl}/distribution/delegators/${address}/rewards`,
+                url: `${this.apiUrl}/distribution/delegators/${address}/rewards`,
                 selector: (json: any) => json.result.total.reduce((s: number, i: any) => s + i.amount, 0)
             },
             {
-                url: `${this.lcdUrl}/distribution/validators/${this.validatorAddress}`,
+                url: `${this.apiUrl}/distribution/validators/${this.validator}`,
                 selector: (json: any) => {
                     const commissionTop = json.result.val_commission;
                     if ('commission' in commissionTop) {
@@ -159,7 +156,7 @@ export default class Target extends TargetAbstract {
     }
 
     private async updateRank(validator: string): Promise<void> {
-        const url = `${this.lcdUrl}/staking/validators?status=bonded&page=1&limit=128`;
+        const url = `${this.apiUrl}/staking/validators?status=bonded&page=1&limit=128`;
 
         return this.get(url, response => {
             const sorted = _.sortBy(response.data.result, (o) => {
@@ -175,7 +172,7 @@ export default class Target extends TargetAbstract {
     }
 
     private async updateMaxValidator(): Promise<void> {
-        const url = `${this.lcdUrl}/staking/parameters`;
+        const url = `${this.apiUrl}/staking/parameters`;
 
         return this.get(url, response => {
             const limit = response.data.result.max_validators;
@@ -184,8 +181,7 @@ export default class Target extends TargetAbstract {
     }
 
     private async updateProposalsCount(): Promise<void> {
-        // aggr status's count
-        const url = `${this.lcdUrl}/gov/proposals`;
+        const url = `${this.apiUrl}/gov/proposals`;
 
         return this.get(url, response => {
             const count = response.data.result.length;
@@ -211,27 +207,5 @@ export default class Target extends TargetAbstract {
     //         });
     //     });
     // }
-
-    private async loadExistMetrics(): Promise<string> {
-        return this.get(this.existMetricUrl, response => {
-            return response.data;
-        });
-    }
-
-    private async get(url: string, process: (response: { data: any }) => string | number | void) {
-        return axios.get(url).then(response => {
-            const result = process(response);
-            this.cache[url] = result;
-            return result;
-        }).catch((e) => {
-            console.error(e.message);
-
-            const result = this.cache[url];
-            if (result === undefined)
-                return '';
-            else
-                return result;
-        });
-    }
 }
 

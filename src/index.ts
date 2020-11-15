@@ -9,6 +9,6 @@ process.on('unhandledRejection', error => {
 });
 
 const server = new Server();
-server.start().then((server) => {
-    if (server.listening) console.log(`Listen 27770`);
+server.start().then(({server, port}) => {
+    if (server.listening) console.log(`Listen ${port}`);
 });

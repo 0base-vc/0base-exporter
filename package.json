@@ -5,10 +5,10 @@
   "main": "src/index.ts",
   "scripts": {
     "test": "jest",
-    "start_local": "METRIC_EXIST_URL='http://localhost:26660' METRIC_LCD_URL='http://localhost:1317' METRIC_ADDRESS=akash1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4jxqcnl METRIC_VALIDATOR_ADDRESS=akashvaloper1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4cyw7r4 ./node_modules/.bin/nodemon --watch src -e ts --delay 2 src/index.ts",
+    "start_local": "PORT=27770 BLOCKCHAIN=./availables/solana.ts EXISTING_METRICS_URL='' API_URL='http://localhost:9899' ADDRESS=HEbMY624UhDGm1Qhy6neKSyi3bQjQ2RidSTyt7ARK8RW VALIDATOR=8VnzWXSkbx9SyvBwSf1FS8KJKJWbucafVUprxiZiE8hH ./node_modules/.bin/nodemon --watch src -e ts --delay 2 src/index.ts",
     "start": "./node_modules/.bin/ts-node src/index.ts"
   },
-  "author": "",
+  "author": "jjangg96@gmail.com",
   "license": "ISC",
   "devDependencies": {
     "@types/express": "^4.17.8",

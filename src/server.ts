@@ -1,22 +1,34 @@
 import * as express from 'express';
-import {Express} from "express";
+import {Express} from 'express';
 import * as http from "http";
 import * as morgan from 'morgan';
-import Loader from './loader';
+import TargetAbstract from "./target.abstract";
 
 export default class Server {
-    private app: Express = express();
+    private readonly app: Express = express();
     private server: http.Server = undefined;
 
     public async setup(): Promise<void> {
         this.app.use(morgan('combined'));
-        this.app.use('/metrics', await (new Loader()).loadApp());
+        this.app.use('/metrics', await this.getMetricLoader());
     }
 
-    public async start(): Promise<http.Server> {
+    private getMetricLoader(): Promise<express.RequestHandler> {
+        const Cls = require(process.env.BLOCKCHAIN).default;
+        const cls: TargetAbstract = new Cls(
+            process.env.EXISTING_METRICS_URL,
+            process.env.API_URL,
+            process.env.ADDRESS,
+            process.env.VALIDATOR);
+
+        return cls.metrics();
+    }
+
+    public async start(): Promise<{ server: http.Server, port: string }> {
         return this.setup().then(() => {
-            this.server = this.app.listen(27770);
-            return this.server;
+            const port = process.env.PORT;
+            this.server = this.app.listen(port);
+            return {server: this.server, port: port};
         });
     }
 
