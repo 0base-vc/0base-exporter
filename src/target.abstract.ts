@@ -2,7 +2,7 @@ import * as express from 'express';
 import axios from "axios";
 
 export default abstract class TargetAbstract {
-    abstract async makeMetrics(): Promise<string>;
+    abstract makeMetrics(): Promise<string>;
 
     protected constructor(protected readonly existMetrics: string,
                           protected readonly apiUrl: string,
