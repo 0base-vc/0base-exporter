@@ -14,7 +14,7 @@ export default class Server {
     }
 
     private getMetricLoader(): Promise<express.RequestHandler> {
-        const Cls = require(process.env.BLOCKCHAIN).default;
+        const Cls = require(process.env.BLOCKCHAIN || './availables/tendermint.ts').default;
         const cls: TargetAbstract = new Cls(
             process.env.EXISTING_METRICS_URL,
             process.env.API_URL,
@@ -26,7 +26,7 @@ export default class Server {
 
     public async start(): Promise<{ server: http.Server, port: string }> {
         return this.setup().then(() => {
-            const port = process.env.PORT;
+            const port = process.env.PORT || '27770';
             this.server = this.app.listen(port);
             return {server: this.server, port: port};
         });
