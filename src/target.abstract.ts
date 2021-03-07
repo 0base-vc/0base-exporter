@@ -30,7 +30,7 @@ export default abstract class TargetAbstract {
             this.cache[url] = result;
             return result;
         }).catch((e) => {
-            console.error('get', e.message);
+            console.error('get', e);
 
             const result = this.cache[url];
             if (result === undefined)
@@ -48,7 +48,7 @@ export default abstract class TargetAbstract {
             this.cache[key] = result;
             return result;
         }).catch((e) => {
-            console.error('post', e.message);
+            console.error('post', e);
 
             const result = this.cache[key];
             if (result === undefined)

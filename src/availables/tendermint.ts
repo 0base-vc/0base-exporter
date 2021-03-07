@@ -91,7 +91,7 @@ export default class Tendermint extends TargetAbstract {
             customMetrics = this.registry.metrics();
 
         } catch (e) {
-            console.error('makeMetrics', e.message);
+            console.error('makeMetrics', e);
         }
 
 
