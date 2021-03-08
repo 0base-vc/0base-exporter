@@ -156,7 +156,7 @@ export default class Tendermint extends TargetAbstract {
     }
 
     private async updateRank(validator: string): Promise<void> {
-        const url = `${this.apiUrl}/staking/validators?status=bonded&page=1&limit=128`;
+        const url = `${this.apiUrl}/staking/validators?status=BOND_STATUS_BONDED&page=1&limit=128`;
 
         return this.get(url, response => {
             const sorted = _.sortBy(response.data.result, (o) => {
