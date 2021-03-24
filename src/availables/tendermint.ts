@@ -5,57 +5,50 @@ import * as _ from 'lodash';
 export default class Tendermint extends TargetAbstract {
 
     private readonly digit = 6;
-    private readonly metricPrefix = 'tendermint';
+    protected readonly metricPrefix = 'tendermint';
 
-    private readonly registry = new Registry();
+    protected readonly registry = new Registry();
 
-    private readonly balanceGauge = new Gauge({
-        name: `${this.metricPrefix}_address_balance`,
-        help: 'Total balance of address',
-        labelNames: ['address']
-    });
-
-
-    private readonly availableGauge = new Gauge({
+    protected readonly availableGauge = new Gauge({
         name: `${this.metricPrefix}_address_available`,
         help: 'Available balance of address',
-        labelNames: ['address']
+        labelNames: ['address', 'denom']
     });
 
-    private readonly delegatedGauge = new Gauge({
+    protected readonly delegatedGauge = new Gauge({
         name: `${this.metricPrefix}_address_delegated`,
         help: 'Delegated balance of address',
-        labelNames: ['address']
+        labelNames: ['address', 'denom']
     });
 
-    private readonly unbondingGauge = new Gauge({
+    protected readonly unbondingGauge = new Gauge({
         name: `${this.metricPrefix}_address_unbonding`,
         help: 'Unbonding balance of address',
-        labelNames: ['address']
+        labelNames: ['address', 'denom']
     });
 
-    private readonly rewardsGauge = new Gauge({
+    protected readonly rewardsGauge = new Gauge({
         name: `${this.metricPrefix}_address_rewards`,
         help: 'Rewards of address',
-        labelNames: ['address']
+        labelNames: ['address', 'denom']
     });
 
-    private readonly commissionGauge = new Gauge({
+    protected readonly commissionGauge = new Gauge({
         name: `${this.metricPrefix}_address_commission`,
         help: 'Commission balance of address',
-        labelNames: ['address']
+        labelNames: ['address', 'denom']
     });
 
-    private readonly rankGauge = new Gauge({
+    protected readonly rankGauge = new Gauge({
         name: `${this.metricPrefix}_validator_rank`,
         help: 'Your rank of validators',
         labelNames: ['validator']
     });
-    private readonly maxValidatorGauge = new Gauge({
+    protected readonly maxValidatorGauge = new Gauge({
         name: `${this.metricPrefix}_staking_parameters_max_validator_count`,
         help: 'Limitation of validators count',
     });
-    private readonly proposalsGauge = new Gauge({
+    protected readonly proposalsGauge = new Gauge({
         name: `${this.metricPrefix}_gov_proposals_count`,
         help: 'Gov proposals count',
     });
@@ -66,7 +59,6 @@ export default class Tendermint extends TargetAbstract {
                        protected readonly validator: string) {
         super(existMetrics, apiUrl, address, validator);
 
-        this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
         this.registry.registerMetric(this.delegatedGauge);
         this.registry.registerMetric(this.unbondingGauge);
@@ -98,65 +90,76 @@ export default class Tendermint extends TargetAbstract {
         return customMetrics + '\n' + await this.loadExistMetrics();
     }
 
-    private async updateAddressBalance(address: string): Promise<void> {
+    protected async updateAddressBalance(address: string): Promise<void> {
 
         const balances = [
             {
                 url: `${this.apiUrl}/bank/balances/${address}`,
-                selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.amount, 0)
+                selector: (json: any) => json.result
             },
             {
                 url: `${this.apiUrl}/staking/delegators/${address}/delegations`,
-                selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.balance.amount, 0)
+                selector: (json: any) => json.result.length === 0 ? [] : [json.result[0].balance]
             },
             {
                 url: `${this.apiUrl}/staking/delegators/${address}/unbonding_delegations`,
-                selector: (json: any) => json.result.reduce((s: number, i: any) => s + i.balance.amount, 0)
+                selector: (json: any) => json.result.length === 0 ? [] : json.result[0].balance
             },
             {
                 url: `${this.apiUrl}/distribution/delegators/${address}/rewards`,
-                selector: (json: any) => json.result.total.reduce((s: number, i: any) => s + i.amount, 0)
+                selector: (json: any) => json.result.total.length === 0 ? [] : json.result.total
             },
             {
                 url: `${this.apiUrl}/distribution/validators/${this.validator}`,
                 selector: (json: any) => {
                     const commissionTop = json.result.val_commission;
                     if ('commission' in commissionTop) {
-                        return commissionTop.commission.reduce((s: number, i: any) => s + i.amount, 0)
+                        return commissionTop.length === 0 ? [] : commissionTop
                     } else {
-                        return commissionTop.reduce((s: number, i: any) => s + i.amount, 0)
+                        return commissionTop.length === 0 ? [] : commissionTop
                     }
 
                 }
             },
         ];
 
-        const available = await this.getAmount(balances[0].url, balances[0].selector, this.digit);
-        this.availableGauge.labels(address).set(available);
+        const availables = await this.getAmount(balances[0].url, balances[0].selector, this.digit);
+        availables.forEach((available) => {
+            this.availableGauge.labels(address, available.denom).set(available.amount);
+        });
 
-        const delegated = await this.getAmount(balances[1].url, balances[1].selector, this.digit);
-        this.delegatedGauge.labels(address).set(delegated);
+        const delegations = await this.getAmount(balances[1].url, balances[1].selector, this.digit);
+        delegations.forEach((delegation) => {
+            this.delegatedGauge.labels(address, delegation.denom).set(delegation.amount);
+        });
 
-        const unbonding = await this.getAmount(balances[2].url, balances[2].selector, this.digit);
-        this.unbondingGauge.labels(address).set(unbonding);
+        const unbondings = await this.getAmount(balances[2].url, balances[2].selector, this.digit);
+        unbondings.forEach((unbonding) => {
+            this.unbondingGauge.labels(address, unbonding.denom).set(unbonding.amount);
+        });
 
         const rewards = await this.getAmount(balances[3].url, balances[3].selector, this.digit);
-        this.rewardsGauge.labels(address).set(rewards);
+        rewards.forEach((reward) => {
+            this.rewardsGauge.labels(address, reward.denom).set(reward.amount);
+        });
 
-        const commission = await this.getAmount(balances[4].url, balances[4].selector, this.digit);
-        this.commissionGauge.labels(address).set(commission);
-
-        this.balanceGauge.labels(address).set(available + delegated + unbonding + rewards + commission);
-    }
-
-    private async getAmount(url: string, selector: (json: {}) => number, decimal: number): Promise<number> {
-        return this.get(url, response => {
-            return selector(response.data) / Math.pow(10, decimal);
+        const commissions = await this.getAmount(balances[4].url, balances[4].selector, this.digit);
+        commissions.forEach((commission) => {
+            this.commissionGauge.labels(address, commission.denom).set(commission.amount);
         });
     }
 
-    private async updateRank(validator: string): Promise<void> {
-        const url = `${this.apiUrl}/staking/validators?status=BOND_STATUS_BONDED&page=1&limit=128`;
+    private async getAmount(url: string, selector: (json: {}) => [{ denom: string, amount: number }], decimal: number): Promise<[{ denom: string, amount: number }]> {
+        return this.get(url, response => {
+            return selector(response.data).map(i => {
+                i.amount /= Math.pow(10, decimal)
+                return i;
+            });
+        });
+    }
+
+    protected async updateRank(validator: string): Promise<void> {
+        const url = `${this.apiUrl}/staking/validators?status=BOND_STATUS_BONDED&?status=BONDED&page=1&limit=128`;
 
         return this.get(url, response => {
             const sorted = _.sortBy(response.data.result, (o) => {
@@ -171,7 +174,7 @@ export default class Tendermint extends TargetAbstract {
         });
     }
 
-    private async updateMaxValidator(): Promise<void> {
+    protected async updateMaxValidator(): Promise<void> {
         const url = `${this.apiUrl}/staking/parameters`;
 
         return this.get(url, response => {

@@ -8,7 +8,7 @@ Extra metrics for Blockchain.
 ## Metrics
 
 ### Tendermint
-- **tendermint_address_balance** - Total balance of address
+- ~~**tendermint_address_balance** - Total balance of address~~
 - **tendermint_address_available** - Available balance of address
 - **tendermint_address_delegated** - Delegated balance of address
 - **tendermint_address_unbonding**  - Unbonding balance of address 
