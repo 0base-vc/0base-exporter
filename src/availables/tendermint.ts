@@ -107,14 +107,14 @@ export default class Tendermint extends TargetAbstract {
             },
             {
                 url: `${this.apiUrl}/distribution/delegators/${address}/rewards`,
-                selector: (json: any) => json.result.total.length === 0 ? [] : json.result.total
+                selector: (json: any) => json.result.total == null || json.result.total.length === 0 ? [] : json.result.total
             },
             {
                 url: `${this.apiUrl}/distribution/validators/${this.validator}`,
                 selector: (json: any) => {
                     const commissionTop = json.result.val_commission;
                     if ('commission' in commissionTop) {
-                        return commissionTop.length === 0 ? [] : commissionTop
+                        return commissionTop.commission == null || commissionTop.length === 0 ? [] : commissionTop
                     } else {
                         return commissionTop.length === 0 ? [] : commissionTop
                     }
