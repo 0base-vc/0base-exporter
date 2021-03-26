@@ -114,9 +114,9 @@ export default class Tendermint extends TargetAbstract {
                 selector: (json: any) => {
                     const commissionTop = json.result.val_commission;
                     if ('commission' in commissionTop) {
-                        return commissionTop.commission == null || commissionTop.length === 0 ? [] : commissionTop
+                        return commissionTop.commission == null || commissionTop.length === 0 ? [] : commissionTop.commission;
                     } else {
-                        return commissionTop.length === 0 ? [] : commissionTop
+                        return commissionTop.length === 0 ? [] : commissionTop;
                     }
 
                 }
