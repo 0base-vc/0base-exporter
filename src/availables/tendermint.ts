@@ -99,7 +99,14 @@ export default class Tendermint extends TargetAbstract {
             },
             {
                 url: `${this.apiUrl}/staking/delegators/${address}/delegations`,
-                selector: (json: any) => json.result.length === 0 ? [] : [json.result[0].balance]
+                selector: (json: any) => json.result.length === 0 ? [] : [json.result.reduce((s: any, i: any) => {
+                    s.amount = parseInt(s.amount) + parseInt(i.balance.amount);
+                    s.amount = s.amount.toString();
+                    return s;
+                }, {
+                    denom: json.result[0].balance.denom,
+                    amount: 0
+                })]
             },
             {
                 url: `${this.apiUrl}/staking/delegators/${address}/unbonding_delegations`,
