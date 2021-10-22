@@ -50,7 +50,7 @@ export default class Tendermint extends TargetAbstract {
     });
     protected readonly proposalsGauge = new Gauge({
         name: `${this.metricPrefix}_gov_proposals_count`,
-        help: 'Gov proposals count',
+        help: 'Gov voting period proposals count',
     });
 
     public constructor(protected readonly existMetrics: string,
@@ -201,7 +201,7 @@ export default class Tendermint extends TargetAbstract {
         const url = `${this.apiUrl}/gov/proposals`;
 
         return this.get(url, response => {
-            const count = response.data.result.length;
+            const count = response.data.result.filter((i: { status: number }) => i.status === 2).length;
             this.proposalsGauge.set(count);
         });
     }
