@@ -15,6 +15,7 @@ Extra metrics for Blockchain.
 - **tendermint_address_rewards** - Rewards of address
 - **tendermint_address_commission** - Commission balance of address
 - **tendermint_validator_rank** - Your rank of validators
+- **tendermint_validator_power_rivals** - Voting power of Rivals
 - **tendermint_staking_parameters_max_validator_count** - Limitation of validators count
 - **tendermint_gov_proposals_count** - Gov proposals count
 
