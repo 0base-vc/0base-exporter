@@ -44,6 +44,13 @@ export default class Tendermint extends TargetAbstract {
         help: 'Your rank of validators',
         labelNames: ['validator']
     });
+
+    protected readonly rivalsPowerGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_power_rivals`,
+        help: 'Voting power of Rivals',
+        labelNames: ['above', 'below']
+    });
+
     protected readonly maxValidatorGauge = new Gauge({
         name: `${this.metricPrefix}_staking_parameters_max_validator_count`,
         help: 'Limitation of validators count',
@@ -66,6 +73,7 @@ export default class Tendermint extends TargetAbstract {
         this.registry.registerMetric(this.commissionGauge);
 
         this.registry.registerMetric(this.rankGauge);
+        this.registry.registerMetric(this.rivalsPowerGauge);
         this.registry.registerMetric(this.maxValidatorGauge);
         this.registry.registerMetric(this.proposalsGauge);
     }
@@ -184,7 +192,12 @@ export default class Tendermint extends TargetAbstract {
                 return o.operator_address === validator;
             }) + 1;
 
+            const above = sorted[rank - 1] || 0;
+            const below = sorted[rank + 1] || 0;
+
             this.rankGauge.labels(validator).set(rank);
+            this.rivalsPowerGauge.labels('above').set(above);
+            this.rivalsPowerGauge.labels('below').set(below);
         });
     }
 
