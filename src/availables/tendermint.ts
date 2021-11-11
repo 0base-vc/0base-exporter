@@ -48,7 +48,7 @@ export default class Tendermint extends TargetAbstract {
     protected readonly rivalsPowerGauge = new Gauge({
         name: `${this.metricPrefix}_validator_power_rivals`,
         help: 'Voting power of Rivals',
-        labelNames: ['above', 'below']
+        labelNames: ['rank']
     });
 
     protected readonly maxValidatorGauge = new Gauge({
@@ -192,12 +192,12 @@ export default class Tendermint extends TargetAbstract {
                 return o.operator_address === validator;
             }) + 1;
 
-            const above = sorted[rank - 1] || 0;
-            const below = sorted[rank + 1] || 0;
+            const above = sorted[rank - 2] || {tokens: '0'};
+            const below = sorted[rank] || {tokens: '0'};
 
             this.rankGauge.labels(validator).set(rank);
-            this.rivalsPowerGauge.labels('above').set(above);
-            this.rivalsPowerGauge.labels('below').set(below);
+            this.rivalsPowerGauge.labels('above').set(parseInt(above.tokens) / 1e6);
+            this.rivalsPowerGauge.labels('below').set(parseInt(below.tokens) / 1e6);
         });
     }
 
