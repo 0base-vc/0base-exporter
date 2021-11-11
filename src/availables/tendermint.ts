@@ -192,7 +192,8 @@ export default class Tendermint extends TargetAbstract {
                 return o.operator_address === validator;
             }) + 1;
 
-            const above = sorted[rank - 2] || {tokens: '0'};
+            const me = sorted[rank - 1];
+            const above = sorted[rank - 2] || {tokens: me.tokens};
             const below = sorted[rank] || {tokens: '0'};
 
             this.rankGauge.labels(validator).set(rank);
