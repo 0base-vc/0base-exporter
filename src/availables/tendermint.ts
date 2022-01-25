@@ -212,10 +212,10 @@ export default class Tendermint extends TargetAbstract {
     }
 
     private async updateProposalsCount(): Promise<void> {
-        const url = `${this.apiUrl}/gov/proposals`;
+        const url = `${this.apiUrl}/gov/proposals?status=voting_period`;
 
         return this.get(url, response => {
-            const count = response.data.result.filter((i: { status: number }) => i.status === 2).length;
+            const count = response.data.result.length;
             this.proposalsGauge.set(count);
         });
     }
