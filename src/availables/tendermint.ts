@@ -4,7 +4,7 @@ import * as _ from 'lodash';
 
 export default class Tendermint extends TargetAbstract {
 
-    private readonly digit = 6;
+    private readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES) || 6;
     protected readonly metricPrefix = 'tendermint';
 
     protected readonly registry = new Registry();
@@ -145,27 +145,27 @@ export default class Tendermint extends TargetAbstract {
             },
         ];
 
-        const availables = await this.getAmount(balances[0].url, balances[0].selector, this.digit);
+        const availables = await this.getAmount(balances[0].url, balances[0].selector, this.decimalPlaces);
         availables.forEach((available) => {
             this.availableGauge.labels(address, available.denom).set(available.amount);
         });
 
-        const delegations = await this.getAmount(balances[1].url, balances[1].selector, this.digit);
+        const delegations = await this.getAmount(balances[1].url, balances[1].selector, this.decimalPlaces);
         delegations.forEach((delegation) => {
             this.delegatedGauge.labels(address, delegation.denom).set(delegation.amount);
         });
 
-        const unbondings = await this.getAmount(balances[2].url, balances[2].selector, this.digit);
+        const unbondings = await this.getAmount(balances[2].url, balances[2].selector, this.decimalPlaces);
         unbondings.forEach((unbonding) => {
             this.unbondingGauge.labels(address, unbonding.denom).set(unbonding.amount);
         });
 
-        const rewards = await this.getAmount(balances[3].url, balances[3].selector, this.digit);
+        const rewards = await this.getAmount(balances[3].url, balances[3].selector, this.decimalPlaces);
         rewards.forEach((reward) => {
             this.rewardsGauge.labels(address, reward.denom).set(reward.amount);
         });
 
-        const commissions = await this.getAmount(balances[4].url, balances[4].selector, this.digit);
+        const commissions = await this.getAmount(balances[4].url, balances[4].selector, this.decimalPlaces);
         commissions.forEach((commission) => {
             this.commissionGauge.labels(address, commission.denom).set(commission.amount);
         });
@@ -197,8 +197,8 @@ export default class Tendermint extends TargetAbstract {
             const below = sorted[rank] || {tokens: '0'};
 
             this.rankGauge.labels(validator).set(rank);
-            this.rivalsPowerGauge.labels('above').set(parseInt(above.tokens) / Math.pow(10, this.digit));
-            this.rivalsPowerGauge.labels('below').set(parseInt(below.tokens) / Math.pow(10, this.digit));
+            this.rivalsPowerGauge.labels('above').set(parseInt(above.tokens) / Math.pow(10, this.decimalPlaces));
+            this.rivalsPowerGauge.labels('below').set(parseInt(below.tokens) / Math.pow(10, this.decimalPlaces));
         });
     }
 
