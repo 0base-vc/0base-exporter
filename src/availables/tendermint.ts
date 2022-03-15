@@ -197,8 +197,8 @@ export default class Tendermint extends TargetAbstract {
             const below = sorted[rank] || {tokens: '0'};
 
             this.rankGauge.labels(validator).set(rank);
-            this.rivalsPowerGauge.labels('above').set(parseInt(above.tokens) / this.digit);
-            this.rivalsPowerGauge.labels('below').set(parseInt(below.tokens) / this.digit);
+            this.rivalsPowerGauge.labels('above').set(parseInt(above.tokens) / Math.pow(10, this.digit));
+            this.rivalsPowerGauge.labels('below').set(parseInt(below.tokens) / Math.pow(10, this.digit));
         });
     }
 
