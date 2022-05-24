@@ -14,6 +14,7 @@ export default class Server {
     }
 
     private getMetricLoader(): Promise<express.RequestHandler> {
+        console.log('Target', process.env.BLOCKCHAIN || './availables/tendermint.ts');
         const Cls = require(process.env.BLOCKCHAIN || './availables/tendermint.ts').default;
         const cls: TargetAbstract = new Cls(
             process.env.EXISTING_METRICS_URL,
