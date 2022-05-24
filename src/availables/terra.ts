@@ -23,7 +23,7 @@ export default class Terra extends Tendermint {
     }
 
     private async updateMissedOracle(validator: string): Promise<void> {
-        const url = `${this.apiUrl}/oracle/voters/${validator}/miss`;
+        const url = `${this.apiUrl}/terra/oracle/v1beta1/validators/${validator}/miss`;
 
         return this.get(url, response => {
             this.missedOracleGauge.set(parseInt(response.data.result));
@@ -31,7 +31,7 @@ export default class Terra extends Tendermint {
     }
 
     protected async updateRank(validator: string): Promise<void> {
-        const url = `${this.apiUrl}/staking/validators?status=BONDED&?status=BONDED&page=1&limit=128`;
+        const url = `${this.apiUrl}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=150`;
 
         return this.get(url, response => {
             const sorted = _.sortBy(response.data.result, (o) => {
