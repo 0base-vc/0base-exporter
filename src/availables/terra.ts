@@ -1,6 +1,6 @@
 import Tendermint from "./tendermint";
 import {Gauge} from "prom-client";
-import * as _ from "lodash";
+// import * as _ from "lodash";
 
 export default class Terra extends Tendermint {
     private readonly missedOracleGauge = new Gauge({
@@ -26,23 +26,23 @@ export default class Terra extends Tendermint {
         const url = `${this.apiUrl}/terra/oracle/v1beta1/validators/${validator}/miss`;
 
         return this.get(url, response => {
-            this.missedOracleGauge.set(parseInt(response.data.result));
+            this.missedOracleGauge.set(parseInt(response.data.miss_counter));
         });
     }
 
-    protected async updateRank(validator: string): Promise<void> {
-        const url = `${this.apiUrl}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=150`;
-
-        return this.get(url, response => {
-            const sorted = _.sortBy(response.data.result, (o) => {
-                return parseInt(o.tokens);
-            }).reverse();
-
-            const rank = _.findIndex(sorted, (o) => {
-                return o.operator_address === validator;
-            }) + 1;
-
-            this.rankGauge.labels(validator).set(rank);
-        });
-    }
+    // protected async updateRank(validator: string): Promise<void> {
+    //     const url = `${this.apiUrl}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=150`;
+    //
+    //     return this.get(url, response => {
+    //         const sorted = _.sortBy(response.data.validators, (o) => {
+    //             return parseInt(o.tokens);
+    //         }).reverse();
+    //
+    //         const rank = _.findIndex(sorted, (o) => {
+    //             return o.operator_address === validator;
+    //         }) + 1;
+    //
+    //         this.rankGauge.labels(validator).set(rank);
+    //     });
+    // }
 }
