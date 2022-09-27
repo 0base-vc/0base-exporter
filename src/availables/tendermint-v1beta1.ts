@@ -195,7 +195,7 @@ export default class Tendermint extends TargetAbstract {
     }
 
     protected async updateMaxValidator(): Promise<void> {
-        const url = `${this.apiUrl}/cosmos/staking/v1beta1/parameters`;
+        const url = `${this.apiUrl}/cosmos/staking/v1beta1/params`;
 
         return this.get(url, response => {
             const limit = response.data.params.max_validators;
@@ -204,7 +204,7 @@ export default class Tendermint extends TargetAbstract {
     }
 
     private async updateProposalsCount(): Promise<void> {
-        const url = `${this.apiUrl}/cosmos/gov/v1beta1/proposals?proposal_status=PROPOSAL_STATUS_VOTING_PERIOD`;
+        const url = `${this.apiUrl}/cosmos/gov/v1beta1/proposals?proposal_status=2`;
 
         return this.get(url, response => {
             const count = response.data.proposals.length;
