@@ -93,7 +93,7 @@ export default class Solana extends TargetAbstract {
                 // await this.updateMaxValidator(),
             ]);
 
-            customMetrics = this.registry.metrics();
+            customMetrics = await this.registry.metrics();
 
         } catch (e) {
             console.error('makeMetrics', e);
