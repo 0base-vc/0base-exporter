@@ -4,7 +4,7 @@ import * as _ from 'lodash';
 
 export default class Tendermint extends TargetAbstract {
 
-    private readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES) || 6;
+    protected readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES) || 6;
     protected readonly metricPrefix = 'tendermint';
 
     protected readonly registry = new Registry();
@@ -171,7 +171,7 @@ export default class Tendermint extends TargetAbstract {
         });
     }
 
-    private async getAmount(url: string, selector: (json: {}) => [{ denom: string, amount: number }], decimal: number): Promise<[{ denom: string, amount: number }]> {
+    protected async getAmount(url: string, selector: (json: {}) => [{ denom: string, amount: number }], decimal: number): Promise<[{ denom: string, amount: number }]> {
         return this.get(url, response => {
             return selector(response.data).map(i => {
                 i.amount /= Math.pow(10, decimal)
@@ -211,7 +211,7 @@ export default class Tendermint extends TargetAbstract {
         });
     }
 
-    private async updateProposalsCount(): Promise<void> {
+    protected async updateProposalsCount(): Promise<void> {
         const url = `${this.apiUrl}/gov/proposals?status=voting_period`;
 
         return this.get(url, response => {
