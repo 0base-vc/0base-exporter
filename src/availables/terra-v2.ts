@@ -3,6 +3,15 @@ import * as _ from "lodash";
 
 export default class Terra extends Tendermint {
 
+    protected async updateMaxValidator(): Promise<void> {
+        const url = `${this.apiUrl}/cosmos/staking/v1beta1/params`;
+
+        return this.get(url, response => {
+            const limit = response.data.params.max_validators;
+            this.maxValidatorGauge.set(limit);
+        });
+    }
+
     protected async updateAddressBalance(address: string): Promise<void> {
 
         const balances = [
