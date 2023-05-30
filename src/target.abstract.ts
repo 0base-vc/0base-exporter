@@ -61,7 +61,10 @@ export default abstract class TargetAbstract {
     protected async loadExistMetrics(): Promise<string> {
         if (this.existMetrics) {
             return this.get(this.existMetrics, response => {
-                return response.data;
+                let currentResponse = response.data;
+                currentResponse = currentResponse.replaceAll('cometbft', 'tendermint');
+                return currentResponse;
+
             });
         } else {
             return '';
