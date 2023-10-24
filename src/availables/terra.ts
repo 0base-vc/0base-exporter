@@ -1,4 +1,4 @@
-import Tendermint from "./tendermint";
+import Tendermint from "./tendermint-v1beta1";
 import {Gauge} from "prom-client";
 // import * as _ from "lodash";
 
