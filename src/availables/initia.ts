@@ -108,10 +108,10 @@ export default class Tendermint extends TargetAbstract {
             {
                 url: `${this.apiUrl}/initia/mstaking/v1/delegations/${address}`,
                 selector: (json: any) => json.delegation_responses.length === 0 ? [] : [json.delegation_responses.reduce((s: any, i: any) => {
-                    s.amount = s.amount + parseInt(i.balance.amount);
+                    s.amount = s.amount + parseInt(i.balance[0].amount);
                     return s;
                 }, {
-                    denom: json.delegation_responses[0].balance.denom,
+                    denom: json.delegation_responses[0].balance[0].denom,
                     amount: 0
                 })]
             },
@@ -119,7 +119,7 @@ export default class Tendermint extends TargetAbstract {
                 url: `${this.apiUrl}/initia/mstaking/v1/delegators/${address}/unbonding_delegations`,
                 selector: (json: any) => json.unbonding_responses.length === 0 ? [] : [json.unbonding_responses.reduce((s: any, i: any) => {
                     s.amount = s.amount + i.entries.reduce((s: any, j: any) => {
-                        s = s + parseInt(j.balance);
+                        s = s + parseInt(j.balance[0]);
                         return s;
                     }, 0);
                     return s;
@@ -129,7 +129,7 @@ export default class Tendermint extends TargetAbstract {
             },
             {
                 url: `${this.apiUrl}/cosmos/distribution/v1beta1/delegators/${address}/rewards`,
-                selector: (json: any) => json.rewards.total == null || json.rewards.total.length === 0 ? [] : json.rewards.total
+                selector: (json: any) => (json.total == null || json.total.length === 0) ? [] : json.total
             },
             {
                 url: `${this.apiUrl}/cosmos/distribution/v1beta1/validators/${this.validator}/commission`,
@@ -163,7 +163,10 @@ export default class Tendermint extends TargetAbstract {
         });
     }
 
-    private async getAmount(url: string, selector: (json: {}) => [{ denom: string, amount: number }], decimal: number): Promise<[{ denom: string, amount: number }]> {
+    private async getAmount(url: string, selector: (json: {}) => [{
+        denom: string,
+        amount: number
+    }], decimal: number): Promise<[{ denom: string, amount: number }]> {
         return this.get(url, response => {
             return selector(response.data).map(i => {
                 i.amount /= Math.pow(10, decimal)
@@ -176,8 +179,12 @@ export default class Tendermint extends TargetAbstract {
         const url = `${this.apiUrl}/initia/mstaking/v1/validators?status=BOND_STATUS_BONDED&pagination.limit=256`;
 
         return this.get(url, response => {
-            const sorted = _.sortBy(response.data.validators, (o) => {
-                return parseInt(o.tokens);
+            const validators = response.data.validators.map((o: any) => {
+                o.tokens = parseInt(o.tokens.filter((s:any) => s.denom === 'uinit')[0].amount);
+                return o;
+            });
+            const sorted = _.sortBy(validators, (o) => {
+                return o.tokens;
             }).reverse();
 
             const rank = _.findIndex(sorted, (o) => {
