@@ -45,10 +45,6 @@ export default class Terra extends Tendermint {
                     url: `${this.apiUrl}/cosmos/distribution/v1beta1/delegators/${address}/rewards`,
                     selector: (json: any) => json.rewards.total == null || json.rewards.total.length === 0 ? [] : json.rewards.total
                 },
-                {
-                    url: `${this.apiUrl}/cosmos/distribution/v1beta1/validators/${this.validator}/commission`,
-                    selector: (json: any) => json.commission.commission == null || json.commission.commission.length === 0 ? [] : json.commission.commission
-                },
             ];
 
             const availables = await this.getAmount(balances[0].url, balances[0].selector, this.decimalPlaces);
@@ -70,12 +66,15 @@ export default class Terra extends Tendermint {
             rewards.forEach((reward) => {
                 this.rewardsGauge.labels(address, reward.denom).set(reward.amount);
             });
-
-            const commissions = await this.getAmount(balances[4].url, balances[4].selector, this.decimalPlaces);
-            commissions.forEach((commission) => {
-                this.commissionGauge.labels(address, commission.denom).set(commission.amount);
-            });
         }
+
+        const commissions = await this.getAmount(
+            `${this.apiUrl}/cosmos/distribution/v1beta1/validators/${this.validator}/commission`,
+            (json: any) => json.commission.commission == null || json.commission.commission.length === 0 ? [] : json.commission.commission,
+            this.decimalPlaces);
+        commissions.forEach((commission) => {
+            this.commissionGauge.labels(this.validator, commission.denom).set(commission.amount);
+        });
     }
 
     protected async updateProposalsCount(): Promise<void> {

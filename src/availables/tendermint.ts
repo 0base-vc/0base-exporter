@@ -131,18 +131,6 @@ export default class Tendermint extends TargetAbstract {
                     url: `${this.apiUrl}/distribution/delegators/${address}/rewards`,
                     selector: (json: any) => json.result.total == null || json.result.total.length === 0 ? [] : json.result.total
                 },
-                {
-                    url: `${this.apiUrl}/distribution/validators/${this.validator}`,
-                    selector: (json: any) => {
-                        const commissionTop = json.result.val_commission;
-                        if ('commission' in commissionTop) {
-                            return commissionTop.commission == null || commissionTop.length === 0 ? [] : commissionTop.commission;
-                        } else {
-                            return commissionTop.length === 0 ? [] : commissionTop;
-                        }
-
-                    }
-                },
             ];
 
             const availables = await this.getAmount(balances[0].url, balances[0].selector, this.decimalPlaces);
@@ -164,12 +152,22 @@ export default class Tendermint extends TargetAbstract {
             rewards.forEach((reward) => {
                 this.rewardsGauge.labels(address, reward.denom).set(reward.amount);
             });
-
-            const commissions = await this.getAmount(balances[4].url, balances[4].selector, this.decimalPlaces);
-            commissions.forEach((commission) => {
-                this.commissionGauge.labels(address, commission.denom).set(commission.amount);
-            });
         }
+
+        const commissions = await this.getAmount(
+            `${this.apiUrl}/distribution/validators/${this.validator}`,
+            (json: any) => {
+                const commissionTop = json.result.val_commission;
+                if ('commission' in commissionTop) {
+                    return commissionTop.commission == null || commissionTop.length === 0 ? [] : commissionTop.commission;
+                } else {
+                    return commissionTop.length === 0 ? [] : commissionTop;
+                }
+            },
+            this.decimalPlaces);
+        commissions.forEach((commission) => {
+            this.commissionGauge.labels(this.validator, commission.denom).set(commission.amount);
+        });
     }
 
     protected async getAmount(url: string, selector: (json: {}) => [{ denom: string, amount: number }], decimal: number): Promise<[{ denom: string, amount: number }]> {
