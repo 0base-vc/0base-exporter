@@ -10,9 +10,9 @@ export default class Terra extends Tendermint {
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
-                       protected readonly address: string,
+                       protected readonly addresses: string,
                        protected readonly validator: string) {
-        super(existMetrics, apiUrl, address, validator);
+        super(existMetrics, apiUrl, addresses, validator);
 
         this.registry.registerMetric(this.missedOracleGauge);
     }

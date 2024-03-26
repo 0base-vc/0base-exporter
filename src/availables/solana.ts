@@ -65,9 +65,9 @@ export default class Solana extends TargetAbstract {
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
-                       protected readonly address: string,
+                       protected readonly addresses: string,
                        protected readonly validator: string) {
-        super(existMetrics, apiUrl, address, validator);
+        super(existMetrics, apiUrl, addresses, validator);
 
         this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
@@ -87,7 +87,7 @@ export default class Solana extends TargetAbstract {
         let customMetrics = '';
         try {
             await Promise.all([
-                await this.updateBalance(this.address),
+                await this.updateBalance(this.addresses),
                 await this.updateVoteAccounts(this.validator),
                 // await this.updateRank(this.validator),
                 // await this.updateMaxValidator(),
@@ -103,14 +103,16 @@ export default class Solana extends TargetAbstract {
         return customMetrics + '\n' + await this.loadExistMetrics();
     }
 
-    private async updateBalance(address: string): Promise<void> {
-        const available = await this.getAmount(this.apiUrl, {
-            method: 'getBalance',
-            params: [address]
-        }, (json: any) => json.result.value);
-        this.availableGauge.labels(address).set(available);
+    private async updateBalance(addresses: string): Promise<void> {
+        for(const address of addresses.split(',')) {
+            const available = await this.getAmount(this.apiUrl, {
+                method: 'getBalance',
+                params: [address]
+            }, (json: any) => json.result.value);
+            this.availableGauge.labels(address).set(available);
 
-        this.balanceGauge.labels(address).set(available);
+            this.balanceGauge.labels(address).set(available);
+        }
     }
 
     private async updateVoteAccounts(validator: string): Promise<void> {
