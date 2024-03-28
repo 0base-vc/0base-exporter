@@ -99,7 +99,7 @@ export default class Tendermint extends TargetAbstract {
     }
 
     protected async updateAddressBalance(addresses: string): Promise<void> {
-        for (const address of addresses.split(',')) {
+        for (const address of addresses.split(',').filter((address) => !address.startsWith('0x'))) {
             const balances = [
                 {
                     url: `${this.apiUrl}/cosmos/bank/v1beta1/balances/${address}`,
