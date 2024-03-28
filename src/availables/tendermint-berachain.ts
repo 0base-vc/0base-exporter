@@ -38,8 +38,8 @@ export default class TendermintBerachain extends Tendermint {
             const balances = [
                 {
                     url: `http://localhost:8545`,
-                    selector: (json: any): { result: number } => {
-                        json.result = this.hexToDecimal(json.result);
+                    selector: (json: any): { amount: number } => {
+                        json.amount = this.hexToDecimal(json.result);
                         return json;
                     }
                 }
@@ -54,7 +54,7 @@ export default class TendermintBerachain extends Tendermint {
         return parseInt(hex, 16);
     }
 
-    protected async getEVMAmount(url: string, address: string, selector: (json: {}) => { result: number }): Promise<{
+    protected async getEVMAmount(url: string, address: string, selector: (json: {}) => { amount: number }): Promise<{
         amount: number
     }> {
         return this.post(url, {
@@ -62,7 +62,7 @@ export default class TendermintBerachain extends Tendermint {
             params: [address, 'latest']
         }, response => {
             const result = selector(response.data);
-            result.result /= Math.pow(10, 18);
+            result.amount /= Math.pow(10, 18);
             return result;
         });
     }
