@@ -58,7 +58,7 @@ export default class BerachainV2 extends TendermintBerachain {
             this.availableGauge.labels(address, 'Honey').set(honey.amount);
 
             const wbera = await this.getERC20Amount('0x7507c1dc16935B82698e4C63f2746A2fCf994dF8', address);
-            this.availableGauge.labels(address, 'Honey').set(wbera.amount);
+            this.availableGauge.labels(address, 'WBERA').set(wbera.amount);
 
             const boostees = await this.getBoostees(address);
             this.boostedGauge.labels(address, 'BGT').set(boostees.amount);
