@@ -4,7 +4,7 @@ import * as _ from 'lodash';
 
 export default class Tendermint extends TargetAbstract {
 
-    private readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES) || 6;
+    protected readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES) || 6;
     protected readonly metricPrefix = 'tendermint';
 
     protected readonly registry = new Registry();

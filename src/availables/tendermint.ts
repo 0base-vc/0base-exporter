@@ -55,6 +55,7 @@ export default class Tendermint extends TargetAbstract {
         name: `${this.metricPrefix}_staking_parameters_max_validator_count`,
         help: 'Limitation of validators count',
     });
+
     protected readonly proposalsGauge = new Gauge({
         name: `${this.metricPrefix}_gov_proposals_count`,
         help: 'Gov voting period proposals count',

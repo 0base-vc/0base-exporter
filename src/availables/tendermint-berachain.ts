@@ -50,7 +50,7 @@ export default class TendermintBerachain extends Tendermint {
         }
     }
 
-    private hexToDecimal(hex: string): number {
+    protected hexToDecimal(hex: string): number {
         return parseInt(hex, 16);
     }
 
@@ -62,7 +62,7 @@ export default class TendermintBerachain extends Tendermint {
             params: [address, 'latest']
         }, response => {
             const result = selector(response.data);
-            result.amount /= Math.pow(10, 18);
+            result.amount /= Math.pow(10, this.decimalPlaces);
             return result;
         });
     }
