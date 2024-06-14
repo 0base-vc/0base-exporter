@@ -8,7 +8,7 @@
     "start_local": "PORT=27770 BLOCKCHAIN=./availables/terra.ts EXISTING_METRICS_URL='' API_URL='http://localhost:1317' ADDRESS=terra12079m57cew2v02zs624zvyed5479an9wxcrveh VALIDATOR=terravaloper12079m57cew2v02zs624zvyed5479an9wxh03fy ./node_modules/.bin/nodemon --watch src -e ts --delay 2 src/index.ts",
     "start": "./node_modules/.bin/ts-node src/index.ts",
     "build": "./node_modules/.bin/tsc --build",
-    "postbuild": "copyfiles -u 1 src/abi/**/*.json dist"
+    "postbuild": "copyfiles -u 1 src/**/*.json src/abi/**/*.json dist"
   },
   "author": "jjangg96@gmail.com",
   "license": "ISC",
