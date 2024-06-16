@@ -1,6 +1,7 @@
 import TendermintBerachain from "../tendermint-berachain";
 import {Web3} from "web3";
 import {Gauge} from "prom-client";
+import axios from "axios";
 
 export default class BerachainV2 extends TendermintBerachain {
     public readonly web3: Web3;
@@ -8,6 +9,12 @@ export default class BerachainV2 extends TendermintBerachain {
         name: `${this.metricPrefix}_validator_boosted`,
         help: 'Boosted balance of validator',
         labelNames: ['validator', 'denom']
+    });
+
+    protected readonly swapPriceGauge = new Gauge({
+        name: `${this.metricPrefix}_swap_price`,
+        help: 'Swap price',
+        labelNames: ['from', 'to']
     });
 
     public constructor(protected readonly existMetrics: string,
@@ -18,6 +25,7 @@ export default class BerachainV2 extends TendermintBerachain {
 
         this.web3 = new Web3(process.env.EVM_API_URL);
         this.registry.registerMetric(this.boostedGauge);
+        this.registry.registerMetric(this.swapPriceGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -27,6 +35,7 @@ export default class BerachainV2 extends TendermintBerachain {
         try {
             await Promise.all([
                 await this.updateEvmAddressBalance(this.addresses),
+                await this.getBeraToHoneyPrice(),
             ]);
             customMetrics = await this.registry.metrics();
         } catch (e) {
@@ -139,6 +148,23 @@ export default class BerachainV2 extends TendermintBerachain {
                 amount: 0
             };
         }
+    }
+
+    public async getBeraToHoneyPrice(): Promise<void> {
+        return await axios.post('https://api.goldsky.com/api/public/project_clq1h5ct0g4a201x18tfte5iv/subgraphs/bex-subgraph/v1/gn', {
+            "operationName": "GetTokenHoneyPrice",
+            "variables": {
+                "id": "0x7507c1dc16935b82698e4c63f2746a2fcf994df8"
+            },
+            "query": "query GetTokenHoneyPrice($id: String) {\n  tokenHoneyPrice(id: $id) {\n    id\n    price\n    __typename\n  }\n}"
+        }, {
+            headers: {
+                "content-type": "application/json",
+                "Referer": "https://bartio.bex.berachain.com/",
+            }
+        }).then(response => {
+            this.availableGauge.labels('bera', 'honey').set(response.data.data.tokenHoneyPrice.price);
+        });
     }
 
 
