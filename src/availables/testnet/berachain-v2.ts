@@ -163,7 +163,7 @@ export default class BerachainV2 extends TendermintBerachain {
                 "Referer": "https://bartio.bex.berachain.com/",
             }
         }).then(response => {
-            this.availableGauge.labels('bera', 'honey').set(parseFloat(response.data.data.tokenHoneyPrice.price));
+            this.swapPriceGauge.labels('bera', 'honey').set(Number(response.data.data.tokenHoneyPrice.price));
         });
     }
 
