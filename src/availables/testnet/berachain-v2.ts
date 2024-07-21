@@ -63,19 +63,19 @@ export default class BerachainV2 extends TendermintBerachain {
             const bgt = await this.getBGTAmount(address);
             this.availableGauge.labels(address, 'BGT').set(bgt.amount);
 
-            const honey = await this.getERC20Amount('0x0E4aaF1351de4c0264C5c7056Ef3777b41BD8e03', address);
+            const honey = await this.getERC20Amount('0x0E4aaF1351de4c0264C5c7056Ef3777b41BD8e03', address, this.decimalPlaces);
             this.availableGauge.labels(address, 'Honey').set(honey.amount);
 
-            const wbera = await this.getERC20Amount('0x7507c1dc16935B82698e4C63f2746A2fCf994dF8', address);
+            const wbera = await this.getERC20Amount('0x7507c1dc16935B82698e4C63f2746A2fCf994dF8', address, 8);
             this.availableGauge.labels(address, 'WBERA').set(wbera.amount);
 
-            const wbtc = await this.getERC20Amount('0x286F1C3f0323dB9c91D1E8f45c8DF2d065AB5fae', address);
+            const wbtc = await this.getERC20Amount('0x286F1C3f0323dB9c91D1E8f45c8DF2d065AB5fae', address, 8);
             this.availableGauge.labels(address, 'WBTC').set(wbtc.amount);
 
-            const weth = await this.getERC20Amount('0x6E1E9896e93F7A71ECB33d4386b49DeeD67a231A', address);
+            const weth = await this.getERC20Amount('0x6E1E9896e93F7A71ECB33d4386b49DeeD67a231A', address, 8);
             this.availableGauge.labels(address, 'WETH').set(weth.amount);
 
-            const usdc = await this.getERC20Amount('0xd6D83aF58a19Cd14eF3CF6fe848C9A4d21e5727c', address);
+            const usdc = await this.getERC20Amount('0xd6D83aF58a19Cd14eF3CF6fe848C9A4d21e5727c', address, 0);
             this.availableGauge.labels(address, 'USDC').set(usdc.amount);
 
             const boostees = await this.getBoostees(address);
@@ -103,7 +103,7 @@ export default class BerachainV2 extends TendermintBerachain {
     }
 
 
-    protected async getERC20Amount(contract: string, address: string): Promise<{
+    protected async getERC20Amount(contract: string, address: string, decimalPlaces: number): Promise<{
         amount: number
     }> {
         const abi = require(`../../abi/erc20.json`);
@@ -112,7 +112,7 @@ export default class BerachainV2 extends TendermintBerachain {
             const amount: bigint = await ERC20Contract.methods.balanceOf(address).call();
             console.log(address, amount);
             return {
-                amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
+                amount: parseInt(amount.toString()) / Math.pow(10, decimalPlaces)
             };
         } catch (e) {
             console.error(e);
