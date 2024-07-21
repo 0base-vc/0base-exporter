@@ -110,6 +110,7 @@ export default class BerachainV2 extends TendermintBerachain {
         const ERC20Contract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await ERC20Contract.methods.balanceOf(address).call();
+            console.log(address, amount);
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
             };
