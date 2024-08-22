@@ -40,17 +40,17 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator']
     });
 
-    private readonly rankGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_rank`,
-        help: 'Your validator rank',
-        labelNames: ['validator']
-    });
+    // private readonly rankGauge = new Gauge({
+    //     name: `${this.metricPrefix}_validator_rank`,
+    //     help: 'Your validator rank',
+    //     labelNames: ['validator']
+    // });
 
-    private readonly rootSlotGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_root_slot`,
-        help: 'Your validator root slot',
-        labelNames: ['validator']
-    });
+    // private readonly rootSlotGauge = new Gauge({
+    //     name: `${this.metricPrefix}_validator_root_slot`,
+    //     help: 'Your validator root slot',
+    //     labelNames: ['validator']
+    // });
 
     private readonly lastVoteGauge = new Gauge({
         name: `${this.metricPrefix}_validator_last_vote`,
@@ -58,10 +58,10 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator']
     });
 
-    private readonly validatorsCount = new Gauge({
-        name: `${this.metricPrefix}_validators_count`,
-        help: 'Validators count',
-    });
+    // private readonly validatorsCount = new Gauge({
+    //     name: `${this.metricPrefix}_validators_count`,
+    //     help: 'Validators count',
+    // });
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
@@ -75,12 +75,12 @@ export default class Solana extends TargetAbstract {
 
         this.registry.registerMetric(this.activeGauge);
         this.registry.registerMetric(this.commissionGauge);
-        this.registry.registerMetric(this.rankGauge);
+        // this.registry.registerMetric(this.rankGauge);
 
-        this.registry.registerMetric(this.rootSlotGauge);
+        // this.registry.registerMetric(this.rootSlotGauge);
         this.registry.registerMetric(this.lastVoteGauge);
 
-        this.registry.registerMetric(this.validatorsCount);
+        // this.registry.registerMetric(this.validatorsCount);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -130,19 +130,19 @@ export default class Solana extends TargetAbstract {
             const myValidator = _.find(sorted, (o) => {
                 return o.votePubkey === validator;
             });
-            const rank = _.findIndex(sorted, (o) => {
-                return o.votePubkey === validator;
-            }) + 1;
+            // const rank = _.findIndex(sorted, (o) => {
+            //     return o.votePubkey === validator;
+            // }) + 1;
 
-            const max = sorted.length;
+            // const max = sorted.length;
 
 
             this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / Math.pow(10, this.digit));
             this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
             this.commissionGauge.labels(validator).set(myValidator.commission);
-            this.rankGauge.labels(validator).set(rank);
-            this.validatorsCount.set(max);
-            this.rootSlotGauge.labels(validator).set(myValidator.rootSlot);
+            // this.rankGauge.labels(validator).set(rank);
+            // this.validatorsCount.set(max);
+            // this.rootSlotGauge.labels(validator).set(myValidator.rootSlot);
             this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
         });
     }
