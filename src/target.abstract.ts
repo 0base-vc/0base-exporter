@@ -41,8 +41,11 @@ export default abstract class TargetAbstract {
     }
 
 
-    protected async post(url: string, data: { method: string, params?: string[] }, process: (response: { data: any }) => any) {
-        const key = data.method;
+    protected async post(url: string, data: { method: string, params?: string[] }, process: (response: {
+        data: any
+    }) => any) {
+        const key = JSON.stringify(data);
+        //const key = data.method + data.params && data.params.length >= 0 ? data.params.join(',') : '';
         return axios.post(url, {jsonrpc: '2.0', id: 1, method: data.method, params: data.params}).then(response => {
             const result = process(response);
             this.cache[key] = result;
