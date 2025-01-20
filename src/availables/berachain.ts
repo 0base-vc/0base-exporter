@@ -1,7 +1,6 @@
 import TendermintBerachain from "./tendermint-berachain";
 import {Web3} from "web3";
 import {Gauge} from "prom-client";
-import axios from "axios";
 
 export default class Berachain extends TendermintBerachain {
     public readonly web3: Web3;
@@ -34,7 +33,6 @@ export default class Berachain extends TendermintBerachain {
         try {
             await Promise.all([
                 await this.updateEvmAddressBalance(this.addresses),
-                await this.getBeraToHoneyPrice(),
             ]);
             customMetrics = await this.registry.metrics();
         } catch (e) {
