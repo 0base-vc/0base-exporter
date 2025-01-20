@@ -1,4 +1,4 @@
-import TendermintBerachain from "../tendermint-berachain";
+import TendermintBerachain from "tendermint-berachain";
 import {Web3} from "web3";
 import {Gauge} from "prom-client";
 import axios from "axios";
