@@ -1,8 +1,8 @@
-import TendermintBerachain from "./tendermint-berachain";
 import {Web3} from "web3";
 import {Gauge} from "prom-client";
+import Tendermint from "./tendermint-v1";
 
-export default class Berachain extends TendermintBerachain {
+export default class Berachain extends Tendermint {
     public readonly web3: Web3;
 
     protected readonly BGTContractAddress = '0x656b95E550C07a9ffe548bd4085c72418Ceb1dba';
