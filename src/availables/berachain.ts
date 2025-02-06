@@ -27,7 +27,7 @@ export default class Berachain extends Tendermint {
     }
 
     public async makeMetrics(): Promise<string> {
-        await super.makeMetrics();
+        // await super.makeMetrics();
 
         let customMetrics = '';
         try {
