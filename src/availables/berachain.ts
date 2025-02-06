@@ -107,7 +107,7 @@ export default class Berachain extends Tendermint {
         const abi = require(`../abi/berachain/${contract}.json`);
         const BGTContract = new this.web3.eth.Contract(abi, contract);
         try {
-            const amount: bigint = await BGTContract.methods.unboostedBalanceOf(address).call();
+            const amount: bigint = await BGTContract.methods.balanceOf(address).call();
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
             };
