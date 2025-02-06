@@ -84,7 +84,7 @@ export default class Berachain extends Tendermint {
     protected async getERC20Amount(contract: string, address: string, decimalPlaces: number): Promise<{
         amount: number
     }> {
-        const abi = require(`../../abi/erc20.json`);
+        const abi = require(`../abi/erc20.json`);
         const ERC20Contract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await ERC20Contract.methods.balanceOf(address).call();
@@ -104,7 +104,7 @@ export default class Berachain extends Tendermint {
         amount: number
     }> {
         const contract = this.BGTContractAddress;
-        const abi = require(`../../abi/berachain/${contract}.json`);
+        const abi = require(`../abi/berachain/${contract}.json`);
         const BGTContract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await BGTContract.methods.unboostedBalanceOf(address).call();
@@ -123,7 +123,7 @@ export default class Berachain extends Tendermint {
         amount: number
     }> {
         const contract = this.BGTContractAddress;
-        const abi = require(`../../abi/berachain/${contract}.json`);
+        const abi = require(`../abi/berachain/${contract}.json`);
         const BGTContract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await BGTContract.methods.boostees(address).call();
