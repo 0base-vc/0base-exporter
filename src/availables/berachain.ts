@@ -5,8 +5,8 @@ import {Gauge} from "prom-client";
 export default class Berachain extends TendermintBerachain {
     public readonly web3: Web3;
 
-    protected readonly BGTContractAddress = '0xbDa130737BDd9618301681329bF2e46A016ff9Ad';
-    protected readonly HoneyContractAddress = '0x0E4aaF1351de4c0264C5c7056Ef3777b41BD8e03';
+    protected readonly BGTContractAddress = '0x656b95E550C07a9ffe548bd4085c72418Ceb1dba';
+    protected readonly HoneyContractAddress = '0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce';
 
 
     protected readonly boostedGauge = new Gauge({
@@ -104,7 +104,7 @@ export default class Berachain extends TendermintBerachain {
         amount: number
     }> {
         const contract = this.BGTContractAddress;
-        const abi = require(`../../abi/berachain-v2/${contract}.json`);
+        const abi = require(`../../abi/berachain/${contract}.json`);
         const BGTContract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await BGTContract.methods.unboostedBalanceOf(address).call();
@@ -123,7 +123,7 @@ export default class Berachain extends TendermintBerachain {
         amount: number
     }> {
         const contract = this.BGTContractAddress;
-        const abi = require(`../../abi/berachain-v2/${contract}.json`);
+        const abi = require(`../../abi/berachain/${contract}.json`);
         const BGTContract = new this.web3.eth.Contract(abi, contract);
         try {
             const amount: bigint = await BGTContract.methods.boostees(address).call();
