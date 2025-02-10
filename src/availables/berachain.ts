@@ -47,17 +47,20 @@ export default class Berachain extends Tendermint {
         const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
         for (const address of evmAddresses) {
 
-            const available = await this.getEVMAmount(address);
-            this.availableGauge.labels(address, 'BERA').set(available.amount);
+            if(address.length > 50) {
+                //pubkey
+                const boostees = await this.getBoostees(address);
+                this.boostedGauge.labels(address, 'BGT').set(boostees.amount);
+            } else {
+                const bera = await this.getEVMAmount(address);
+                this.availableGauge.labels(address, 'BERA').set(bera.amount);
 
-            const bgt = await this.getBGTAmount(address);
-            this.availableGauge.labels(address, 'BGT').set(bgt.amount);
+                const bgt = await this.getBGTAmount(address);
+                this.availableGauge.labels(address, 'BGT').set(bgt.amount);
 
-            const honey = await this.getERC20Amount(this.HoneyContractAddress, address, this.decimalPlaces);
-            this.availableGauge.labels(address, 'Honey').set(honey.amount);
-
-            const boostees = await this.getBoostees(address);
-            this.boostedGauge.labels(address, 'BGT').set(boostees.amount);
+                const honey = await this.getERC20Amount(this.HoneyContractAddress, address, this.decimalPlaces);
+                this.availableGauge.labels(address, 'Honey').set(honey.amount);
+            }
         }
     }
 
