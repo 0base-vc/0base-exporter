@@ -63,6 +63,7 @@ export default class Tendermint extends TargetAbstract {
     protected readonly validatorsGauge = new Gauge({
         name: `${this.metricPrefix}_validators_power`,
         help: 'Validators power',
+        labelNames: ['address']
     });
 
     public constructor(protected readonly existMetrics: string,
