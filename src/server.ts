@@ -19,6 +19,7 @@ export default class Server {
         const cls: TargetAbstract = new Cls(
             process.env.EXISTING_METRICS_URL,
             process.env.API_URL,
+            process.env.RPC_URL,
             process.env.ADDRESS,
             process.env.VALIDATOR);
 
