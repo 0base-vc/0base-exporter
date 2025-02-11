@@ -6,6 +6,7 @@ export default abstract class TargetAbstract {
 
     protected constructor(protected readonly existMetrics: string,
                           protected readonly apiUrl: string,
+                          protected readonly rpcUrl: string,
                           protected readonly addresses: string,
                           protected readonly validator: string) {
     }

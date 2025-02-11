@@ -18,9 +18,10 @@ export default class Berachain extends Tendermint {
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
+                       protected readonly rpcUrl: string,
                        protected readonly addresses: string,
                        protected readonly validator: string) {
-        super(existMetrics, apiUrl, addresses, validator);
+        super(existMetrics, apiUrl, rpcUrl, addresses, validator);
 
         this.web3 = new Web3(process.env.EVM_API_URL);
         this.registry.registerMetric(this.boostedGauge);

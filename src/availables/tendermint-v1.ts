@@ -60,11 +60,17 @@ export default class Tendermint extends TargetAbstract {
         help: 'Gov voting period proposals count',
     });
 
+    protected readonly validatorsGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_power`,
+        help: 'Validators power',
+    });
+
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
+                       protected readonly rpcUrl: string,
                        protected readonly addresses: string,
                        protected readonly validator: string) {
-        super(existMetrics, apiUrl, addresses, validator);
+        super(existMetrics, apiUrl, rpcUrl, addresses, validator);
 
         this.registry.registerMetric(this.availableGauge);
         this.registry.registerMetric(this.delegatedGauge);
@@ -76,6 +82,7 @@ export default class Tendermint extends TargetAbstract {
         this.registry.registerMetric(this.rivalsPowerGauge);
         this.registry.registerMetric(this.maxValidatorGauge);
         this.registry.registerMetric(this.proposalsGauge);
+        this.registry.registerMetric(this.validatorsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -85,7 +92,8 @@ export default class Tendermint extends TargetAbstract {
                 await this.updateAddressBalance(this.addresses),
                 await this.updateRank(this.validator),
                 await this.updateMaxValidator(),
-                await this.updateProposalsCount()
+                await this.updateProposalsCount(),
+                await this.updateValidatorsPower(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -209,6 +217,17 @@ export default class Tendermint extends TargetAbstract {
         return this.get(url, response => {
             const count = response.data.proposals.length;
             this.proposalsGauge.set(count);
+        });
+    }
+
+    protected async updateValidatorsPower(): Promise<void> {
+        const url = `${this.rpcUrl}/validators?per_page=100`;
+
+        return this.get(url, response => {
+            const validators = response.data.result.validators;
+            validators.forEach((validator: any) => {
+                this.validatorsGauge.labels(validator.address).set(parseInt(validator.voting_power) / Math.pow(10, this.decimalPlaces));
+            });
         });
     }
 

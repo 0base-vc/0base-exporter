@@ -38,7 +38,8 @@ Extra metrics for Blockchain.
 | `PORT`                           | Exporter listening Port                           | `27770`                                               |
 | `BLOCKCHAIN`                     | Blockchain to be used in `./availables` directory | `./availables/tendermint.ts`                          |
 | `EXISTING_METRICS_URL(Optional)` | The existing metrics URL                          | `http://localhost:26660,http://localhost:26661`       |
-| `API_URL`                        | Blockchain API URL                                | `http://localhost:26657`                              |
+| `API_URL`                        | Blockchain API URL                                | `http://localhost:1317`                               |
+| `RPC_URL`                        | Blockchain RPC URL                                | `http://localhost:26657`                              |
 | `ADDRESS`                        | Your addresses                                    | `akash1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4jxqcnl`        |
 | `VALIDATOR`                      | Your validator address                            | `akashvaloper1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4cyw7r4` |
 | `DECIMAL_PLACES(Optional)`       | Decimal Places                                    | `6 or 18`                                             |

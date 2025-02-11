@@ -3,9 +3,10 @@ import Tendermint from "./tendermint-v1";
 export default class TendermintBerachain extends Tendermint {
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
+                       protected readonly rpcUrl: string,
                        protected readonly addresses: string,
                        protected readonly validator: string) {
-        super(existMetrics, apiUrl, addresses, validator);
+        super(existMetrics, apiUrl, rpcUrl, addresses, validator);
     }
 
     public async makeMetrics(): Promise<string> {
