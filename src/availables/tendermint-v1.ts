@@ -227,7 +227,7 @@ export default class Tendermint extends TargetAbstract {
         return this.get(url, response => {
             const validators = response.data.result.validators;
             validators.forEach((validator: any) => {
-                this.validatorsGauge.labels(validator.address).set(parseInt(validator.voting_power) / Math.pow(10, this.decimalPlaces));
+                this.validatorsGauge.labels(validator.address).set(parseInt(validator.voting_power));
             });
         });
     }
