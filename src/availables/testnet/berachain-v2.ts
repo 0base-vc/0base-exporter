@@ -35,8 +35,8 @@ export default class BerachainV2 extends TendermintBerachain {
         let customMetrics = '';
         try {
             await Promise.all([
-                await this.updateEvmAddressBalance(this.addresses),
-                await this.getBeraToHoneyPrice(),
+                this.updateEvmAddressBalance(this.addresses),
+                this.getBeraToHoneyPrice(),
             ]);
             customMetrics = await this.registry.metrics();
         } catch (e) {

@@ -83,10 +83,10 @@ export default class Tendermint extends TargetAbstract {
         let customMetrics = '';
         try {
             await Promise.all([
-                await this.updateAddressBalance(this.addresses),
-                await this.updateRank(this.validator),
-                await this.updateMaxValidator(),
-                await this.updateProposalsCount()
+                this.updateAddressBalance(this.addresses),
+                this.updateRank(this.validator),
+                this.updateMaxValidator(),
+                this.updateProposalsCount()
             ]);
 
             customMetrics = await this.registry.metrics();

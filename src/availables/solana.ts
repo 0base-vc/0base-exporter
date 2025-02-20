@@ -88,8 +88,8 @@ export default class Solana extends TargetAbstract {
         let customMetrics = '';
         try {
             await Promise.all([
-                await this.updateBalance(this.addresses),
-                await this.updateVoteAccounts(this.validator),
+                this.updateBalance(this.addresses),
+                this.updateVoteAccounts(this.validator),
                 // await this.updateRank(this.validator),
                 // await this.updateMaxValidator(),
             ]);
