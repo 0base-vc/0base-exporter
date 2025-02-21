@@ -7,7 +7,7 @@ export default class Berachain extends Tendermint {
 
     protected readonly BGTContractAddress = '0x656b95E550C07a9ffe548bd4085c72418Ceb1dba';
     protected readonly HoneyContractAddress = '0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce';
-    protected readonly BGTStakerContractAddress = '0x44f07ce5afecbcc406e6befd40cc2998eeb8c7c6';
+    protected readonly BGTStakerContractAddress = '0x44F07Ce5AfeCbCC406e6beFD40cc2998eEb8c7C6';
 
     protected readonly boostedGauge = new Gauge({
         name: `${this.metricPrefix}_validator_boosted`,
