@@ -18,7 +18,7 @@ export default class Berachain extends Tendermint {
     protected readonly earnedHoneyGauge = new Gauge({
         name: `${this.metricPrefix}_earned_honey`,
         help: 'Earned Honey of validator',
-        labelNames: ['validator', 'denom']
+        labelNames: ['address', 'denom']
     });
 
     private readonly erc20Abi: any;
