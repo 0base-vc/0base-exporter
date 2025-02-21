@@ -7,7 +7,7 @@ export default class Berachain extends Tendermint {
 
     protected readonly BGTContractAddress = '0x656b95E550C07a9ffe548bd4085c72418Ceb1dba';
     protected readonly HoneyContractAddress = '0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce';
-
+    protected readonly BGTStakerContractAddress = '0x44f07ce5afecbcc406e6befd40cc2998eeb8c7c6';
 
     protected readonly boostedGauge = new Gauge({
         name: `${this.metricPrefix}_validator_boosted`,
@@ -15,8 +15,15 @@ export default class Berachain extends Tendermint {
         labelNames: ['validator', 'denom']
     });
 
+    protected readonly earnedHoneyGauge = new Gauge({
+        name: `${this.metricPrefix}_earned_honey`,
+        help: 'Earned Honey of validator',
+        labelNames: ['validator', 'denom']
+    });
+
     private readonly erc20Abi: any;
     private readonly bgtAbi: any;
+    private readonly bgtStakerAbi: any;
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
@@ -27,10 +34,12 @@ export default class Berachain extends Tendermint {
 
         this.web3 = new Web3(process.env.EVM_API_URL);
         this.registry.registerMetric(this.boostedGauge);
+        this.registry.registerMetric(this.earnedHoneyGauge);
 
         // 객체 생성 시 ABI 파일을 한 번만 불러오기
         this.erc20Abi = require('../abi/erc20.json');
         this.bgtAbi = require(`../abi/berachain/${this.BGTContractAddress}.json`);
+        this.bgtStakerAbi = require(`../abi/berachain/${this.BGTStakerContractAddress}.json`);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -68,6 +77,9 @@ export default class Berachain extends Tendermint {
 
                 const honey = await this.getERC20Amount(this.HoneyContractAddress, address, this.decimalPlaces);
                 this.availableGauge.labels(address, 'Honey').set(honey.amount);
+
+                const earnedHoney = await this.getBGTStakerEarnedAmount(this.BGTStakerContractAddress, address, this.decimalPlaces);
+                this.earnedHoneyGauge.labels(address, 'Honey').set(earnedHoney.amount);
             }
         }
     }
@@ -98,7 +110,6 @@ export default class Berachain extends Tendermint {
         const ERC20Contract = new this.web3.eth.Contract(this.erc20Abi, contract);
         try {
             const amount: bigint = await ERC20Contract.methods.balanceOf(address).call();
-            console.log(address, amount);
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, decimalPlaces)
             };
@@ -107,6 +118,24 @@ export default class Berachain extends Tendermint {
             return {
                 amount: 0
             };
+        }
+    }
+
+    protected async getBGTStakerEarnedAmount(contract: string, address: string, decimalPlaces: number): Promise<{
+        amount: number
+    }> {
+        const BGTStakerContract = new this.web3.eth.Contract(this.bgtStakerAbi, contract);
+        try {
+            const amount: bigint = await BGTStakerContract.methods.earned(address).call();
+            return {
+                amount: parseInt(amount.toString()) / Math.pow(10, decimalPlaces)
+            };
+        } catch (e) {
+            console.error('getBGTStakerEarnedAmount');
+            console.error(e);
+            return {
+                amount: 0
+            }
         }
     }
 
