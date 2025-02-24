@@ -8,6 +8,9 @@ export default class Berachain extends Tendermint {
     protected readonly BGTContractAddress = '0x656b95E550C07a9ffe548bd4085c72418Ceb1dba';
     protected readonly HoneyContractAddress = '0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce';
     protected readonly BGTStakerContractAddress = '0x44F07Ce5AfeCbCC406e6beFD40cc2998eEb8c7C6';
+    private readonly BGTContract;
+    private readonly BGTStakerContract;
+    private readonly HoneyERC20Contract;
 
     protected readonly boostedGauge = new Gauge({
         name: `${this.metricPrefix}_validator_boosted`,
@@ -21,10 +24,6 @@ export default class Berachain extends Tendermint {
         labelNames: ['address', 'denom']
     });
 
-    private readonly erc20Abi: any;
-    private readonly bgtAbi: any;
-    private readonly bgtStakerAbi: any;
-
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
                        protected readonly rpcUrl: string,
@@ -33,13 +32,14 @@ export default class Berachain extends Tendermint {
         super(existMetrics, apiUrl, rpcUrl, addresses, validator);
 
         this.web3 = new Web3(process.env.EVM_API_URL);
+        this.BGTContract = new this.web3.eth.Contract(require(`../abi/berachain/${this.BGTContractAddress}.json`), this.BGTContractAddress);
+        this.BGTStakerContract = new this.web3.eth.Contract(require(`../abi/berachain/${this.BGTStakerContractAddress}.json`), this.BGTStakerContractAddress);
+        this.HoneyERC20Contract = new this.web3.eth.Contract(require('../abi/erc20.json'), this.HoneyContractAddress);
+
         this.registry.registerMetric(this.boostedGauge);
         this.registry.registerMetric(this.earnedHoneyGauge);
 
-        // 객체 생성 시 ABI 파일을 한 번만 불러오기
-        this.erc20Abi = require('../abi/erc20.json');
-        this.bgtAbi = require(`../abi/berachain/${this.BGTContractAddress}.json`);
-        this.bgtStakerAbi = require(`../abi/berachain/${this.BGTStakerContractAddress}.json`);
+
     }
 
     public async makeMetrics(): Promise<string> {
@@ -60,11 +60,13 @@ export default class Berachain extends Tendermint {
     }
 
     protected async updateEvmAddressBalance(addresses: string): Promise<void> {
+        this.boostedGauge.reset();
+        this.earnedHoneyGauge.reset();
 
         const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
         for (const address of evmAddresses) {
 
-            if(address.length > 50) {
+            if (address.length > 50) {
                 //pubkey
                 const boostees = await this.getBoostees(address);
                 this.boostedGauge.labels(address, 'BGT').set(boostees.amount);
@@ -75,10 +77,10 @@ export default class Berachain extends Tendermint {
                 const bgt = await this.getBGTAmount(address);
                 this.availableGauge.labels(address, 'BGT').set(bgt.amount);
 
-                const honey = await this.getERC20Amount(this.HoneyContractAddress, address, this.decimalPlaces);
+                const honey = await this.getHoneyERC20Amount(address, this.decimalPlaces);
                 this.availableGauge.labels(address, 'Honey').set(honey.amount);
 
-                const earnedHoney = await this.getBGTStakerEarnedAmount(this.BGTStakerContractAddress, address, this.decimalPlaces);
+                const earnedHoney = await this.getBGTStakerEarnedAmount(address, this.decimalPlaces);
                 this.earnedHoneyGauge.labels(address, 'Honey').set(earnedHoney.amount);
             }
         }
@@ -104,12 +106,11 @@ export default class Berachain extends Tendermint {
     }
 
 
-    protected async getERC20Amount(contract: string, address: string, decimalPlaces: number): Promise<{
+    protected async getHoneyERC20Amount(address: string, decimalPlaces: number): Promise<{
         amount: number
     }> {
-        const ERC20Contract = new this.web3.eth.Contract(this.erc20Abi, contract);
         try {
-            const amount: bigint = await ERC20Contract.methods.balanceOf(address).call();
+            const amount: bigint = await this.HoneyERC20Contract.methods.balanceOf(address).call();
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, decimalPlaces)
             };
@@ -121,12 +122,12 @@ export default class Berachain extends Tendermint {
         }
     }
 
-    protected async getBGTStakerEarnedAmount(contract: string, address: string, decimalPlaces: number): Promise<{
+    protected async getBGTStakerEarnedAmount(address: string, decimalPlaces: number): Promise<{
         amount: number
     }> {
-        const BGTStakerContract = new this.web3.eth.Contract(this.bgtStakerAbi, contract);
+
         try {
-            const amount: bigint = await BGTStakerContract.methods.earned(address).call();
+            const amount: bigint = await this.BGTStakerContract.methods.earned(address).call();
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, decimalPlaces)
             };
@@ -142,10 +143,8 @@ export default class Berachain extends Tendermint {
     protected async getBGTAmount(address: string): Promise<{
         amount: number
     }> {
-        const contract = this.BGTContractAddress;
-        const BGTContract = new this.web3.eth.Contract(this.bgtAbi, contract);
         try {
-            const amount: bigint = await BGTContract.methods.balanceOf(address).call();
+            const amount: bigint = await this.BGTContract.methods.balanceOf(address).call();
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
             };
@@ -160,10 +159,8 @@ export default class Berachain extends Tendermint {
     protected async getBoostees(address: string): Promise<{
         amount: number
     }> {
-        const contract = this.BGTContractAddress;
-        const BGTContract = new this.web3.eth.Contract(this.bgtAbi, contract);
         try {
-            const amount: bigint = await BGTContract.methods.boostees(address).call();
+            const amount: bigint = await this.BGTContract.methods.boostees(address).call();
             return {
                 amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
             };
