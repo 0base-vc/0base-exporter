@@ -51,7 +51,7 @@ export default class Story extends Tendermint {
             }).reverse();
 
             const rank = _.findIndex(sorted, (o) => {
-                return o.operator_address === validator;
+                return o.operator_address.toLowerCase() === validator.toLowerCase();
             }) + 1;
 
             const me = sorted[rank - 1];
