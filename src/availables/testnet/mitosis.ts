@@ -69,7 +69,7 @@ export default class Mitosis extends Tendermint {
         const url = `${this.apiUrl}/mitosis/evmvalidator/v1/params`;
 
         return this.get(url, response => {
-            const limit = response.data.msg.params.max_validators;
+            const limit = response.data.params.max_validators;
             this.maxValidatorGauge.set(limit);
         });
     }
