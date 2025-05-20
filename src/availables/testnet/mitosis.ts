@@ -51,7 +51,7 @@ export default class Mitosis extends Tendermint {
             }).reverse();
 
             const rank = _.findIndex(sorted, (o) => {
-                return o.operator_address.toLowerCase() === validator.toLowerCase();
+                return o.addr.toLowerCase() === validator.toLowerCase();
             }) + 1;
 
             const me = sorted[rank - 1];
@@ -81,7 +81,7 @@ export default class Mitosis extends Tendermint {
         return this.get(url, response => {
             const validators = response.data.validators;
             validators.forEach((validator: any) => {
-                this.validatorsGauge.labels(validator.operator_address).set(parseInt(validator.collateral_shares));
+                this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares));
             });
         });
     }
