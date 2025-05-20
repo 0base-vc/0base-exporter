@@ -66,7 +66,7 @@ export default class Mitosis extends Tendermint {
 
 
     protected async updateMaxValidator(): Promise<void> {
-        const url = `${this.apiUrl}/staking/params`;
+        const url = `${this.apiUrl}/mitosis/evmvalidator/v1/params`;
 
         return this.get(url, response => {
             const limit = response.data.msg.params.max_validators;
@@ -76,12 +76,12 @@ export default class Mitosis extends Tendermint {
 
 
     protected async updateValidatorsPower(): Promise<void> {
-        const url = `${this.apiUrl}/staking/validators?status=BOND_STATUS_BONDED&pagination.limit=256`;
+        const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
 
         return this.get(url, response => {
             const validators = response.data.msg.validators;
             validators.forEach((validator: any) => {
-                this.validatorsGauge.labels(validator.operator_address).set(parseInt(validator.tokens));
+                this.validatorsGauge.labels(validator.operator_address).set(parseInt(validator.collateral_shares));
             });
         });
     }
