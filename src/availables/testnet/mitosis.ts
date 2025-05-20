@@ -46,7 +46,7 @@ export default class Mitosis extends Tendermint {
         const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
 
         return this.get(url, response => {
-            const sorted = _.sortBy(response.data.msg.validators, (o) => {
+            const sorted = _.sortBy(response.data.validators, (o) => {
                 return parseInt(o.collateral_shares);
             }).reverse();
 
@@ -79,7 +79,7 @@ export default class Mitosis extends Tendermint {
         const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
 
         return this.get(url, response => {
-            const validators = response.data.msg.validators;
+            const validators = response.data.validators;
             validators.forEach((validator: any) => {
                 this.validatorsGauge.labels(validator.operator_address).set(parseInt(validator.collateral_shares));
             });
