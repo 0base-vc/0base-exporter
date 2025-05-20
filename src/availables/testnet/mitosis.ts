@@ -93,8 +93,8 @@ export default class Mitosis extends Tendermint {
         for (const address of evmAddresses) {
 
             // 네이티브 토큰 조회
-            const ip = await this.getEVMAmount(address);
-            this.availableGauge.labels(address, 'IP').set(ip.amount);
+            const mito = await this.getEVMAmount(address);
+            this.availableGauge.labels(address, 'MITO').set(mito.amount);
         }
     }
 
