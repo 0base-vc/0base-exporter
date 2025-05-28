@@ -233,7 +233,7 @@ export default class Berachain extends Tendermint {
             const date = new Date(Number(item.timestamp) / 1000).toISOString().slice(0, 10); // YYYY-MM-DD
             const tokenAddr = item.token.address.toLowerCase();
             const decimals = item.token.decimals || 18;
-            const amount = Number(item.receivedTokenAmount) / Math.pow(10, decimals);
+            const amount = Number(item.receivedTokenAmount);
             if (!dailyTokenMap[date]) dailyTokenMap[date] = {};
             if (!dailyTokenMap[date][tokenAddr]) dailyTokenMap[date][tokenAddr] = { amount: 0, decimals };
             dailyTokenMap[date][tokenAddr].amount += amount;
