@@ -9,11 +9,6 @@ interface ERC20TokenMetadata {
     decimals: number;
 }
 
-interface IncentiveReward {
-    token: string;
-    total_unclaimed: string;
-}
-
 export default class Berachain extends Tendermint {
     public readonly web3: Web3;
 
@@ -43,11 +38,13 @@ export default class Berachain extends Tendermint {
         labelNames: ['address', 'contractAddress', 'token', 'symbol']
     });
 
-    protected readonly incentiveGauge = new Gauge({
-        name: `${this.metricPrefix}_incentive_rewards`,
-        help: 'Unclaimed incentive rewards',
-        labelNames: ['address', 'contractAddress', 'token', 'symbol']
+    // 날짜별 인센티브(USD) 기록용 Gauge
+    protected readonly incentiveByDateGauge = new Gauge({
+        name: `${this.metricPrefix}_incentive_rewards_by_date`,
+        help: '날짜별 인센티브 총합(USD)',
+        labelNames: ['date', 'currency']
     });
+
 
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
@@ -63,7 +60,7 @@ export default class Berachain extends Tendermint {
         this.registry.registerMetric(this.boostedGauge);
         this.registry.registerMetric(this.earnedHoneyGauge);
         this.registry.registerMetric(this.erc20BalanceGauge);
-        this.registry.registerMetric(this.incentiveGauge);
+        this.registry.registerMetric(this.incentiveByDateGauge);
 
         // 초기 ERC20 토큰 스캔 실행
         this.scanERC20Tokens();
@@ -82,8 +79,10 @@ export default class Berachain extends Tendermint {
             await Promise.all([
                 this.updateValidatorsPower(),
                 this.updateEvmAddressBalance(this.addresses),
-                this.updateIncentiveBalances(this.addresses),
+                this.updateBoosted(),
+                this.fetchDailyIncentives()
             ]);
+
             customMetrics = await this.registry.metrics();
         } catch (e) {
             console.error('makeMetrics', e);
@@ -94,7 +93,7 @@ export default class Berachain extends Tendermint {
 
     // ERC20 토큰 스캔 메서드
     private async scanERC20Tokens(): Promise<void> {
-        const evmAddresses = this.addresses.split(',').filter((address) => address.startsWith('0x') && address.length < 50);
+        const evmAddresses = this.addresses.split(',');
         
         try {
             for (const address of evmAddresses) {
@@ -156,124 +155,126 @@ export default class Berachain extends Tendermint {
         }
     }
 
-    // 인센티브 정보 조회
-    private async fetchIncentives(address: string): Promise<Array<{
-        validator: string;
-        rewards: IncentiveReward[];
-    }> | null> {
-        try {
-            const response = await axios.get(`https://hub.berachain.com/api/portfolio/incentives/?account=${address}`, {
-                headers: {
-                    'accept': '*/*',
-                    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-                }
-            });
-            
-            if (response.data && Array.isArray(response.data)) {
-                return response.data;
-            }
-            return null;
-        } catch (e) {
-            console.error(`Error fetching incentives for address ${address}:`, e);
-            return null;
-        }
-    }
 
-    // 인센티브 밸런스를 업데이트하는 분리된 함수
-    protected async updateIncentiveBalances(addresses: string): Promise<void> {
-        this.incentiveGauge.reset();
-        
-        const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x') && address.length < 50);
-        for (const address of evmAddresses) {
-            // 인센티브 정보 조회 및 설정
-            const incentives = await this.fetchIncentives(address);
-            if (incentives) {
-                // 모든 validator의 rewards 합계를 계산
-                const tokenRewards = new Map<string, bigint>();
-                
-                // 토큰 목록 수집 및 메타데이터 사전 조회
-                const uniqueTokens = new Set<string>();
-                for (const incentive of incentives) {
-                    for (const reward of incentive.rewards) {
-                        uniqueTokens.add(reward.token);
-                    }
-                }
-                
-                // 메타데이터가 없는 토큰들의 메타데이터 조회
-                const metadataPromises = Array.from(uniqueTokens).map(async (token) => {
-                    if (!this.erc20Metadata.has(token)) {
-                        await this.fetchTokenMetadata(token);
-                    }
-                });
-                
-                // 모든 메타데이터 조회 완료 대기
-                await Promise.all(metadataPromises);
-                
-                // 리워드 합계 계산
-                for (const incentive of incentives) {
-                    for (const reward of incentive.rewards) {
-                        const token = reward.token;
-                        const amount = BigInt(reward.total_unclaimed);
-                        
-                        if (tokenRewards.has(token)) {
-                            tokenRewards.set(token, tokenRewards.get(token)! + amount);
-                        } else {
-                            tokenRewards.set(token, amount);
-                        }
-                    }
-                }
-                
-                // 각 토큰의 합계를 메트릭으로 설정
-                for (const [token, total] of tokenRewards.entries()) {
-                    const metadata = this.erc20Metadata.get(token);
-                    const decimals = metadata ? metadata.decimals : 18;
-                    const tokenName = metadata ? metadata.name : 'Unknown';
-                    const tokenSymbol = metadata ? metadata.symbol : 'UNKNOWN';
-                    const normalizedAmount = Number(total) / Math.pow(10, decimals);
-                    
-                    this.incentiveGauge.labels(address, token, tokenName, tokenSymbol).set(normalizedAmount);
-                }
-            }
-        }
+    protected async updateBoosted(): Promise<void> {
+        this.boostedGauge.reset();
+        const boostees = await this.getBoostees(this.validator);
+        this.boostedGauge.labels(this.validator, 'BGT').set(boostees.amount);
     }
 
     protected async updateEvmAddressBalance(addresses: string): Promise<void> {
-        this.boostedGauge.reset();
         this.earnedHoneyGauge.reset();
         this.erc20BalanceGauge.reset();
 
         const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
         for (const address of evmAddresses) {
-            if (address.length > 50) {
-                //pubkey
-                const boostees = await this.getBoostees(address);
-                this.boostedGauge.labels(address, 'BGT').set(boostees.amount);
-            } else {
-                // BERA 네이티브 토큰 조회
-                const bera = await this.getEVMAmount(address);
-                this.availableGauge.labels(address, 'BERA').set(bera.amount);
+            
+            // BERA 네이티브 토큰 조회
+            const bera = await this.getEVMAmount(address);
+            this.availableGauge.labels(address, 'BERA').set(bera.amount);
 
-                // BGT 밸런스 조회 (ERC20 아님)
-                const bgt = await this.getBGTAmount(address);
-                this.availableGauge.labels(address, 'BGT').set(bgt.amount);
+            // BGT 밸런스 조회 (ERC20 아님)
+            const bgt = await this.getBGTAmount(address);
+            this.availableGauge.labels(address, 'BGT').set(bgt.amount);
 
-                // ERC20 토큰 밸런스 조회
-                for (const [tokenAddress, metadata] of this.erc20Metadata.entries()) {
-                    try {
-                        const tokenContract = new this.web3.eth.Contract(require('../abi/erc20.json'), tokenAddress);
-                        const balance: bigint = await tokenContract.methods.balanceOf(address).call();
-                        const amount = parseInt(balance.toString()) / Math.pow(10, metadata.decimals);
-                        
-                        this.erc20BalanceGauge.labels(address, tokenAddress, metadata.name, metadata.symbol).set(amount);
-                    } catch (e) {
-                        console.error(`Error fetching balance for token ${tokenAddress} (${metadata.symbol})`, e);
-                    }
+            // ERC20 토큰 밸런스 조회
+            for (const [tokenAddress, metadata] of this.erc20Metadata.entries()) {
+                try {
+                    const tokenContract = new this.web3.eth.Contract(require('../abi/erc20.json'), tokenAddress);
+                    const balance: bigint = await tokenContract.methods.balanceOf(address).call();
+                    const amount = parseInt(balance.toString()) / Math.pow(10, metadata.decimals);
+                    
+                    this.erc20BalanceGauge.labels(address, tokenAddress, metadata.name, metadata.symbol).set(amount);
+                } catch (e) {
+                    console.error(`Error fetching balance for token ${tokenAddress} (${metadata.symbol})`, e);
                 }
-
-                // 스테이킹으로 얻은 Honey 조회
-                const earnedHoney = await this.getBGTStakerEarnedAmount(address, this.decimalPlaces);
-                this.earnedHoneyGauge.labels(address, 'Honey').set(earnedHoney.amount);
             }
+
+            // 스테이킹으로 얻은 Honey 조회
+            const earnedHoney = await this.getBGTStakerEarnedAmount(address, this.decimalPlaces);
+            this.earnedHoneyGauge.labels(address, 'Honey').set(earnedHoney.amount);
+        }
+    }
+
+    /**
+     * 날짜별 인센티브(USD) 집계 및 Gauge 기록
+     * Goldsky GraphQL API에서 incentiveDistributionByValidators를 가져오고, 토큰 가격을 Berachain API에서 받아와 USD로 환산하여 날짜별로 합산 후 Gauge에 기록
+     */
+    private async fetchDailyIncentives(): Promise<void> {
+        // validator publicKey, timestamp 설정
+        const pubKey = this.validator;
+        // 30일 전부터 조회 (timestamp: 마이크로초 단위)
+        const daysAgo = 30;
+        const now = Math.floor(Date.now() / 1000);
+        const fromTimestamp = (now - daysAgo * 24 * 60 * 60) * 1_000_000;
+        // Goldsky GraphQL 쿼리
+        const goldskyUrl = 'https://api.goldsky.com/api/public/project_clq1h5ct0g4a201x18tfte5iv/subgraphs/pol-subgraph/mainnet-v1.5.2/gn';
+        const query = {
+            operationName: 'GetValidatorAnalytics',
+            variables: {
+                pubKey: pubKey,
+                timestamp: fromTimestamp.toString()
+            },
+            query: `query GetValidatorAnalytics($pubKey: Bytes!, $timestamp: Timestamp!) {\n  incentiveDistributionByValidators(\n    interval: day\n    where: {validator_: {publicKey: $pubKey}, timestamp_gte: $timestamp}\n  ) {\n    token {\n      address\n      symbol\n      decimals\n      name\n    }\n    receivedTokenAmount\n    timestamp\n    id\n    __typename\n  }\n}`
+        };
+        let incentiveList: any[] = [];
+        try {
+            const res = await axios.post(goldskyUrl, query, {
+                headers: { 'content-type': 'application/json' }
+            });
+            incentiveList = res.data?.data?.incentiveDistributionByValidators || [];
+        } catch (e) {
+            console.error('Goldsky incentiveDistributionByValidators error', e);
+            return;
+        }
+        // 날짜별, 토큰별 집계
+        const dailyTokenMap: Record<string, Record<string, { amount: number, decimals: number }>> = {};
+        for (const item of incentiveList) {
+            const date = new Date(Number(item.timestamp) / 1000).toISOString().slice(0, 10); // YYYY-MM-DD
+            const tokenAddr = item.token.address.toLowerCase();
+            const decimals = item.token.decimals || 18;
+            const amount = Number(item.receivedTokenAmount) / Math.pow(10, decimals);
+            if (!dailyTokenMap[date]) dailyTokenMap[date] = {};
+            if (!dailyTokenMap[date][tokenAddr]) dailyTokenMap[date][tokenAddr] = { amount: 0, decimals };
+            dailyTokenMap[date][tokenAddr].amount += amount;
+        }
+        // 토큰 가격 조회 (Berachain API)
+        const tokenAddresses = Array.from(new Set(
+            Object.values(dailyTokenMap).flatMap(tokens => Object.keys(tokens))
+        ));
+        let priceMap: Record<string, number> = {};
+        if (tokenAddresses.length > 0) {
+            const beraApiUrl = 'https://api.berachain.com/';
+            const priceQuery = {
+                operationName: 'GetTokenCurrentPrices',
+                variables: {
+                    chains: ['BERACHAIN'],
+                    addressIn: tokenAddresses
+                },
+                query: `query GetTokenCurrentPrices($chains: [GqlChain!], $addressIn: [String!]) {\n  tokenGetCurrentPrices(chains: $chains, addressIn: $addressIn) {\n    address\n    price\n  }\n}`
+            };
+            try {
+                const priceRes = await axios.post(beraApiUrl, priceQuery, {
+                    headers: { 'content-type': 'application/json' }
+                });
+                const priceList = priceRes.data?.data?.tokenGetCurrentPrices || [];
+                for (const p of priceList) {
+                    priceMap[p.address.toLowerCase()] = Number(p.price);
+                }
+            } catch (e) {
+                console.error('Berachain price fetch error', e);
+            }
+        }
+        // 날짜별 USD 집계 및 Gauge 기록
+        for (const date of Object.keys(dailyTokenMap)) {
+            let usdSum = 0;
+            for (const tokenAddr of Object.keys(dailyTokenMap[date])) {
+                const { amount } = dailyTokenMap[date][tokenAddr];
+                const price = priceMap[tokenAddr] || 0;
+                usdSum += amount * price;
+            }
+            // Prometheus Gauge 기록 (date, USD)
+            this.incentiveByDateGauge.labels(date, 'USD').set(usdSum);
         }
     }
 
