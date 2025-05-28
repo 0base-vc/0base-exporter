@@ -251,7 +251,7 @@ export default class Berachain extends Tendermint {
                     chains: ['BERACHAIN'],
                     addressIn: tokenAddresses
                 },
-                query: `query GetTokenCurrentPrices($chains: [GqlChain!], $addressIn: [String!]) {\n  tokenGetCurrentPrices(chains: $chains, addressIn: $addressIn) {\n    address\n    price\n  }\n}`
+                query: `query GetTokenCurrentPrices($chains: [GqlChain!]!, $addressIn: [String!]!) {\n  tokenGetCurrentPrices(chains: $chains, addressIn: $addressIn) {\n    address\n    price\n  }\n}`
             };
             try {
                 const priceRes = await axios.post(beraApiUrl, priceQuery, {
