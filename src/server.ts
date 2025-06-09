@@ -7,19 +7,20 @@ import TargetAbstract from "./target.abstract";
 export default class Server {
     private readonly app: Express = express();
     private server: http.Server = undefined;
-    private targetInstance: TargetAbstract = null; // 싱글톤 인스턴스
-    
+
     public async setup(): Promise<void> {
         this.app.use(morgan('combined'));
         this.app.use('/metrics', await this.getMetricLoader());
     }
-    
-    private async getMetricLoader(): Promise<express.RequestHandler> {
-        // 인스턴스가 없을 때만 생성 (싱글톤 패턴)
-        if (!this.targetInstance) {
+
+    // TargetAbstract 인스턴스를 싱글턴으로 관리
+    private static singletonInstance: TargetAbstract = null;
+
+    private getMetricLoader(): Promise<express.RequestHandler> {
+        if (!Server.singletonInstance) {
             console.log('BLOCKCHAIN', process.env.BLOCKCHAIN || './availables/tendermint.ts');
             const Cls = require(process.env.BLOCKCHAIN || './availables/tendermint.ts').default;
-            this.targetInstance = new Cls(
+            Server.singletonInstance = new Cls(
                 process.env.EXISTING_METRICS_URL,
                 process.env.API_URL,
                 process.env.RPC_URL,
@@ -27,28 +28,15 @@ export default class Server {
                 process.env.VALIDATOR
             );
         }
-        
-        // 메트릭 핸들러 반환
-        return async (_req: express.Request, res: express.Response) => {
-            try {
-                const metrics = await this.targetInstance.makeMetrics();
-                res.set('Content-Type', 'text/plain');
-                res.send(metrics);
-            } catch (error) {
-                console.error('Error generating metrics:', error);
-                res.status(500).send('Error generating metrics');
-            }
-        };
+        return Server.singletonInstance.metrics();
     }
-    
+
     public async start(): Promise<{ server: http.Server, port: string }> {
         return this.setup().then(() => {
             const port = process.env.PORT || '27770';
-            this.server = this.app.listen(port, () => {
-                console.log(`Server started on port ${port}`);
-            });
-            
-            return { server: this.server, port: port };
+            this.server = this.app.listen(port);
+            return {server: this.server, port: port};
         });
     }
+
 }
