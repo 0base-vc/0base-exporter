@@ -117,7 +117,7 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateVoteAccounts(validator: string): Promise<void> {
-        return this.post(this.apiUrl, {method: 'getVoteAccounts'}, response => {
+        return this.postWithCache(this.apiUrl, {method: 'getVoteAccounts'}, response => {
 
             const validators = _.concat(response.data.result.current.map((i: any) => {
                 i.status = 'current'
@@ -149,7 +149,7 @@ export default class Solana extends TargetAbstract {
     }
 
     private async getAmount(url: string, data: { method: string, params?: string[] }, selector: (json: {}) => number): Promise<number> {
-        return this.post(url, data, response => {
+        return this.postWithCache(url, data, response => {
             return selector(response.data) / Math.pow(10, this.digit);
         });
     }
