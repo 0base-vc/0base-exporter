@@ -130,15 +130,16 @@ export default class Solana extends TargetAbstract {
     }
 
     private async getValidatorBonds(voteAccount: string): Promise<number | undefined> {
-        return this.getWithCache('https://validator-bonds-api.marinade.finance/bonds', (response: { data: any }) => {
-            const arr = response.data.bonds;
-            // vote_account와 일치하는 객체 찾기
-            const found = Array.isArray(arr)
-                ? arr.find((item: any) => item.vote_account === voteAccount)
-                : undefined;
-            // 값이 있으면 effective_amount / 1e9 반환
-            return found ? found.effective_amount / 1e9 : undefined;
+        const arr = await this.getWithCache('https://validator-bonds-api.marinade.finance/bonds', (response: { data: any }) => {
+            return response.data.bonds;
         });
+
+        // vote_account와 일치하는 객체 찾기
+        const found = Array.isArray(arr)
+            ? arr.find((item: any) => item.vote_account === voteAccount)
+            : undefined;
+        // 값이 있으면 effective_amount / 1e9 반환
+        return found ? found.effective_amount / 1e9 : undefined;
     }
 
     private async updateVoteAccounts(validator: string): Promise<void> {
