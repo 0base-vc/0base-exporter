@@ -1,5 +1,5 @@
 import TargetAbstract from "../target.abstract";
-import {Gauge, Registry} from 'prom-client';
+import { Gauge, Registry } from 'prom-client';
 import * as _ from 'lodash';
 
 export default class Solana extends TargetAbstract {
@@ -40,6 +40,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator']
     });
 
+    private readonly validatorBondsGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_bonds`,
+        help: 'Your validator bonds',
+        labelNames: ['validator']
+    });
+
     // private readonly rankGauge = new Gauge({
     //     name: `${this.metricPrefix}_validator_rank`,
     //     help: 'Your validator rank',
@@ -64,10 +70,10 @@ export default class Solana extends TargetAbstract {
     // });
 
     public constructor(protected readonly existMetrics: string,
-                       protected readonly apiUrl: string,
-                       protected readonly rpcUrl: string,
-                       protected readonly addresses: string,
-                       protected readonly validator: string) {
+        protected readonly apiUrl: string,
+        protected readonly rpcUrl: string,
+        protected readonly addresses: string,
+        protected readonly validator: string) {
         super(existMetrics, apiUrl, rpcUrl, addresses, validator);
 
         this.registry.registerMetric(this.balanceGauge);
@@ -76,6 +82,7 @@ export default class Solana extends TargetAbstract {
 
         this.registry.registerMetric(this.activeGauge);
         this.registry.registerMetric(this.commissionGauge);
+        this.registry.registerMetric(this.validatorBondsGauge);
         // this.registry.registerMetric(this.rankGauge);
 
         // this.registry.registerMetric(this.rootSlotGauge);
@@ -105,7 +112,7 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateBalance(addresses: string): Promise<void> {
-        for(const address of addresses.split(',')) {
+        for (const address of addresses.split(',')) {
             const available = await this.getAmount(this.apiUrl, {
                 method: 'getBalance',
                 params: [address]
@@ -113,11 +120,29 @@ export default class Solana extends TargetAbstract {
             this.availableGauge.labels(address).set(available);
 
             this.balanceGauge.labels(address).set(available);
+
+            // validator bonds
+            const validatorBonds = await this.getValidatorBonds(address);
+            if (validatorBonds) {
+                this.validatorBondsGauge.labels(address).set(validatorBonds);
+            }
         }
     }
 
+    private async getValidatorBonds(voteAccount: string): Promise<number | undefined> {
+        return this.getWithCache('https://validator-bonds-api.marinade.finance/bonds', (response: { data: any }) => {
+            const arr = response.data.bonds;
+            // vote_account와 일치하는 객체 찾기
+            const found = Array.isArray(arr)
+                ? arr.find((item: any) => item.vote_account === voteAccount)
+                : undefined;
+            // 값이 있으면 effective_amount / 1e9 반환
+            return found ? found.effective_amount / 1e9 : undefined;
+        });
+    }
+
     private async updateVoteAccounts(validator: string): Promise<void> {
-        return this.postWithCache(this.apiUrl, {method: 'getVoteAccounts'}, response => {
+        return this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
 
             const validators = _.concat(response.data.result.current.map((i: any) => {
                 i.status = 'current'
