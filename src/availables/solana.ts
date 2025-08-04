@@ -70,11 +70,11 @@ export default class Solana extends TargetAbstract {
     // });
 
     public constructor(protected readonly existMetrics: string,
-        protected readonly apiUrl: string,
-        protected readonly rpcUrl: string,
-        protected readonly addresses: string,
-        protected readonly validator: string) {
-        super(existMetrics, apiUrl, rpcUrl, addresses, validator);
+                       protected readonly apiUrl: string,
+                       protected readonly rpcUrl: string,
+                       protected readonly addresses: string,
+                       protected readonly validators: string) {
+        super(existMetrics, apiUrl, rpcUrl, addresses, validators);
 
         this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
@@ -83,12 +83,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.activeGauge);
         this.registry.registerMetric(this.commissionGauge);
         this.registry.registerMetric(this.validatorBondsGauge);
-        // this.registry.registerMetric(this.rankGauge);
-
-        // this.registry.registerMetric(this.rootSlotGauge);
         this.registry.registerMetric(this.lastVoteGauge);
-
-        // this.registry.registerMetric(this.validatorsCount);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -96,9 +91,7 @@ export default class Solana extends TargetAbstract {
         try {
             await Promise.all([
                 this.updateBalance(this.addresses),
-                this.updateVoteAccounts(this.validator),
-                // await this.updateRank(this.validator),
-                // await this.updateMaxValidator(),
+                this.updateVoteAccounts(this.validators),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -106,7 +99,6 @@ export default class Solana extends TargetAbstract {
         } catch (e) {
             console.error('makeMetrics', e);
         }
-
 
         return customMetrics + '\n' + await this.loadExistMetrics();
     }
@@ -142,36 +134,28 @@ export default class Solana extends TargetAbstract {
         return found ? found.effective_amount / 1e9 : undefined;
     }
 
-    private async updateVoteAccounts(validator: string): Promise<void> {
-        return this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
+    private async updateVoteAccounts(validators: string): Promise<void> {
+        for (const validator of validators.split(',')) {
+            await this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
 
-            const validators = _.concat(response.data.result.current.map((i: any) => {
-                i.status = 'current'
-                return i;
-            }), response.data.result.delinquent.map((i: any) => {
-                i.status = 'delinquent'
-                return i;
-            }));
+                const allValidators = _.concat(response.data.result.current.map((i: any) => {
+                    i.status = 'current'
+                    return i;
+                }), response.data.result.delinquent.map((i: any) => {
+                    i.status = 'delinquent'
+                    return i;
+                }));
 
-            const sorted = _.sortBy(validators, (i) => i.activatedStake).reverse();
-            const myValidator = _.find(sorted, (o) => {
-                return o.votePubkey === validator;
+                const myValidator = _.find(allValidators, (o: any) => {
+                    return o.votePubkey === validator;
+                });
+
+                this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / Math.pow(10, this.digit));
+                this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
+                this.commissionGauge.labels(validator).set(myValidator.commission);
+                this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
             });
-            // const rank = _.findIndex(sorted, (o) => {
-            //     return o.votePubkey === validator;
-            // }) + 1;
-
-            // const max = sorted.length;
-
-
-            this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / Math.pow(10, this.digit));
-            this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
-            this.commissionGauge.labels(validator).set(myValidator.commission);
-            // this.rankGauge.labels(validator).set(rank);
-            // this.validatorsCount.set(max);
-            // this.rootSlotGauge.labels(validator).set(myValidator.rootSlot);
-            this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
-        });
+        }
     }
 
     private async getAmount(url: string, data: { method: string, params?: string[] }, selector: (json: {}) => number): Promise<number> {
@@ -181,4 +165,3 @@ export default class Solana extends TargetAbstract {
     }
 
 }
-
