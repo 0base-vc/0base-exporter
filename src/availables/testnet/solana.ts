@@ -1,4 +1,4 @@
-import TargetAbstract from "../target.abstract";
+import TargetAbstract from "../../target.abstract";
 import { Gauge, Registry } from 'prom-client';
 import * as _ from 'lodash';
 
