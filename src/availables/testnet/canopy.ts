@@ -12,21 +12,6 @@ export default class Canopy extends TargetAbstract {
         help: 'Available balance of address',
         labelNames: ['address', 'denom']
     });
-    protected readonly unbondingGauge = new Gauge({
-        name: `${this.metricPrefix}_address_unbonding`,
-        help: 'Unbonding balance of address',
-        labelNames: ['address', 'denom']
-    });
-    protected readonly rewardsGauge = new Gauge({
-        name: `${this.metricPrefix}_address_rewards`,
-        help: 'Rewards of address',
-        labelNames: ['address', 'denom']
-    });
-    protected readonly validatorPowerGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_power`,
-        help: 'Validator staked amount',
-        labelNames: ['validator']
-    });
     protected readonly rankGauge = new Gauge({
         name: `${this.metricPrefix}_validator_rank`,
         help: 'Your rank of validators',
@@ -55,9 +40,6 @@ export default class Canopy extends TargetAbstract {
     ) {
         super(existMetrics, apiUrl, rpcUrl, addresses, validator);
         this.registry.registerMetric(this.availableGauge);
-        this.registry.registerMetric(this.unbondingGauge);
-        this.registry.registerMetric(this.rewardsGauge);
-        this.registry.registerMetric(this.validatorPowerGauge);
         this.registry.registerMetric(this.rankGauge);
         this.registry.registerMetric(this.rivalsPowerGauge);
         this.registry.registerMetric(this.maxValidatorGauge);
@@ -83,7 +65,7 @@ export default class Canopy extends TargetAbstract {
     // Canopy는 위임/언본딩/리워드 개념이 없으므로 0으로 처리
     protected async updateAddressBalance(addresses: string): Promise<void> {
         for (const address of addresses.split(',').filter((address) => !address.startsWith('0x'))) {
-            // 1. 잔액 조회
+            // 잔액 조회
             try {
                 const res = await axios.post(`${this.apiUrl}/v1/query/account`, { address });
                 const amount = res.data.amount ? Number(res.data.amount) / Math.pow(10, this.decimalPlaces) : 0;
@@ -92,9 +74,6 @@ export default class Canopy extends TargetAbstract {
                 console.error('updateAddressBalance: available', address, e);
                 this.availableGauge.labels(address, 'uCNPY').set(0);
             }
-            // 2. delegated/unbonding/rewards: 0으로 세팅
-            this.unbondingGauge.labels(address, 'uCNPY').set(0);
-            this.rewardsGauge.labels(address, 'uCNPY').set(0);
         }
     }
 
@@ -114,19 +93,11 @@ export default class Canopy extends TargetAbstract {
             this.rankGauge.labels(validator).set(rank);
             this.rivalsPowerGauge.labels('above').set(Number(above.stakedAmount) / Math.pow(10, this.decimalPlaces));
             this.rivalsPowerGauge.labels('below').set(Number(below.stakedAmount) / Math.pow(10, this.decimalPlaces));
-            
-            // validator의 stakedAmount를 validatorPowerGauge에 설정
-            if (me) {
-                this.validatorPowerGauge.labels(validator).set(Number(me.stakedAmount) / Math.pow(10, this.decimalPlaces));
-            } else {
-                this.validatorPowerGauge.labels(validator).set(0);
-            }
         } catch (e) {
             console.error('updateRank', validator, e);
             this.rankGauge.labels(validator).set(0);
             this.rivalsPowerGauge.labels('above').set(0);
             this.rivalsPowerGauge.labels('below').set(0);
-            this.validatorPowerGauge.labels(validator).set(0);
         }
     }
 
