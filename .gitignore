@@ -34,3 +34,5 @@ coverage.json
 jest.json
 
 ignore/
+ignore/*.sh
+run-solana-metrics.sh
