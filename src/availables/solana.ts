@@ -111,6 +111,14 @@ export default class Solana extends TargetAbstract {
     // validator voteAccount -> node identity mapping
     private validatorToIdentityMap: Record<string, string> = {};
 
+    // vx.tools 응답 캐시 (identity 기준)
+    private vxIncomeCache: Map<string, { ts: number, rows: any[] }> = new Map();
+    private readonly VX_CACHE_TTL_MS = 60000;
+
+    private toUniqueList(csv: string): string[] {
+        return Array.from(new Set(csv.split(',').map(v => v.trim()).filter(Boolean)));
+    }
+
     // private readonly rankGauge = new Gauge({
     //     name: `${this.metricPrefix}_validator_rank`,
     //     help: 'Your validator rank',
@@ -164,7 +172,7 @@ export default class Solana extends TargetAbstract {
     public async makeMetrics(): Promise<string> {
         let customMetrics = '';
         try {
-            // 1) 먼저 vote account -> identity 매핑 생성
+            // 1) 먼저 vote account -> identity 매핑 생성 (getVoteAccounts 1회 호출)
             await this.updateVoteAccounts(this.validators);
 
             // 2) 독립 작업 병렬 수행
@@ -185,7 +193,7 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateBalance(addresses: string): Promise<void> {
-        for (const address of addresses.split(',')) {
+        for (const address of this.toUniqueList(addresses)) {
             const available = await this.getAmount(this.apiUrl, {
                 method: 'getBalance',
                 params: [address]
@@ -198,7 +206,7 @@ export default class Solana extends TargetAbstract {
 
     // JPool: validator별 위임 출처별 합계를 수집
     private async updateDelegationsFromJPool(validators: string): Promise<void> {
-        const voteAccounts = validators.split(',').map(v => v.trim()).filter(Boolean);
+        const voteAccounts = this.toUniqueList(validators);
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/delegation?vote=${vote}`;
@@ -218,32 +226,30 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateVoteAccounts(validators: string): Promise<void> {
-        for (const validator of validators.split(',')) {
-            await this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
-
-                const allValidators = _.concat(response.data.result.current.map((i: any) => {
-                    i.status = 'current'
+        const voteAccounts = this.toUniqueList(validators);
+        await this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
+            const allValidators = _.concat(
+                response.data.result.current.map((i: any) => {
+                    i.status = 'current';
                     return i;
-                }), response.data.result.delinquent.map((i: any) => {
-                    i.status = 'delinquent'
+                }),
+                response.data.result.delinquent.map((i: any) => {
+                    i.status = 'delinquent';
                     return i;
-                }));
-
-                const myValidator = _.find(allValidators, (o: any) => {
-                    return o.votePubkey === validator;
-                });
-
+                })
+            );
+            for (const validator of voteAccounts) {
+                const myValidator = _.find(allValidators, (o: any) => o.votePubkey === validator);
+                if (!myValidator) continue;
                 this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / LAMPORTS_PER_SOL);
                 this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
                 this.commissionGauge.labels(validator).set(myValidator.commission);
                 this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
-
-                // identity 매핑 저장
-                if (myValidator && myValidator.nodePubkey) {
+                if (myValidator.nodePubkey) {
                     this.validatorToIdentityMap[validator] = myValidator.nodePubkey;
                 }
-            });
-        }
+            }
+        });
     }
 
     private async getAmount(url: string, data: { method: string, params?: string[] }, selector: (json: {}) => number): Promise<number> {
@@ -277,15 +283,23 @@ export default class Solana extends TargetAbstract {
 
     // vx.tools epoch income → slots/fees/tips 집계
     private async updateEpochIncomeFromVx(validators: string): Promise<void> {
-        const voteAccounts = validators.split(',').map(v => v.trim()).filter(Boolean);
+        const voteAccounts = this.toUniqueList(validators);
         await Promise.all(voteAccounts.map(async (vote) => {
             const identity = this.validatorToIdentityMap[vote];
             if (!identity) return;
             try {
-                const url = 'https://api.vx.tools/epochs/income';
-                const payload = { identity, limit: 1 };
-                const { data } = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
-                const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+                const now = Date.now();
+                const cached = this.vxIncomeCache.get(identity);
+                let rows: any[] = [];
+                if (cached && (now - cached.ts) < this.VX_CACHE_TTL_MS) {
+                    rows = cached.rows;
+                } else {
+                    const url = 'https://api.vx.tools/epochs/income';
+                    const payload = { identity, limit: 1 };
+                    const { data } = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+                    rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+                    this.vxIncomeCache.set(identity, { ts: now, rows });
+                }
                 if (!Array.isArray(rows) || rows.length === 0) return;
                 const latest = rows[rows.length - 1];
                 const epochLabel = String(latest?.epoch ?? '');
