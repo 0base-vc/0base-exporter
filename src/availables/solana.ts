@@ -54,6 +54,18 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator', 'source']
     });
 
+    private readonly pendingActivationBySourceGauge = new Gauge({
+        name: `${this.metricPrefix}_pending_activation_sol`,
+        help: 'Pending activation stake by source',
+        labelNames: ['validator', 'source']
+    });
+
+    private readonly pendingDeactivationBySourceGauge = new Gauge({
+        name: `${this.metricPrefix}_pending_deactivation_sol`,
+        help: 'Pending deactivation stake by source',
+        labelNames: ['validator', 'source']
+    });
+
     private readonly marinadeMinEffectiveBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_min_effective_bid_sol`,
         help: 'Minimum effective bid required to receive delegation from Marinade',
@@ -158,6 +170,8 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.validatorBondsGauge);
         this.registry.registerMetric(this.lastVoteGauge);
         this.registry.registerMetric(this.delegationBySourceGauge);
+        this.registry.registerMetric(this.pendingActivationBySourceGauge);
+        this.registry.registerMetric(this.pendingDeactivationBySourceGauge);
         this.registry.registerMetric(this.marinadeMinEffectiveBidGauge);
         this.registry.registerMetric(this.marinadeMyBidGauge);
         this.registry.registerMetric(this.slotsAssignedGauge);
@@ -179,6 +193,7 @@ export default class Solana extends TargetAbstract {
             await Promise.all([
                 this.updateBalance(this.addresses),
                 this.updateDelegationsFromJPool(this.validators),
+                this.updatePendingStakeFromJPool(this.validators),
                 this.updateMarinadeScoring(this.validators),
                 this.updateEpochIncomeFromVx(this.validators),
             ]);
@@ -331,6 +346,42 @@ export default class Solana extends TargetAbstract {
                 this.blockTipsMedianGauge.labels(vote, epochLabel).set(medianTipsSol);
             } catch (e) {
                 console.error('updateEpochIncomeFromVx', e);
+            }
+        }));
+    }
+
+    // JPool pending stake: activation/deactivation by source aggregated in SOL
+    private async updatePendingStakeFromJPool(validators: string): Promise<void> {
+        const voteAccounts = this.toUniqueList(validators);
+        await Promise.all(voteAccounts.map(async (vote) => {
+            try {
+                const url = `https://api.jpool.one/validators/${vote}/pending-stake`;
+                const data = await this.getWithCache(url, (response: { data: any }) => response.data);
+                const accounts: any[] = Array.isArray(data?.stake_accounts) ? data.stake_accounts : [];
+                if (accounts.length === 0) return;
+
+                const activationBySource: Record<string, number> = {};
+                const deactivationBySource: Record<string, number> = {};
+
+                for (const it of accounts) {
+                    const source = String(it?.stake_type || 'unknown') || 'unknown';
+                    const lamports = Number(it?.delegated_amount ?? 0);
+                    const type = String(it?.type || '').toLowerCase();
+                    if (type === 'activation') {
+                        activationBySource[source] = (activationBySource[source] || 0) + lamports;
+                    } else if (type === 'deactivation') {
+                        deactivationBySource[source] = (deactivationBySource[source] || 0) + lamports;
+                    }
+                }
+
+                for (const [source, lamports] of Object.entries(activationBySource)) {
+                    this.pendingActivationBySourceGauge.labels(vote, source).set(lamports / LAMPORTS_PER_SOL);
+                }
+                for (const [source, lamports] of Object.entries(deactivationBySource)) {
+                    this.pendingDeactivationBySourceGauge.labels(vote, source).set(lamports / LAMPORTS_PER_SOL);
+                }
+            } catch (e) {
+                console.error('updatePendingStakeFromJPool', e);
             }
         }));
     }
