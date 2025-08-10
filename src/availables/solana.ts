@@ -298,6 +298,16 @@ export default class Solana extends TargetAbstract {
 
     // vx.tools epoch income → slots/fees/tips 집계
     private async updateEpochIncomeFromVx(validators: string): Promise<void> {
+        // epoch 스코프 지표는 이전 epoch 라벨이 남지 않도록 매 호출마다 리셋
+        // (현재 epoch 데이터만 노출되게 함)
+        this.slotsAssignedGauge.reset();
+        this.slotsProducedGauge.reset();
+        this.slotsSkippedGauge.reset();
+        this.blockFeesTotalGauge.reset();
+        this.mevFeesTotalGauge.reset();
+        this.blockFeesMedianGauge.reset();
+        this.blockTipsMedianGauge.reset();
+
         const voteAccounts = this.toUniqueList(validators);
         await Promise.all(voteAccounts.map(async (vote) => {
             const identity = this.validatorToIdentityMap[vote];
