@@ -78,6 +78,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator']
     });
 
+    private readonly marinadeMaxStakeWantedGauge = new Gauge({
+        name: `${this.metricPrefix}_marinade_max_stake_wanted_sol`,
+        help: 'Maximum stake wanted by validator in Marinade',
+        labelNames: ['validator']
+    });
+
     private readonly slotsAssignedGauge = new Gauge({
         name: `${this.metricPrefix}_slots_assigned_total`,
         help: 'Total number of leader slots assigned to our validator in the current epoch',
@@ -174,6 +180,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.pendingDeactivationBySourceGauge);
         this.registry.registerMetric(this.marinadeMinEffectiveBidGauge);
         this.registry.registerMetric(this.marinadeMyBidGauge);
+        this.registry.registerMetric(this.marinadeMaxStakeWantedGauge);
         this.registry.registerMetric(this.slotsAssignedGauge);
         this.registry.registerMetric(this.slotsProducedGauge);
         this.registry.registerMetric(this.slotsSkippedGauge);
@@ -286,10 +293,12 @@ export default class Solana extends TargetAbstract {
                 const bidPmpe = Number(found?.revShare?.bidPmpe ?? 0);
                 const minEffectiveBid = Number(found?.effectiveBid ?? 0);
                 const bondBalanceSol = Number(found?.values?.bondBalanceSol ?? 0);
+                const maxStakeWanted = Number(found?.values?.maxStakeWanted ?? 0);
 
                 this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                 this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
                 this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
+                this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
             }
         } catch (e) {
             console.error('updateMarinadeScoring', e);
