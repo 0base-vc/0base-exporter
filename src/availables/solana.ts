@@ -293,7 +293,7 @@ export default class Solana extends TargetAbstract {
                 const bidPmpe = Number(found?.revShare?.bidPmpe ?? 0);
                 const minEffectiveBid = Number(found?.effectiveBid ?? 0);
                 const bondBalanceSol = Number(found?.values?.bondBalanceSol ?? 0);
-                const maxStakeWanted = Number(found?.values?.maxStakeWanted ?? 0);
+                const maxStakeWanted = Number(found?.maxStakeWanted ?? 0);
 
                 this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                 this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
