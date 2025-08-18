@@ -283,22 +283,45 @@ export default class Solana extends TargetAbstract {
     // Marinade scoring API → bid, min effective bid, bonds(=bondBalanceSol)
     private async updateMarinadeScoring(validators: string): Promise<void> {
         try {
-            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=1';
-            const list = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
-            if (!Array.isArray(list)) return;
+            // 1. Scoring API에서 minEffectiveBid만 가져오기
+            const scoringUrl = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=1';
+            const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 60000);
+            
+            // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
+            const bondsUrl = 'https://validator-bonds-api.marinade.finance/bonds';
+            const bondsList = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 60000);
+            
+            if (!Array.isArray(scoringList) || !Array.isArray(bondsList)) return;
+            
             const voteAccounts = validators.split(',').map(v => v.trim()).filter(Boolean);
+            
             for (const vote of voteAccounts) {
-                const found = list.find((it: any) => it && (it.voteAccount === vote));
-                if (!found) continue;
-                const bidPmpe = Number(found?.revShare?.bidPmpe ?? 0);
-                const minEffectiveBid = Number(found?.effectiveBid ?? 0);
-                const bondBalanceSol = Number(found?.values?.bondBalanceSol ?? 0);
-                const maxStakeWanted = Number(found?.maxStakeWanted ?? 0);
+                // Scoring API에서 minEffectiveBid 찾기
+                const scoringFound = scoringList.find((it: any) => it && (it.voteAccount === vote));
+                const minEffectiveBid = Number(scoringFound?.effectiveBid ?? 0);
+                
+                // Bonds API에서 나머지 값들 찾기
+                const bondsFound = bondsList.find((it: any) => it && (it.vote_account === vote));
+                if (bondsFound) {
+                    const bidPmpe = Number(bondsFound.cpmpe ?? 0) / 1e9; // Convert from lamports to SOL
+                    const maxStakeWanted = Number(bondsFound.max_stake_wanted ?? 0) / 1e9; // Convert from lamports to SOL
+                    const bondBalanceSol = Number(bondsFound.funded_amount ?? 0) / 1e9; // Convert from lamports to SOL
 
-                this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
-                this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
-                this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
-                this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
+                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
+                    this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
+                    this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
+                    this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
+                } else if (scoringFound) {
+                    // Bonds API에서 찾지 못한 경우 scoring API의 기존 값 사용
+                    const bidPmpe = Number(scoringFound?.revShare?.bidPmpe ?? 0);
+                    const maxStakeWanted = Number(scoringFound?.maxStakeWanted ?? 0);
+                    const bondBalanceSol = Number(scoringFound?.values?.bondBalanceSol ?? 0);
+
+                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
+                    this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
+                    this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
+                    this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
+                }
             }
         } catch (e) {
             console.error('updateMarinadeScoring', e);
