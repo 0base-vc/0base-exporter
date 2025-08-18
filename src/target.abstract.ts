@@ -61,6 +61,17 @@ export default abstract class TargetAbstract {
         }
     }
 
+    /**
+     * 랜덤 캐시 지속시간을 제공하여 동시 요청을 분산시키는 헬퍼 메서드
+     * @param baseDurationMs 기본 캐시 지속시간(ms)
+     * @param varianceMs 랜덤 분산 범위(ms), 기본 10000 (10초)
+     * @returns 랜덤 캐시 지속시간
+     */
+    protected getRandomCacheDuration(baseDurationMs: number = 60000, varianceMs: number = 10000): number {
+        const randomOffset = Math.random() * varianceMs - (varianceMs / 2);
+        return Math.max(baseDurationMs + randomOffset, baseDurationMs / 2);
+    }
+
     protected async get(url: string, process: (response: { data: any }) => any) {
         const fallbackKey = url;
         return axios.get(url).then(response => {

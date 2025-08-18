@@ -232,7 +232,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/delegation?vote=${vote}`;
-                const arr = await this.getWithCache(url, (response: { data: any }) => response.data);
+                const arr = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
                 if (Array.isArray(arr)) {
                     for (const item of arr) {
                         const source = String(item.stake_type || item.stakeType || 'unknown');
@@ -399,7 +399,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/validators/${vote}/pending-stake`;
-                const data = await this.getWithCache(url, (response: { data: any }) => response.data);
+                const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
                 const accounts: any[] = Array.isArray(data?.stake_accounts) ? data.stake_accounts : [];
                 if (accounts.length === 0) return;
 
