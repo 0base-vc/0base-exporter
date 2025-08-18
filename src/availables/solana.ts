@@ -289,7 +289,8 @@ export default class Solana extends TargetAbstract {
             
             // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
             const bondsUrl = 'https://validator-bonds-api.marinade.finance/bonds';
-            const bondsList = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 60000);
+            const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 60000);
+            const bondsList = bondsResponse?.bonds || [];
             
             if (!Array.isArray(scoringList) || !Array.isArray(bondsList)) return;
             
