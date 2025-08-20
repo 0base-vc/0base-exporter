@@ -228,6 +228,7 @@ export default class Solana extends TargetAbstract {
 
     // JPool: validator별 위임 출처별 합계를 수집
     private async updateDelegationsFromJPool(validators: string): Promise<void> {
+        this.delegationBySourceGauge.reset();
         const voteAccounts = this.toUniqueList(validators);
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
@@ -395,6 +396,8 @@ export default class Solana extends TargetAbstract {
 
     // JPool pending stake: activation/deactivation by source aggregated in SOL
     private async updatePendingStakeFromJPool(validators: string): Promise<void> {
+        this.pendingActivationBySourceGauge.reset();
+        this.pendingDeactivationBySourceGauge.reset();
         const voteAccounts = this.toUniqueList(validators);
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
@@ -417,10 +420,12 @@ export default class Solana extends TargetAbstract {
                     }
                 }
 
-                for (const [source, lamports] of Object.entries(activationBySource)) {
+                for (const source of Object.keys(activationBySource)) {
+                    const lamports = activationBySource[source];
                     this.pendingActivationBySourceGauge.labels(vote, source).set(lamports / LAMPORTS_PER_SOL);
                 }
-                for (const [source, lamports] of Object.entries(deactivationBySource)) {
+                for (const source of Object.keys(deactivationBySource)) {
+                    const lamports = deactivationBySource[source];
                     this.pendingDeactivationBySourceGauge.labels(vote, source).set(lamports / LAMPORTS_PER_SOL);
                 }
             } catch (e) {
