@@ -72,6 +72,18 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity']
     });
 
+    private readonly clusterRequiredVersionGauge = new Gauge({
+        name: `${this.metricPrefix}_cluster_required_versions`,
+        help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch',
+        labelNames: ['min_version_agave', 'min_version_frankendancer']
+    });
+
+    private readonly validatorReleaseVersionGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_release_version`,
+        help: 'Validator release client version labeled as string; value fixed to 1',
+        labelNames: ['vote', 'release_version']
+    });
+
     // private readonly validatorsCount = new Gauge({
     //     name: `${this.metricPrefix}_validators_count`,
     //     help: 'Validators count',
@@ -104,6 +116,8 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.validatorBondsGauge);
         this.registry.registerMetric(this.lastVoteGauge);
         this.registry.registerMetric(this.onboardingPriorityGauge);
+        this.registry.registerMetric(this.clusterRequiredVersionGauge);
+        this.registry.registerMetric(this.validatorReleaseVersionGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -113,6 +127,8 @@ export default class Solana extends TargetAbstract {
                 this.updateBalance(this.votes + (this.identities ? ',' + this.identities : '')),
                 this.updateVoteAccounts(this.votes),
                 this.updateOnboardingPriority(this.identities),
+                this.updateClusterRequiredVersions(),
+                this.updateValidatorReleaseVersions(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -234,6 +250,45 @@ export default class Solana extends TargetAbstract {
         // 첫 패스 이후엔 성공한 주소만 계속 확인하도록 고정
         if (!this.onboardingSelectionLocked) {
             this.onboardingSelectionLocked = true;
+        }
+    }
+
+    private async updateClusterRequiredVersions(): Promise<void> {
+        try {
+            this.clusterRequiredVersionGauge.reset();
+            const url = `https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=testnet`;
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
+            const items: any[] = Array.isArray(data?.data) ? data.data : [];
+            if (items.length === 0) return;
+            const latest = items[items.length - 1];
+            const ep: number = Number(latest?.epoch ?? NaN);
+            if (!Number.isFinite(ep)) return;
+            const minAgave: string = String(latest?.agave_min_version ?? '');
+            const minFrank: string = String(latest?.firedancer_min_version ?? '');
+            this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(ep);
+        } catch (e) {
+            console.error('updateClusterRequiredVersions', e);
+        }
+    }
+
+    private async updateValidatorReleaseVersions(): Promise<void> {
+        try {
+            this.validatorReleaseVersionGauge.reset();
+            const voteAccounts = this.toUniqueList(this.votes);
+            await Promise.all(voteAccounts.map(async (vote) => {
+                try {
+                    const url = `https://api.jpool.one/validators/${vote}`;
+                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
+                    const releaseVersion: string = String(data?.version ?? '');
+                    if (releaseVersion) {
+                        this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
+                    }
+                } catch (inner) {
+                    console.error(`updateValidatorReleaseVersions ${vote}`, inner);
+                }
+            }));
+        } catch (e) {
+            console.error('updateValidatorReleaseVersions', e);
         }
     }
 
