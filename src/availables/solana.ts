@@ -310,13 +310,12 @@ export default class Solana extends TargetAbstract {
             const items: any[] = Array.isArray(data?.data) ? data.data : [];
             if (items.length === 0) return;
 
-            for (const it of items) {
-                const ep: number = Number(it?.epoch ?? NaN);
-                if (!Number.isFinite(ep)) continue;
-                const minAgave: string = String(it?.agave_min_version ?? '');
-                const minFrank: string = String(it?.firedancer_min_version ?? '');
-                this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(ep);
-            }
+            const latest = items[items.length - 1];
+            const ep: number = Number(latest?.epoch ?? NaN);
+            if (!Number.isFinite(ep)) return;
+            const minAgave: string = String(latest?.agave_min_version ?? '');
+            const minFrank: string = String(latest?.firedancer_min_version ?? '');
+            this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(ep);
         } catch (e) {
             console.error('updateClusterRequiredVersions', e);
         }
@@ -325,19 +324,17 @@ export default class Solana extends TargetAbstract {
     private async updateValidatorReleaseVersions(): Promise<void> {
         try {
             this.validatorReleaseVersionGauge.reset();
-            const epoch = Solana.currentEpoch;
-            if (epoch == null) return;
-            const addresses = this.toUniqueList(this.addresses);
-            await Promise.all(addresses.map(async (addr) => {
+            const voteAccounts = this.toUniqueList(this.validators);
+            await Promise.all(voteAccounts.map(async (vote) => {
                 try {
-                    const url = `https://api.solana.org/api/validators/details?pk=${encodeURIComponent(addr)}&epoch=${encodeURIComponent(String(epoch))}`;
+                    const url = `https://api.jpool.one/validators/${encodeURIComponent(vote)}`;
                     const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
-                    const releaseVersion: string = String(data?.stats?.release_version ?? '');
+                    const releaseVersion: string = String(data?.version ?? '');
                     if (releaseVersion) {
-                        this.validatorReleaseVersionGauge.labels(addr, releaseVersion).set(1);
+                        this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
                     }
                 } catch (inner) {
-                    console.error(`updateValidatorReleaseVersions ${addr}`, inner);
+                    console.error(`updateValidatorReleaseVersions ${vote}`, inner);
                 }
             }));
         } catch (e) {
