@@ -125,6 +125,9 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateBalance(addresses: string): Promise<void> {
+        this.availableGauge.reset();
+        this.balanceGauge.reset();
+        this.validatorBondsGauge.reset();
         for (const address of this.toUniqueList(addresses)) {
             const available = await this.getAmount(this.apiUrl, {
                 method: 'getBalance',
@@ -156,6 +159,10 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateVoteAccounts(validators: string): Promise<void> {
+        this.activatedStakeGauge.reset();
+        this.activeGauge.reset();
+        this.commissionGauge.reset();
+        this.lastVoteGauge.reset();
         const voteAccounts = this.toUniqueList(validators);
         await this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
 
@@ -188,6 +195,7 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateOnboardingPriority(validators: string): Promise<void> {
+        this.onboardingPriorityGauge.reset();
         const voteAccounts = this.toUniqueList(validators);
 
         // 첫 실행 전: 실패한 주소 제외, 성공/실패를 판별해 집합에 기록
