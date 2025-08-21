@@ -10,8 +10,6 @@ export default class Solana extends TargetAbstract {
 
     private readonly metricPrefix = 'solana';
 
-    public static currentEpoch: number | null = null;
-
     private readonly registry = new Registry();
 
     private readonly balanceGauge = new Gauge({
@@ -423,12 +421,6 @@ export default class Solana extends TargetAbstract {
                 if (!Array.isArray(rows) || rows.length === 0) return;
                 const latest = rows[rows.length - 1];
                 const epochLabel = String(latest?.epoch ?? '');
-                if (epochLabel !== '') {
-                    const parsedEpoch = Number(epochLabel);
-                    if (!Number.isNaN(parsedEpoch)) {
-                        Solana.currentEpoch = parsedEpoch;
-                    }
-                }
 
                 const totalSlots = Number(latest?.totalSlots ?? 0);
                 const confirmedSlots = Number(latest?.confirmedSlots ?? 0);
