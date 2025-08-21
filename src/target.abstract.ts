@@ -94,15 +94,15 @@ export default abstract class TargetAbstract {
     private postCacheTimestamps: { [key: string]: number } = {};
 
     /**
-     * 1분 캐시가 적용된 POST 요청 함수. 모든 하위 클래스에서 사용 가능.
+     * 1분 캐시가 적용된 POST 요청 함수. JSON-RPC({ method, params }) 또는 일반 JSON 바디 모두 지원.
      * @param url 요청 URL
-     * @param data { method, params }
+     * @param data JSON-RPC({ method, params }) 또는 일반 JSON 객체 바디
      * @param process 응답 처리 함수
      * @param cacheDurationMs 캐시 유지 시간(ms), 기본 1분
      */
     protected async postWithCache(
         url: string,
-        data: { method: string, params?: string[] },
+        data: any,
         process: (response: { data: any }) => any,
         cacheDurationMs: number = 60000
     ) {
@@ -116,12 +116,11 @@ export default abstract class TargetAbstract {
             return this.postCache[key];
         }
         try {
-            const response = await axios.post(url, {
-                jsonrpc: '2.0',
-                id: 1,
-                method: data.method,
-                params: data.params,
-            });
+            const isJsonRpc = data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'method');
+            const body = isJsonRpc
+                ? { jsonrpc: '2.0', id: 1, method: data.method, params: data.params }
+                : data;
+            const response = await axios.post(url, body);
             const result = process(response);
             this.postCache[key] = result;
             this.postCacheTimestamps[key] = now;

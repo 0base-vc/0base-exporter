@@ -1,7 +1,7 @@
 import TargetAbstract from "../target.abstract";
 import { Gauge, Registry } from 'prom-client';
 import * as _ from 'lodash';
-import axios from 'axios';
+// axios 제거: TargetAbstract의 getWithCache/postWithCache 사용
 
 const LAMPORTS_PER_SOL = 1e9;
 
@@ -304,7 +304,7 @@ export default class Solana extends TargetAbstract {
             this.clusterRequiredVersionGauge.reset();
 
             const url = `https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=mainnet-beta`;
-            const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
             const items: any[] = Array.isArray(data?.data) ? data.data : [];
             if (items.length === 0) return;
 
@@ -326,7 +326,7 @@ export default class Solana extends TargetAbstract {
             await Promise.all(voteAccounts.map(async (vote) => {
                 try {
                     const url = `https://api.jpool.one/validators/${encodeURIComponent(vote)}`;
-                    const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
+                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
                     const releaseVersion: string = String(data?.version ?? '');
                     if (releaseVersion) {
                         this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
@@ -414,7 +414,7 @@ export default class Solana extends TargetAbstract {
                 } else {
                     const url = 'https://api.vx.tools/epochs/income';
                     const payload = { identity, limit: 1 };
-                    const { data } = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+                    const data = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.VX_CACHE_TTL_MS);
                     rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
                     this.vxIncomeCache.set(identity, { ts: now, rows });
                 }
