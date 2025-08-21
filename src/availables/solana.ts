@@ -304,19 +304,15 @@ export default class Solana extends TargetAbstract {
     private async updateClusterRequiredVersions(): Promise<void> {
         try {
             this.clusterRequiredVersionGauge.reset();
-            const currentEpoch = Solana.currentEpoch;
-            if (currentEpoch == null) return;
 
             const url = `https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=mainnet-beta`;
             const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
             const items: any[] = Array.isArray(data?.data) ? data.data : [];
             if (items.length === 0) return;
 
-            // 현재 epoch과 다음 epoch만 노출
-            const targetEpochs = new Set<number>([currentEpoch, currentEpoch + 1]);
             for (const it of items) {
                 const ep: number = Number(it?.epoch ?? NaN);
-                if (!Number.isFinite(ep) || !targetEpochs.has(ep)) continue;
+                if (!Number.isFinite(ep)) continue;
                 const minAgave: string = String(it?.agave_min_version ?? '');
                 const minFrank: string = String(it?.firedancer_min_version ?? '');
                 this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(ep);
