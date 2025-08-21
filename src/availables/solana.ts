@@ -130,7 +130,7 @@ export default class Solana extends TargetAbstract {
 
     private readonly clusterRequiredVersionGauge = new Gauge({
         name: `${this.metricPrefix}_cluster_required_versions`,
-        help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value fixed to 1',
+        help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch',
         labelNames: ['min_version_agave', 'min_version_frankendancer']
     });
 
@@ -304,15 +304,23 @@ export default class Solana extends TargetAbstract {
     private async updateClusterRequiredVersions(): Promise<void> {
         try {
             this.clusterRequiredVersionGauge.reset();
-            const epoch = Solana.currentEpoch;
-            if (epoch == null) return;
+            const currentEpoch = Solana.currentEpoch;
+            if (currentEpoch == null) return;
 
-            const url = `https://api.solana.org/api/validators/epoch-stats?cluster=mainnet-beta&epoch=${encodeURIComponent(String(epoch))}`;
+            const url = `https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=mainnet-beta`;
             const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
-            const minAgave: string = String(data?.stats?.config?.min_version ?? '');
-            const minFrank: string = String(data?.stats?.config?.min_version_frankendancer ?? '');
+            const items: any[] = Array.isArray(data?.data) ? data.data : [];
+            if (items.length === 0) return;
 
-            this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(1);
+            // 현재 epoch과 다음 epoch만 노출
+            const targetEpochs = new Set<number>([currentEpoch, currentEpoch + 1]);
+            for (const it of items) {
+                const ep: number = Number(it?.epoch ?? NaN);
+                if (!Number.isFinite(ep) || !targetEpochs.has(ep)) continue;
+                const minAgave: string = String(it?.agave_min_version ?? '');
+                const minFrank: string = String(it?.firedancer_min_version ?? '');
+                this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(ep);
+            }
         } catch (e) {
             console.error('updateClusterRequiredVersions', e);
         }
