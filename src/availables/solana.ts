@@ -27,103 +27,103 @@ export default class Solana extends TargetAbstract {
     private readonly activatedStakeGauge = new Gauge({
         name: `${this.metricPrefix}_validator_activated_stake`,
         help: 'Your activated stake',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly activeGauge = new Gauge({
         name: `${this.metricPrefix}_validator_active`,
         help: 'Your validator active',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly commissionGauge = new Gauge({
         name: `${this.metricPrefix}_validator_commission`,
         help: 'Your validator commission',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly validatorBondsGauge = new Gauge({
         name: `${this.metricPrefix}_validator_bonds`,
         help: 'Your validator bonds',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly delegationBySourceGauge = new Gauge({
         name: `${this.metricPrefix}_delegation_sol`,
         help: 'Delegations to validator by source',
-        labelNames: ['validator', 'source']
+        labelNames: ['vote', 'source']
     });
 
     private readonly pendingActivationBySourceGauge = new Gauge({
         name: `${this.metricPrefix}_pending_activation_sol`,
         help: 'Pending activation stake by source',
-        labelNames: ['validator', 'source']
+        labelNames: ['vote', 'source']
     });
 
     private readonly pendingDeactivationBySourceGauge = new Gauge({
         name: `${this.metricPrefix}_pending_deactivation_sol`,
         help: 'Pending deactivation stake by source',
-        labelNames: ['validator', 'source']
+        labelNames: ['vote', 'source']
     });
 
     private readonly marinadeMinEffectiveBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_min_effective_bid_sol`,
         help: 'Minimum effective bid required to receive delegation from Marinade',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly marinadeMyBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_my_bid_sol`,
         help: 'Current bid value our validator has set in Marinade',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly marinadeMaxStakeWantedGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_max_stake_wanted_sol`,
         help: 'Maximum stake wanted by validator in Marinade',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly slotsAssignedGauge = new Gauge({
         name: `${this.metricPrefix}_slots_assigned_total`,
         help: 'Total number of leader slots assigned to our validator in the current epoch',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly slotsProducedGauge = new Gauge({
         name: `${this.metricPrefix}_slots_produced_total`,
         help: 'Number of leader slots we successfully produced in the current epoch',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly slotsSkippedGauge = new Gauge({
         name: `${this.metricPrefix}_slots_skipped_total`,
         help: 'Number of leader slots assigned but not produced in the current epoch',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly blockFeesTotalGauge = new Gauge({
         name: `${this.metricPrefix}_block_fees_total_sol`,
         help: 'Total transaction fees from blocks we produced',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly mevFeesTotalGauge = new Gauge({
         name: `${this.metricPrefix}_mev_fees_total_sol`,
         help: 'Total MEV-related fees collected',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly blockFeesMedianGauge = new Gauge({
         name: `${this.metricPrefix}_block_fees_median_sol`,
         help: 'Median transaction fees per produced block',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly blockTipsMedianGauge = new Gauge({
         name: `${this.metricPrefix}_block_tips_median_sol`,
         help: 'Median block tips per produced block',
-        labelNames: ['validator', 'epoch']
+        labelNames: ['vote', 'epoch']
     });
 
     private readonly clusterRequiredVersionGauge = new Gauge({
@@ -135,7 +135,7 @@ export default class Solana extends TargetAbstract {
     private readonly validatorReleaseVersionGauge = new Gauge({
         name: `${this.metricPrefix}_validator_release_version`,
         help: 'Validator release client version labeled as string; value fixed to 1',
-        labelNames: ['validator', 'release_version']
+        labelNames: ['vote', 'release_version']
     });
 
     // validator voteAccount -> node identity mapping
@@ -164,7 +164,7 @@ export default class Solana extends TargetAbstract {
     private readonly lastVoteGauge = new Gauge({
         name: `${this.metricPrefix}_validator_last_vote`,
         help: 'Your validator last vote',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     // private readonly validatorsCount = new Gauge({
@@ -175,9 +175,9 @@ export default class Solana extends TargetAbstract {
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
                        protected readonly rpcUrl: string,
-                       protected readonly addresses: string,
-                       protected readonly validators: string) {
-        super(existMetrics, apiUrl, rpcUrl, addresses, validators);
+                       protected readonly votes: string,
+                       protected readonly identities: string) {
+        super(existMetrics, apiUrl, rpcUrl, votes, identities);
 
         this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
@@ -208,15 +208,15 @@ export default class Solana extends TargetAbstract {
         let customMetrics = '';
         try {
             // 1) 먼저 vote account -> identity 매핑 생성 (getVoteAccounts 1회 호출)
-            await this.updateVoteAccounts(this.validators);
+            await this.updateVoteAccounts(this.votes);
 
             // 2) 독립 작업 병렬 수행
             await Promise.all([
-                this.updateBalance(this.addresses),
-                this.updateDelegationsFromJPool(this.validators),
-                this.updatePendingStakeFromJPool(this.validators),
-                this.updateMarinadeScoring(this.validators),
-                this.updateEpochIncomeFromVx(this.validators),
+                this.updateBalance(this.votes + (this.identities ? ',' + this.identities : '')),
+                this.updateDelegationsFromJPool(this.votes),
+                this.updatePendingStakeFromJPool(this.votes),
+                this.updateMarinadeScoring(this.votes),
+                this.updateEpochIncomeFromVx(this.votes),
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
             ]);
@@ -277,15 +277,15 @@ export default class Solana extends TargetAbstract {
                     return i;
                 })
             );
-            for (const validator of voteAccounts) {
-                const myValidator = _.find(allValidators, (o: any) => o.votePubkey === validator);
+            for (const vote of voteAccounts) {
+                const myValidator = _.find(allValidators, (o: any) => o.votePubkey === vote);
                 if (!myValidator) continue;
-                this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / LAMPORTS_PER_SOL);
-                this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
-                this.commissionGauge.labels(validator).set(myValidator.commission);
-                this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
+                this.activatedStakeGauge.labels(vote).set(myValidator.activatedStake / LAMPORTS_PER_SOL);
+                this.activeGauge.labels(vote).set(myValidator.status === 'current' ? 1 : 0);
+                this.commissionGauge.labels(vote).set(myValidator.commission);
+                this.lastVoteGauge.labels(vote).set(myValidator.lastVote);
                 if (myValidator.nodePubkey) {
-                    this.validatorToIdentityMap[validator] = myValidator.nodePubkey;
+                    this.validatorToIdentityMap[vote] = myValidator.nodePubkey;
                 }
             }
         });
@@ -322,7 +322,7 @@ export default class Solana extends TargetAbstract {
     private async updateValidatorReleaseVersions(): Promise<void> {
         try {
             this.validatorReleaseVersionGauge.reset();
-            const voteAccounts = this.toUniqueList(this.validators);
+            const voteAccounts = this.toUniqueList(this.votes);
             await Promise.all(voteAccounts.map(async (vote) => {
                 try {
                     const url = `https://api.jpool.one/validators/${encodeURIComponent(vote)}`;

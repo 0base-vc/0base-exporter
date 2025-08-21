@@ -60,6 +60,8 @@ Extra metrics for Blockchain.
 | `EXISTING_METRICS_URL(Optional)` | The existing metrics URL                          | `http://localhost:26660,http://localhost:26661`       |
 | `API_URL`                        | Blockchain API URL                                | `http://localhost:1317`                               |
 | `RPC_URL`                        | Blockchain RPC URL                                | `http://localhost:26657`                              |
-| `ADDRESS`                        | Your addresses(Identity for Solana)               | `akash1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4jxqcnl`        |
-| `VALIDATOR`                      | Your validator address(Vote for solana)           | `akashvaloper1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4cyw7r4` |
+| `ADDRESS`                        | Your addresses                                    | `akash1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4jxqcnl`        |
+| `VALIDATOR`                      | Your validator address                            | `akashvaloper1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4cyw7r4` |
+| `VOTE`                           | Solana vote accounts (comma-separated)            | `5BAi9YGCipHq4ZcXuen5vagRQqRTVTRszXNqBZC6uBPZ`        |
+| `IDENTITY`                       | Solana identity accounts (comma-separated)        | `zeroT6PTAEjipvZuACTh1mbGCqTHgA6i1ped9DcuidX`         |
 | `DECIMAL_PLACES(Optional)`       | Decimal Places                                    | `6 or 18`                                             |
