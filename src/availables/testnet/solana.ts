@@ -81,7 +81,7 @@ export default class Solana extends TargetAbstract {
     private readonly validatorReleaseVersionGauge = new Gauge({
         name: `${this.metricPrefix}_validator_release_version`,
         help: 'Validator release client version labeled as string; value fixed to 1',
-        labelNames: ['vote', 'release_version']
+        labelNames: ['identity', 'release_version']
     });
 
     // private readonly validatorsCount = new Gauge({
@@ -271,20 +271,36 @@ export default class Solana extends TargetAbstract {
         }
     }
 
+    private async getCurrentEpochNumber(): Promise<number | null> {
+        try {
+            const epoch = await this.postWithCache(this.apiUrl, { method: 'getEpochInfo' }, response => {
+                return Number(response.data?.result?.epoch ?? NaN);
+            });
+            return Number.isFinite(epoch) ? epoch : null;
+        } catch (e) {
+            console.error('getCurrentEpochNumber', e);
+            return null;
+        }
+    }
+
     private async updateValidatorReleaseVersions(): Promise<void> {
         try {
             this.validatorReleaseVersionGauge.reset();
-            const voteAccounts = this.toUniqueList(this.votes);
-            await Promise.all(voteAccounts.map(async (vote) => {
+            const epoch = await this.getCurrentEpochNumber();
+            if (epoch == null) return;
+            const targetEpoch = epoch - 1;
+            if (targetEpoch < 0) return;
+            const identityAccounts = this.toUniqueList(this.identities);
+            await Promise.all(identityAccounts.map(async (identity) => {
                 try {
-                    const url = `https://api.jpool.one/validators/${vote}`;
+                    const url = `https://api.solana.org/api/validators/details?pk=${encodeURIComponent(identity)}&epoch=${encodeURIComponent(String(targetEpoch))}`;
                     const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
-                    const releaseVersion: string = String(data?.version ?? '');
+                    const releaseVersion: string = String(data?.stats?.release_version ?? '');
                     if (releaseVersion) {
-                        this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
+                        this.validatorReleaseVersionGauge.labels(identity, releaseVersion).set(1);
                     }
                 } catch (inner) {
-                    console.error(`updateValidatorReleaseVersions ${vote}`, inner);
+                    console.error(`updateValidatorReleaseVersions ${identity}`, inner);
                 }
             }));
         } catch (e) {
