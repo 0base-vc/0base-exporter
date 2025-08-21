@@ -10,6 +10,8 @@ export default class Solana extends TargetAbstract {
 
     private readonly metricPrefix = 'solana';
 
+    public static currentEpoch: number | null = null;
+
     private readonly registry = new Registry();
 
     private readonly balanceGauge = new Gauge({
@@ -126,6 +128,18 @@ export default class Solana extends TargetAbstract {
         labelNames: ['validator', 'epoch']
     });
 
+    private readonly clusterRequiredVersionGauge = new Gauge({
+        name: `${this.metricPrefix}_cluster_required_versions`,
+        help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value fixed to 1',
+        labelNames: ['min_version_agave', 'min_version_frankendancer']
+    });
+
+    private readonly validatorReleaseVersionGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_release_version`,
+        help: 'Validator release client version labeled as string; value fixed to 1',
+        labelNames: ['validator', 'release_version']
+    });
+
     // validator voteAccount -> node identity mapping
     private validatorToIdentityMap: Record<string, string> = {};
 
@@ -188,6 +202,8 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.mevFeesTotalGauge);
         this.registry.registerMetric(this.blockFeesMedianGauge);
         this.registry.registerMetric(this.blockTipsMedianGauge);
+        this.registry.registerMetric(this.clusterRequiredVersionGauge);
+        this.registry.registerMetric(this.validatorReleaseVersionGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -203,6 +219,8 @@ export default class Solana extends TargetAbstract {
                 this.updatePendingStakeFromJPool(this.validators),
                 this.updateMarinadeScoring(this.validators),
                 this.updateEpochIncomeFromVx(this.validators),
+                this.updateClusterRequiredVersions(),
+                this.updateValidatorReleaseVersions(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -279,6 +297,48 @@ export default class Solana extends TargetAbstract {
         return this.postWithCache(url, data, response => {
             return selector(response.data) / LAMPORTS_PER_SOL;
         });
+    }
+
+    // Epoch 값은 updateEpochIncomeFromVx에서만 갱신한다.
+
+    private async updateClusterRequiredVersions(): Promise<void> {
+        try {
+            this.clusterRequiredVersionGauge.reset();
+            const epoch = Solana.currentEpoch;
+            if (epoch == null) return;
+
+            const url = `https://api.solana.org/api/validators/epoch-stats?cluster=mainnet-beta&epoch=${encodeURIComponent(String(epoch))}`;
+            const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
+            const minAgave: string = String(data?.stats?.config?.min_version ?? '');
+            const minFrank: string = String(data?.stats?.config?.min_version_frankendancer ?? '');
+
+            this.clusterRequiredVersionGauge.labels(minAgave, minFrank).set(1);
+        } catch (e) {
+            console.error('updateClusterRequiredVersions', e);
+        }
+    }
+
+    private async updateValidatorReleaseVersions(): Promise<void> {
+        try {
+            this.validatorReleaseVersionGauge.reset();
+            const epoch = Solana.currentEpoch;
+            if (epoch == null) return;
+            const addresses = this.toUniqueList(this.addresses);
+            await Promise.all(addresses.map(async (addr) => {
+                try {
+                    const url = `https://api.solana.org/api/validators/details?pk=${encodeURIComponent(addr)}&epoch=${encodeURIComponent(String(epoch))}`;
+                    const { data } = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
+                    const releaseVersion: string = String(data?.stats?.release_version ?? '');
+                    if (releaseVersion) {
+                        this.validatorReleaseVersionGauge.labels(addr, releaseVersion).set(1);
+                    }
+                } catch (inner) {
+                    console.error(`updateValidatorReleaseVersions ${addr}`, inner);
+                }
+            }));
+        } catch (e) {
+            console.error('updateValidatorReleaseVersions', e);
+        }
     }
 
     // Marinade scoring API → bid, min effective bid, bonds(=bondBalanceSol)
@@ -362,6 +422,12 @@ export default class Solana extends TargetAbstract {
                 if (!Array.isArray(rows) || rows.length === 0) return;
                 const latest = rows[rows.length - 1];
                 const epochLabel = String(latest?.epoch ?? '');
+                if (epochLabel !== '') {
+                    const parsedEpoch = Number(epochLabel);
+                    if (!Number.isNaN(parsedEpoch)) {
+                        Solana.currentEpoch = parsedEpoch;
+                    }
+                }
 
                 const totalSlots = Number(latest?.totalSlots ?? 0);
                 const confirmedSlots = Number(latest?.confirmedSlots ?? 0);
