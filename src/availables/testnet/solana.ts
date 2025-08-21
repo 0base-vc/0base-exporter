@@ -27,25 +27,25 @@ export default class Solana extends TargetAbstract {
     private readonly activatedStakeGauge = new Gauge({
         name: `${this.metricPrefix}_validator_activated_stake`,
         help: 'Your activated stake',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly activeGauge = new Gauge({
         name: `${this.metricPrefix}_validator_active`,
         help: 'Your validator active',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly commissionGauge = new Gauge({
         name: `${this.metricPrefix}_validator_commission`,
         help: 'Your validator commission',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly validatorBondsGauge = new Gauge({
         name: `${this.metricPrefix}_validator_bonds`,
         help: 'Your validator bonds',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     // private readonly rankGauge = new Gauge({
@@ -63,13 +63,13 @@ export default class Solana extends TargetAbstract {
     private readonly lastVoteGauge = new Gauge({
         name: `${this.metricPrefix}_validator_last_vote`,
         help: 'Your validator last vote',
-        labelNames: ['validator']
+        labelNames: ['vote']
     });
 
     private readonly onboardingPriorityGauge = new Gauge({
         name: `${this.metricPrefix}_onboarding_priority`,
         help: 'Validator onboarding priority number',
-        labelNames: ['validator']
+        labelNames: ['identity']
     });
 
     // private readonly validatorsCount = new Gauge({
@@ -91,9 +91,9 @@ export default class Solana extends TargetAbstract {
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
                        protected readonly rpcUrl: string,
-                       protected readonly addresses: string,
-                       protected readonly validators: string) {
-        super(existMetrics, apiUrl, rpcUrl, addresses, validators);
+                       protected readonly votes: string,
+                       protected readonly identities: string) {
+        super(existMetrics, apiUrl, rpcUrl, votes, identities);
 
         this.registry.registerMetric(this.balanceGauge);
         this.registry.registerMetric(this.availableGauge);
@@ -110,9 +110,9 @@ export default class Solana extends TargetAbstract {
         let customMetrics = '';
         try {
             await Promise.all([
-                this.updateBalance(this.addresses),
-                this.updateVoteAccounts(this.validators),
-                this.updateOnboardingPriority(this.validators),
+                this.updateBalance(this.votes + (this.identities ? ',' + this.identities : '')),
+                this.updateVoteAccounts(this.votes),
+                this.updateOnboardingPriority(this.identities),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -128,6 +128,7 @@ export default class Solana extends TargetAbstract {
         this.availableGauge.reset();
         this.balanceGauge.reset();
         this.validatorBondsGauge.reset();
+        const voteSet = new Set(this.toUniqueList(this.votes));
         for (const address of this.toUniqueList(addresses)) {
             const available = await this.getAmount(this.apiUrl, {
                 method: 'getBalance',
@@ -138,9 +139,11 @@ export default class Solana extends TargetAbstract {
             this.balanceGauge.labels(address).set(available);
 
             // validator bonds
-            const validatorBonds = await this.getValidatorBonds(address);
-            if (validatorBonds) {
-                this.validatorBondsGauge.labels(address).set(validatorBonds);
+            if (voteSet.has(address)) {
+                const validatorBonds = await this.getValidatorBonds(address);
+                if (validatorBonds) {
+                    this.validatorBondsGauge.labels(address).set(validatorBonds);
+                }
             }
         }
     }
@@ -174,16 +177,16 @@ export default class Solana extends TargetAbstract {
                 return i;
             }));
 
-            for (const validator of voteAccounts) {
+            for (const vote of voteAccounts) {
                 const myValidator = _.find(allValidators, (o: any) => {
-                    return o.votePubkey === validator;
+                    return o.votePubkey === vote;
                 });
                 if (!myValidator) continue;
 
-                this.activatedStakeGauge.labels(validator).set(myValidator.activatedStake / Solana.LAMPORTS_PER_SOL);
-                this.activeGauge.labels(validator).set(myValidator.status === 'current' ? 1 : 0);
-                this.commissionGauge.labels(validator).set(myValidator.commission);
-                this.lastVoteGauge.labels(validator).set(myValidator.lastVote);
+                this.activatedStakeGauge.labels(vote).set(myValidator.activatedStake / Solana.LAMPORTS_PER_SOL);
+                this.activeGauge.labels(vote).set(myValidator.status === 'current' ? 1 : 0);
+                this.commissionGauge.labels(vote).set(myValidator.commission);
+                this.lastVoteGauge.labels(vote).set(myValidator.lastVote);
             }
         });
     }
@@ -194,37 +197,37 @@ export default class Solana extends TargetAbstract {
         });
     }
 
-    private async updateOnboardingPriority(validators: string): Promise<void> {
+    private async updateOnboardingPriority(identities: string): Promise<void> {
         this.onboardingPriorityGauge.reset();
-        const voteAccounts = this.toUniqueList(validators);
+        const identityAccounts = this.toUniqueList(identities);
 
         // 첫 실행 전: 실패한 주소 제외, 성공/실패를 판별해 집합에 기록
         // 첫 실행 이후(locked): 최초 성공한 주소만 계속 조회
         const targets: string[] = this.onboardingSelectionLocked
-            ? voteAccounts.filter(v => this.onboardingAllowedValidators.has(v))
-            : voteAccounts.filter(v => !this.onboardingFailedValidators.has(v));
+            ? identityAccounts.filter(v => this.onboardingAllowedValidators.has(v))
+            : identityAccounts.filter(v => !this.onboardingFailedValidators.has(v));
 
-        await Promise.all(targets.map(async (validator) => {
+        await Promise.all(targets.map(async (identity) => {
             try {
                 const onboardingData = await this.getWithCache(
-                    `https://api.solana.org/api/validators/${validator}?cacheStatus=enable`,
+                    `https://api.solana.org/api/validators/${identity}?cacheStatus=enable`,
                     (response: { data: any }) => response.data
                 );
 
                 const hasValue = onboardingData && onboardingData.onboardingNumber !== null && onboardingData.onboardingNumber !== undefined;
                 if (hasValue) {
-                    this.onboardingPriorityGauge.labels(validator).set(onboardingData.onboardingNumber);
+                    this.onboardingPriorityGauge.labels(identity).set(onboardingData.onboardingNumber);
                     if (!this.onboardingSelectionLocked) {
-                        this.onboardingAllowedValidators.add(validator);
+                        this.onboardingAllowedValidators.add(identity);
                     }
                 } else if (!this.onboardingSelectionLocked) {
-                    this.onboardingFailedValidators.add(validator);
+                    this.onboardingFailedValidators.add(identity);
                 }
             } catch (e) {
                 if (!this.onboardingSelectionLocked) {
-                    this.onboardingFailedValidators.add(validator);
+                    this.onboardingFailedValidators.add(identity);
                 }
-                console.error(`Failed to get onboarding priority for validator ${validator}:`, e);
+                console.error(`Failed to get onboarding priority for identity ${identity}:`, e);
             }
         }));
 
