@@ -64,8 +64,8 @@ export default class Mitosis extends Tendermint {
             const below = sorted[rank] || {collateral_shares: '0'};
 
             this.rankGauge.labels(validator).set(rank);
-            this.rivalsPowerGauge.labels('above').set(parseInt(above.collateral_shares));
-            this.rivalsPowerGauge.labels('below').set(parseInt(below.collateral_shares));
+            this.rivalsPowerGauge.labels('above').set(parseInt(above.collateral_shares) / Math.pow(10, this.decimalPlaces));
+            this.rivalsPowerGauge.labels('below').set(parseInt(below.collateral_shares) / Math.pow(10, this.decimalPlaces));
         });
     }
 
