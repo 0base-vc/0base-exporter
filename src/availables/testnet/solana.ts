@@ -42,12 +42,6 @@ export default class Solana extends TargetAbstract {
         labelNames: ['vote']
     });
 
-    private readonly validatorBondsGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_bonds`,
-        help: 'Your validator bonds',
-        labelNames: ['vote']
-    });
-
     // private readonly rankGauge = new Gauge({
     //     name: `${this.metricPrefix}_validator_rank`,
     //     help: 'Your validator rank',
@@ -153,28 +147,7 @@ export default class Solana extends TargetAbstract {
             this.availableGauge.labels(address).set(available);
 
             this.balanceGauge.labels(address).set(available);
-
-            // validator bonds
-            if (voteSet.has(address)) {
-                const validatorBonds = await this.getValidatorBonds(address);
-                if (validatorBonds) {
-                    this.validatorBondsGauge.labels(address).set(validatorBonds);
-                }
-            }
         }
-    }
-
-    private async getValidatorBonds(voteAccount: string): Promise<number | undefined> {
-        const arr = await this.getWithCache('https://validator-bonds-api.marinade.finance/bonds', (response: { data: any }) => {
-            return response.data.bonds;
-        });
-
-        // vote_account와 일치하는 객체 찾기
-        const found = Array.isArray(arr)
-            ? arr.find((item: any) => item.vote_account === voteAccount)
-            : undefined;
-        // 값이 있으면 effective_amount / 1e9 반환
-        return found ? found.effective_amount / 1e9 : undefined;
     }
 
     private async updateVoteAccounts(validators: string): Promise<void> {
