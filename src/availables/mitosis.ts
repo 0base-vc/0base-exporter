@@ -19,19 +19,19 @@ export default class Mitosis extends Tendermint {
     protected readonly validatorsCollateralGauge = new Gauge({
         name: `${this.metricPrefix}_validators_collateral`,
         help: 'Validators collateral amount',
-        labelNames: ['address']
+        labelNames: ['address', 'moniker']
     });
 
     protected readonly validatorsExtraVotingPowerGauge = new Gauge({
         name: `${this.metricPrefix}_validators_extra_voting_power`,
         help: 'Validators extra voting power',
-        labelNames: ['address']
+        labelNames: ['address', 'moniker']
     });
 
     protected readonly validatorsVotingPowerGauge = new Gauge({
         name: `${this.metricPrefix}_validators_voting_power`,
         help: 'Validators voting power',
-        labelNames: ['address']
+        labelNames: ['address', 'moniker']
     });
 
     protected readonly validatorsCommissionRateGauge = new Gauge({
@@ -130,13 +130,8 @@ export default class Mitosis extends Tendermint {
         return this.get(url, async (response: { data: any }) => {
             const validators = response.data.validators;
             for (const validator of validators) {
-                this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares));
-                this.validatorsCollateralGauge.labels(validator.addr).set(parseInt(validator.collateral));
-                this.validatorsExtraVotingPowerGauge.labels(validator.addr).set(parseInt(validator.extra_voting_power));
-                this.validatorsVotingPowerGauge.labels(validator.addr).set(parseInt(validator.voting_power));
-                
-                // 스마트 컨트랙트에서 추가 정보 가져오기
-                await this.updateValidatorContractInfo(validator.addr);
+                // 스마트 컨트랙트에서 모든 정보 가져오기 (한 번의 호출로 최적화)
+                await this.updateValidatorInfo(validator);
             }
         });
     }
@@ -268,6 +263,45 @@ export default class Mitosis extends Tendermint {
         return this.validatorManagerContract;
     }
 
+    private async updateValidatorInfo(validator: any): Promise<void> {
+        try {
+            // 스마트 컨트랙트에서 정보 가져오기
+            const contract = this.getValidatorManagerContract();
+            const result = await contract.methods.validatorInfo(validator.addr).call();
+            
+            // Metadata에서 moniker 추출 (JSON 파싱)
+            const metadata = this.parseMetadataToJson(result.metadata);
+            const moniker = metadata?.name || 'Unknown';
+            
+            // API 데이터로 기본 validator power 정보 업데이트 (moniker 포함)
+            this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares));
+            this.validatorsCollateralGauge.labels(validator.addr, moniker).set(parseInt(validator.collateral));
+            this.validatorsExtraVotingPowerGauge.labels(validator.addr, moniker).set(parseInt(validator.extra_voting_power));
+            this.validatorsVotingPowerGauge.labels(validator.addr, moniker).set(parseInt(validator.voting_power));
+            
+            // 컨트랙트 데이터로 commission rate 정보 업데이트
+            const commissionRatePercent = parseFloat((parseInt(result.commissionRate) / 100).toFixed(2));
+            const pendingCommissionRatePercent = parseFloat((parseInt(result.pendingCommissionRate) / 100).toFixed(2));
+            const pendingCommissionRateUpdateEpoch = parseInt(result.pendingCommissionRateUpdateEpoch);
+            
+            this.validatorsCommissionRateGauge.labels(validator.addr, moniker).set(commissionRatePercent);
+            this.validatorsPendingCommissionRateGauge.labels(validator.addr, moniker).set(pendingCommissionRatePercent);
+            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(validator.addr, moniker).set(pendingCommissionRateUpdateEpoch);
+            
+        } catch (e) {
+            console.error(`Error fetching validator info for ${validator.addr}:`, e);
+            // 에러 발생 시 기본값으로 설정
+            const fallbackMoniker = 'Unknown';
+            this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares || '0'));
+            this.validatorsCollateralGauge.labels(validator.addr, fallbackMoniker).set(parseInt(validator.collateral || '0'));
+            this.validatorsExtraVotingPowerGauge.labels(validator.addr, fallbackMoniker).set(parseInt(validator.extra_voting_power || '0'));
+            this.validatorsVotingPowerGauge.labels(validator.addr, fallbackMoniker).set(parseInt(validator.voting_power || '0'));
+            this.validatorsCommissionRateGauge.labels(validator.addr, fallbackMoniker).set(0);
+            this.validatorsPendingCommissionRateGauge.labels(validator.addr, fallbackMoniker).set(0);
+            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(validator.addr, fallbackMoniker).set(0);
+        }
+    }
+
     private parseMetadataToJson(metadataHex: string): any {
         try {
             if (!metadataHex || metadataHex === '0x') {
@@ -301,39 +335,7 @@ export default class Mitosis extends Tendermint {
         }
     }
 
-    protected async updateValidatorContractInfo(valAddr: string): Promise<void> {
-        try {
-            // 컨트랙트 호출
-            const contract = this.getValidatorManagerContract();
-            const result = await contract.methods.validatorInfo(valAddr).call();
-            
-            // Commission Rate (기본 단위 100 = 1%, 따라서 100으로 나누어 퍼센트로 변환)
-            const commissionRatePercent = parseFloat((parseInt(result.commissionRate) / 100).toFixed(2));
-            
-            // Pending Commission Rate
-            const pendingCommissionRatePercent = parseFloat((parseInt(result.pendingCommissionRate) / 100).toFixed(2));
-            
-            // Pending Commission Rate Update Epoch
-            const pendingCommissionRateUpdateEpoch = parseInt(result.pendingCommissionRateUpdateEpoch);
-            
-            // Metadata에서 moniker 추출 (JSON 파싱)
-            const metadata = this.parseMetadataToJson(result.metadata);
-            const moniker = metadata?.name || 'Unknown';
-            
-            // Gauge 업데이트
-            this.validatorsCommissionRateGauge.labels(valAddr, moniker).set(commissionRatePercent);
-            this.validatorsPendingCommissionRateGauge.labels(valAddr, moniker).set(pendingCommissionRatePercent);
-            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(valAddr, moniker).set(pendingCommissionRateUpdateEpoch);
-            
-        } catch (e) {
-            console.error(`Error fetching validator contract info for ${valAddr}:`, e);
-            // 에러 발생 시 기본값으로 설정
-            const fallbackMoniker = 'Unknown';
-            this.validatorsCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
-            this.validatorsPendingCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
-            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(valAddr, fallbackMoniker).set(0);
-        }
-    }
+
 
     //curl -X POST -H "Content-Type: application/json" https://berachain-v2-testnet-node-web3.1xp.vc -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x7A9Ba30e544d2b6F1cD11709e9F0a5C57A779e94", "latest"],"id":1}'
     //curl -X POST -H "Content-Type: application/json" http://localhost:8545 -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x7A9Ba30e544d2b6F1cD11709e9F0a5C57A779e94", "latest"],"id":1}'
