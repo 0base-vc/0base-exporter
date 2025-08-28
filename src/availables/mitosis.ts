@@ -6,9 +6,9 @@ import erc20Abi from '../abi/erc20.json';
 
 export default class Mitosis extends Tendermint {
     public readonly web3: Web3;
-    private readonly gMitoContractAddress: string = '';
+    private readonly gMitoContractAddress: string = '0x1248163272144FdbBbE6D1a8c43Ca56DE9bD5cEA';
     private gMitoDecimals: number | null = null;
-    private readonly validatorRewardDistributorContractAddress: string = '';
+    private readonly validatorRewardDistributorContractAddress: string = '0x124816321ac3a7F3A68Cf2D36876e670beaBC6c7';
 
     protected readonly erc20BalanceGauge = new Gauge({
         name: `${this.metricPrefix}_erc20_balance`,
