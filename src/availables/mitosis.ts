@@ -3,7 +3,6 @@ import {Gauge} from "prom-client";
 import Tendermint from "./tendermint-v1";
 import * as _ from 'lodash';
 import erc20Abi from '../abi/erc20.json';
-import validatorManagerAbi from '../abi/mitosis/validator-manager.json';
 
 export default class Mitosis extends Tendermint {
     public readonly web3: Web3;
@@ -189,10 +188,75 @@ export default class Mitosis extends Tendermint {
 
     // 컨트랙트 인스턴스 재사용
     private validatorManagerContract?: any;
+    
+    // Validator Manager ABI 정의
+    private readonly validatorManagerAbi = [
+        {
+            "type": "function",
+            "name": "validatorInfo",
+            "inputs": [
+                {
+                    "name": "valAddr",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "tuple",
+                    "internalType": "struct IValidatorManager.ValidatorInfoResponse",
+                    "components": [
+                        {
+                            "name": "valAddr",
+                            "type": "address",
+                            "internalType": "address"
+                        },
+                        {
+                            "name": "pubKey",
+                            "type": "bytes",
+                            "internalType": "bytes"
+                        },
+                        {
+                            "name": "operator",
+                            "type": "address",
+                            "internalType": "address"
+                        },
+                        {
+                            "name": "rewardManager",
+                            "type": "address",
+                            "internalType": "address"
+                        },
+                        {
+                            "name": "commissionRate",
+                            "type": "uint256",
+                            "internalType": "uint256"
+                        },
+                        {
+                            "name": "pendingCommissionRate",
+                            "type": "uint256",
+                            "internalType": "uint256"
+                        },
+                        {
+                            "name": "pendingCommissionRateUpdateEpoch",
+                            "type": "uint256",
+                            "internalType": "uint256"
+                        },
+                        {
+                            "name": "metadata",
+                            "type": "bytes",
+                            "internalType": "bytes"
+                        }
+                    ]
+                }
+            ],
+            "stateMutability": "view"
+        }
+    ];
 
     private getValidatorManagerContract() {
         if (!this.validatorManagerContract) {
-            this.validatorManagerContract = new this.web3.eth.Contract(validatorManagerAbi as any, this.validatorManagerContractAddress);
+            this.validatorManagerContract = new this.web3.eth.Contract(this.validatorManagerAbi as any, this.validatorManagerContractAddress);
         }
         return this.validatorManagerContract;
     }
