@@ -2,7 +2,6 @@ import {Web3} from "web3";
 import {Gauge} from "prom-client";
 import Tendermint from "./tendermint-v1";
 import * as _ from 'lodash';
-import erc20Abi from '../abi/erc20.json';
 
 export default class Mitosis extends Tendermint {
     public readonly web3: Web3;
@@ -149,7 +148,7 @@ export default class Mitosis extends Tendermint {
             // gMITO(ERC20) 토큰 조회 (contract address는 환경변수로 주입)
             if (this.gMitoContractAddress) {
                 try {
-                    const tokenContract = new this.web3.eth.Contract(erc20Abi as any, this.gMitoContractAddress);
+                    const tokenContract = new this.web3.eth.Contract(this.erc20Abi as any, this.gMitoContractAddress);
                     if (this.gMitoDecimals == null) {
                         const decimals: number = await tokenContract.methods.decimals().call();
                         this.gMitoDecimals = Number(decimals) || 18;
@@ -190,6 +189,24 @@ export default class Mitosis extends Tendermint {
 
     // 컨트랙트 인스턴스 재사용
     private validatorManagerContract?: any;
+    
+    // ERC20 ABI 정의 (필요한 함수들만)
+    private readonly erc20Abi = [
+        {
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+            "name": "balanceOf", 
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ];
     
     // Validator Manager ABI 정의
     private readonly validatorManagerAbi = [
