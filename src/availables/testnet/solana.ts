@@ -107,7 +107,6 @@ export default class Solana extends TargetAbstract {
 
         this.registry.registerMetric(this.activeGauge);
         this.registry.registerMetric(this.commissionGauge);
-        this.registry.registerMetric(this.validatorBondsGauge);
         this.registry.registerMetric(this.lastVoteGauge);
         this.registry.registerMetric(this.onboardingPriorityGauge);
         this.registry.registerMetric(this.clusterRequiredVersionGauge);
@@ -137,7 +136,6 @@ export default class Solana extends TargetAbstract {
     private async updateBalance(addresses: string): Promise<void> {
         this.availableGauge.reset();
         this.balanceGauge.reset();
-        this.validatorBondsGauge.reset();
         const voteSet = new Set(this.toUniqueList(this.votes));
         for (const address of this.toUniqueList(addresses)) {
             const available = await this.getAmount(this.apiUrl, {
