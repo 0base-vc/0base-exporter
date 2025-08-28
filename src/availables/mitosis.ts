@@ -16,6 +16,24 @@ export default class Mitosis extends Tendermint {
         labelNames: ['address', 'contractAddress', 'token', 'symbol']
     });
 
+    protected readonly validatorsCollateralGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_collateral`,
+        help: 'Validators collateral amount',
+        labelNames: ['address']
+    });
+
+    protected readonly validatorsExtraVotingPowerGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_extra_voting_power`,
+        help: 'Validators extra voting power',
+        labelNames: ['address']
+    });
+
+    protected readonly validatorsVotingPowerGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_voting_power`,
+        help: 'Validators voting power',
+        labelNames: ['address']
+    });
+
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
                        protected readonly rpcUrl: string,
@@ -25,6 +43,9 @@ export default class Mitosis extends Tendermint {
 
         this.web3 = new Web3(process.env.EVM_API_URL);
         this.registry.registerMetric(this.erc20BalanceGauge);
+        this.registry.registerMetric(this.validatorsCollateralGauge);
+        this.registry.registerMetric(this.validatorsExtraVotingPowerGauge);
+        this.registry.registerMetric(this.validatorsVotingPowerGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -87,6 +108,9 @@ export default class Mitosis extends Tendermint {
             const validators = response.data.validators;
             validators.forEach((validator: any) => {
                 this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares));
+                this.validatorsCollateralGauge.labels(validator.addr).set(parseInt(validator.collateral));
+                this.validatorsExtraVotingPowerGauge.labels(validator.addr).set(parseInt(validator.extra_voting_power));
+                this.validatorsVotingPowerGauge.labels(validator.addr).set(parseInt(validator.voting_power));
             });
         });
     }
