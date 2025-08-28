@@ -46,6 +46,12 @@ export default class Mitosis extends Tendermint {
         labelNames: ['address', 'moniker']
     });
 
+    protected readonly validatorsPendingCommissionRateUpdateEpochGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_pending_commission_rate_update_epoch`,
+        help: 'Validators pending commission rate update epoch',
+        labelNames: ['address', 'moniker']
+    });
+
     private readonly validatorManagerContractAddress: string = '0x12481632e81c446ecFa1CD8F93df4DebC8F5ACd2';
 
     public constructor(protected readonly existMetrics: string,
@@ -62,6 +68,7 @@ export default class Mitosis extends Tendermint {
         this.registry.registerMetric(this.validatorsVotingPowerGauge);
         this.registry.registerMetric(this.validatorsCommissionRateGauge);
         this.registry.registerMetric(this.validatorsPendingCommissionRateGauge);
+        this.registry.registerMetric(this.validatorsPendingCommissionRateUpdateEpochGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -300,11 +307,14 @@ export default class Mitosis extends Tendermint {
             const contract = this.getValidatorManagerContract();
             const result = await contract.methods.validatorInfo(valAddr).call();
             
-            // Commission Rate (기본 단위는 1e18, 퍼센트로 변환)
-            const commissionRatePercent = parseFloat((parseInt(result.commissionRate) / Math.pow(10, 16)).toFixed(2));
+            // Commission Rate (기본 단위 100 = 1%, 따라서 100으로 나누어 퍼센트로 변환)
+            const commissionRatePercent = parseFloat((parseInt(result.commissionRate) / 100).toFixed(2));
             
             // Pending Commission Rate
-            const pendingCommissionRatePercent = parseFloat((parseInt(result.pendingCommissionRate) / Math.pow(10, 16)).toFixed(2));
+            const pendingCommissionRatePercent = parseFloat((parseInt(result.pendingCommissionRate) / 100).toFixed(2));
+            
+            // Pending Commission Rate Update Epoch
+            const pendingCommissionRateUpdateEpoch = parseInt(result.pendingCommissionRateUpdateEpoch);
             
             // Metadata에서 moniker 추출 (JSON 파싱)
             const metadata = this.parseMetadataToJson(result.metadata);
@@ -313,6 +323,7 @@ export default class Mitosis extends Tendermint {
             // Gauge 업데이트
             this.validatorsCommissionRateGauge.labels(valAddr, moniker).set(commissionRatePercent);
             this.validatorsPendingCommissionRateGauge.labels(valAddr, moniker).set(pendingCommissionRatePercent);
+            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(valAddr, moniker).set(pendingCommissionRateUpdateEpoch);
             
         } catch (e) {
             console.error(`Error fetching validator contract info for ${valAddr}:`, e);
@@ -320,6 +331,7 @@ export default class Mitosis extends Tendermint {
             const fallbackMoniker = 'Unknown';
             this.validatorsCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
             this.validatorsPendingCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
+            this.validatorsPendingCommissionRateUpdateEpochGauge.labels(valAddr, fallbackMoniker).set(0);
         }
     }
 
