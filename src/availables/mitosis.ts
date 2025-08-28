@@ -3,6 +3,7 @@ import {Gauge} from "prom-client";
 import Tendermint from "./tendermint-v1";
 import * as _ from 'lodash';
 import erc20Abi from '../abi/erc20.json';
+import validatorManagerAbi from '../abi/mitosis/validator-manager.json';
 
 export default class Mitosis extends Tendermint {
     public readonly web3: Web3;
@@ -34,6 +35,20 @@ export default class Mitosis extends Tendermint {
         labelNames: ['address']
     });
 
+    protected readonly validatorsCommissionRateGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_commission_rate`,
+        help: 'Validators commission rate',
+        labelNames: ['address', 'moniker']
+    });
+
+    protected readonly validatorsPendingCommissionRateGauge = new Gauge({
+        name: `${this.metricPrefix}_validators_pending_commission_rate`,
+        help: 'Validators pending commission rate',
+        labelNames: ['address', 'moniker']
+    });
+
+    private readonly validatorManagerContractAddress: string = '0x12481632e81c446ecFa1CD8F93df4DebC8F5ACd2';
+
     public constructor(protected readonly existMetrics: string,
                        protected readonly apiUrl: string,
                        protected readonly rpcUrl: string,
@@ -46,6 +61,8 @@ export default class Mitosis extends Tendermint {
         this.registry.registerMetric(this.validatorsCollateralGauge);
         this.registry.registerMetric(this.validatorsExtraVotingPowerGauge);
         this.registry.registerMetric(this.validatorsVotingPowerGauge);
+        this.registry.registerMetric(this.validatorsCommissionRateGauge);
+        this.registry.registerMetric(this.validatorsPendingCommissionRateGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -104,14 +121,17 @@ export default class Mitosis extends Tendermint {
     protected async updateValidatorsPower(): Promise<void> {
         const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
 
-        return this.get(url, (response: { data: any }) => {
+        return this.get(url, async (response: { data: any }) => {
             const validators = response.data.validators;
-            validators.forEach((validator: any) => {
+            for (const validator of validators) {
                 this.validatorsGauge.labels(validator.addr).set(parseInt(validator.collateral_shares));
                 this.validatorsCollateralGauge.labels(validator.addr).set(parseInt(validator.collateral));
                 this.validatorsExtraVotingPowerGauge.labels(validator.addr).set(parseInt(validator.extra_voting_power));
                 this.validatorsVotingPowerGauge.labels(validator.addr).set(parseInt(validator.voting_power));
-            });
+                
+                // 스마트 컨트랙트에서 추가 정보 가져오기
+                await this.updateValidatorContractInfo(validator.addr);
+            }
         });
     }
 
@@ -164,6 +184,78 @@ export default class Mitosis extends Tendermint {
             this.commissionGauge.labels(validator, 'gMITO').set(primary);
         } catch (e) {
             console.error('updateOperatorCommission error', e);
+        }
+    }
+
+    // 컨트랙트 인스턴스 재사용
+    private validatorManagerContract?: any;
+
+    private getValidatorManagerContract() {
+        if (!this.validatorManagerContract) {
+            this.validatorManagerContract = new this.web3.eth.Contract(validatorManagerAbi as any, this.validatorManagerContractAddress);
+        }
+        return this.validatorManagerContract;
+    }
+
+    private parseMetadataToJson(metadataHex: string): any {
+        try {
+            if (!metadataHex || metadataHex === '0x') {
+                return null;
+            }
+            
+            // bytes를 string으로 변환
+            const hex = metadataHex.slice(2); // 0x 제거
+            const metadataString = Buffer.from(hex, 'hex').toString('utf8');
+            
+            // null byte 제거
+            const cleanedString = metadataString.replace(/\0/g, '');
+            
+            if (!cleanedString.trim()) {
+                return null;
+            }
+            
+            // JSON 파싱 시도
+            return JSON.parse(cleanedString);
+        } catch (e) {
+            console.error('Metadata JSON parsing error:', e);
+            // JSON 파싱이 실패하면 plain text로 처리
+            try {
+                const hex = metadataHex.slice(2);
+                const plainText = Buffer.from(hex, 'hex').toString('utf8').replace(/\0/g, '');
+                return { name: plainText.trim() || 'Unknown' };
+            } catch (fallbackError) {
+                console.error('Metadata fallback parsing error:', fallbackError);
+                return { name: 'Unknown' };
+            }
+        }
+    }
+
+    protected async updateValidatorContractInfo(valAddr: string): Promise<void> {
+        try {
+            // 컨트랙트 호출
+            const contract = this.getValidatorManagerContract();
+            const result = await contract.methods.validatorInfo(valAddr).call();
+            
+            // Commission Rate (기본 단위는 1e18, 퍼센트로 변환)
+            const commissionRatePercent = parseFloat((parseInt(result.commissionRate) / Math.pow(10, 16)).toFixed(2));
+            
+            // Pending Commission Rate
+            const pendingCommissionRatePercent = parseFloat((parseInt(result.pendingCommissionRate) / Math.pow(10, 16)).toFixed(2));
+            
+            // Metadata에서 moniker 추출 (JSON 파싱)
+            const metadata = this.parseMetadataToJson(result.metadata);
+            const moniker = metadata?.name || 'Unknown';
+            
+            // Gauge 업데이트
+            this.validatorsCommissionRateGauge.labels(valAddr, moniker).set(commissionRatePercent);
+            this.validatorsPendingCommissionRateGauge.labels(valAddr, moniker).set(pendingCommissionRatePercent);
+            
+        } catch (e) {
+            console.error(`Error fetching validator contract info for ${valAddr}:`, e);
+            // 에러 발생 시 기본값으로 설정
+            const fallbackMoniker = 'Unknown';
+            this.validatorsCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
+            this.validatorsPendingCommissionRateGauge.labels(valAddr, fallbackMoniker).set(0);
         }
     }
 
