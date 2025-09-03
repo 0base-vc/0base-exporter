@@ -28,11 +28,15 @@
     "incremental": true,
     "resolveJsonModule": true
   },
+  "include": [
+    "src/**/*"
+  ],
   "exclude": [
     "node_modules",
     "**/*.spec.ts",
     "./dist",
-    "./bin"
+    "./bin",
+    "./ignore"
   ]
 }
 

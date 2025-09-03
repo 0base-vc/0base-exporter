@@ -68,8 +68,8 @@ export default class Solana extends TargetAbstract {
 
     private readonly marinadeMinEffectiveBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_min_effective_bid_sol`,
-        help: 'Minimum effective bid required to receive delegation from Marinade',
-        labelNames: ['vote']
+        help: 'Minimum effective bid required to receive delegation from Marinade (pmpe)',
+        labelNames: ['commission', 'mev_commission']
     });
 
     private readonly marinadeMyBidGauge = new Gauge({
@@ -145,6 +145,10 @@ export default class Solana extends TargetAbstract {
     private vxIncomeCache: Map<string, { ts: number, rows: any[] }> = new Map();
     private readonly VX_CACHE_TTL_MS = 60000;
 
+    // SDK 기반 Eff. Bid 계산 결과 캐시
+    private sdkEffBidCache: { ts: number, winningTotalPmpe: number, inflationPmpe: number, mevPmpe: number } | null = null;
+    private readonly SDK_CACHE_TTL_MS = 10 * 60 * 1000;
+
     private toUniqueList(csv: string): string[] {
         return Array.from(new Set(csv.split(',').map(v => v.trim()).filter(Boolean)));
     }
@@ -216,6 +220,7 @@ export default class Solana extends TargetAbstract {
                 this.updateDelegationsFromJPool(this.votes),
                 this.updatePendingStakeFromJPool(this.votes),
                 this.updateMarinadeScoring(this.votes),
+                this.updateGlobalEffectiveBid(),
                 this.updateEpochIncomeFromVx(this.votes),
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
@@ -359,7 +364,6 @@ export default class Solana extends TargetAbstract {
             for (const vote of voteAccounts) {
                 // Scoring API에서 minEffectiveBid 찾기
                 const scoringFound = scoringList.find((it: any) => it && (it.voteAccount === vote));
-                const minEffectiveBid = Number(scoringFound?.effectiveBid ?? 0);
                 
                 // Bonds API에서 나머지 값들 찾기
                 const bondsFound = bondsList.find((it: any) => it && (it.vote_account === vote));
@@ -370,7 +374,6 @@ export default class Solana extends TargetAbstract {
 
                     this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
-                    this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 } else if (scoringFound) {
                     // Bonds API에서 찾지 못한 경우 scoring API의 기존 값 사용
@@ -380,12 +383,68 @@ export default class Solana extends TargetAbstract {
 
                     this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
-                    this.marinadeMinEffectiveBidGauge.labels(vote).set(minEffectiveBid);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 }
             }
         } catch (e) {
             console.error('updateMarinadeScoring', e);
+        }
+    }
+
+    // Global effective bid (pmpe) 계산 후 commission/mev_commission 라벨로 게이지에 설정
+    private async updateGlobalEffectiveBid(): Promise<void> {
+        try {
+            this.marinadeMinEffectiveBidGauge.reset();
+            // 0) 먼저 정확도를 위해 ds-sam-sdk가 있으면 그 값을 우선 사용
+            try {
+                // 캐시 체크
+                const now = Date.now();
+                if (this.sdkEffBidCache && (now - this.sdkEffBidCache.ts) < this.SDK_CACHE_TTL_MS) {
+                    const { winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe } = this.sdkEffBidCache;
+                    const pairs: Array<[number, number]> = [ [0, 0], [5, 10] ];
+                    for (const [commissionPct, mevCommissionPct] of pairs) {
+                        const commission = commissionPct / 100;
+                        const mevCommission = mevCommissionPct / 100;
+                        const effBidPmpe = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - commission) + baseMevPmpe * (1 - mevCommission)));
+                        this.marinadeMinEffectiveBidGauge.labels(String(commissionPct), String(mevCommissionPct)).set(effBidPmpe);
+                    }
+                    return;
+                }
+
+                const configUrl = 'https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json';
+                const config = await this.getWithCache(configUrl, (response: { data: any }) => response.data, 60000);
+                // use require to satisfy TS type resolver while runtime uses monorepo package
+                const req: any = (global as any).require ? (global as any).require : eval('require');
+                const sdkMod: any = req('@marinade.finance/ds-sam-sdk');
+                const dsSam = new sdkMod.DsSamSDK({ ...config, inputsSource: sdkMod.InputsSource.APIS, cacheInputs: false });
+                const origLog = console.log; const origWarn = console.warn;
+                try {
+                    console.log = () => {}; console.warn = () => {};
+                    const runRes = await dsSam.runFinalOnly();
+                    const winningTotalPmpe: number = Number(runRes?.winningTotalPmpe ?? 0);
+                    const aggregated = await dsSam.getAggregatedData();
+                    const baseInflPmpe: number = Number(aggregated?.rewards?.inflationPmpe ?? 0);
+                    const baseMevPmpe: number = Number(aggregated?.rewards?.mevPmpe ?? 0);
+
+                    // 캐시에 저장 (1시간)
+                    this.sdkEffBidCache = { ts: now, winningTotalPmpe: Number(winningTotalPmpe), inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
+
+                    const pairs: Array<[number, number]> = [ [0, 0], [5, 10] ];
+                    for (const [commissionPct, mevCommissionPct] of pairs) {
+                        const commission = commissionPct / 100;
+                        const mevCommission = mevCommissionPct / 100;
+                        const effBidPmpe = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - commission) + baseMevPmpe * (1 - mevCommission)));
+                        this.marinadeMinEffectiveBidGauge.labels(String(commissionPct), String(mevCommissionPct)).set(effBidPmpe);
+                    }
+                    return;
+                } finally { console.log = origLog; console.warn = origWarn; }
+            } catch (e) {
+                console.error('updateGlobalEffectiveBid', e);
+                // SDK 부재/오류 시 근사치 계산은 수행하지 않음
+                return;
+            }
+        } catch (e) {
+            console.error('updateGlobalEffectiveBid', e);
         }
     }
 
