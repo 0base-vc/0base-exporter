@@ -429,7 +429,7 @@ export default class Solana extends TargetAbstract {
                     // 캐시에 저장 (1시간)
                     this.sdkEffBidCache = { ts: now, winningTotalPmpe: Number(winningTotalPmpe), inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
 
-                    const pairs: Array<[number, number]> = [ [0, 0], [5, 10] ];
+                    const pairs: Array<[number, number]> = [ [5, 10] ]; //[ [0, 0], [5, 10] ];
                     for (const [commissionPct, mevCommissionPct] of pairs) {
                         const commission = commissionPct / 100;
                         const mevCommission = mevCommissionPct / 100;
