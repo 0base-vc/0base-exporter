@@ -401,7 +401,7 @@ export default class Solana extends TargetAbstract {
                 const now = Date.now();
                 if (this.sdkEffBidCache && (now - this.sdkEffBidCache.ts) < this.SDK_CACHE_TTL_MS) {
                     const { winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe } = this.sdkEffBidCache;
-                    const pairs: Array<[number, number]> = [ [0, 0], [5, 10] ];
+                    const pairs: Array<[number, number]> = [ [5, 10] ]; //[ [0, 0], [5, 10] ];
                     for (const [commissionPct, mevCommissionPct] of pairs) {
                         const commission = commissionPct / 100;
                         const mevCommission = mevCommissionPct / 100;
