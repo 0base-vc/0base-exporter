@@ -69,7 +69,7 @@ export default class Solana extends TargetAbstract {
     private readonly marinadeMinEffectiveBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_min_effective_bid_sol`,
         help: 'Minimum effective bid required to receive delegation from Marinade (pmpe)',
-        labelNames: ['commission', 'mev_commission']
+        labelNames: ['vote', 'commission', 'mev_commission']
     });
 
     private readonly marinadeMyBidGauge = new Gauge({
@@ -427,30 +427,15 @@ export default class Solana extends TargetAbstract {
         try {
             const url = 'https://validators-api.marinade.finance/mev';
             const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
-            // 다양한 포맷에 대응: 배열 혹은 객체 맵
-            const map: Record<string, number> = {};
-            if (Array.isArray(data)) {
-                for (const it of data) {
-                    const vote = String(it?.vote_account || it?.vote || '');
-                    const bps = Number(it?.mev_commission_bps ?? it?.mevCommissionBps ?? it?.mev_commission);
-                    if (vote && Number.isFinite(bps)) map[vote] = bps;
-                }
-            } else if (data && typeof data === 'object') {
-                // { validators: [...] } 형태 처리
-                const validatorsArr: any[] = Array.isArray((data as any).validators) ? (data as any).validators : [];
-                for (const it of validatorsArr) {
-                    const vote = String(it?.vote_account || it?.vote || '');
-                    const bps = Number(it?.mev_commission_bps ?? it?.mevCommissionBps ?? it?.mev_commission);
-                    if (vote && Number.isFinite(bps)) map[vote] = bps;
-                }
-                for (const key of Object.keys(data)) {
-                    const entry = data[key];
-                    const vote = String(entry?.vote_account || entry?.vote || key || '');
-                    const bps = Number(entry?.mev_commission_bps ?? entry?.mevCommissionBps ?? entry?.mev_commission ?? data[key]);
-                    if (vote && Number.isFinite(bps)) map[vote] = bps;
-                }
+            // { validators: [ { vote_account, mev_commission_bps, ... }, ... ] } 형태만 처리
+            const out: Record<string, number> = {};
+            const arr: any[] = Array.isArray((data as any)?.validators) ? (data as any).validators : [];
+            for (const it of arr) {
+                const vote = String(it?.vote_account || '');
+                const bps = Number(it?.mev_commission_bps);
+                if (vote && Number.isFinite(bps)) out[vote] = bps;
             }
-            return map;
+            return out;
         } catch (e) {
             console.error('loadMevCommissionBps', e);
             return {};
@@ -467,12 +452,19 @@ export default class Solana extends TargetAbstract {
                 const now = Date.now();
                 if (this.sdkEffBidCache && (now - this.sdkEffBidCache.ts) < this.SDK_CACHE_TTL_MS) {
                     const { winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe } = this.sdkEffBidCache;
-                    const pairs: Array<[number, number]> = [ [5, 10] ]; //[ [0, 0], [5, 10] ];
-                    for (const [commissionPct, mevCommissionPct] of pairs) {
-                        const commission = commissionPct / 100;
-                        const mevCommission = mevCommissionPct / 100;
-                        const effBidPmpe = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - commission) + baseMevPmpe * (1 - mevCommission)));
-                        this.marinadeMinEffectiveBidGauge.labels(String(commissionPct), String(mevCommissionPct)).set(effBidPmpe);
+                    // 미리 두 케이스 계산
+                    const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
+                    const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
+                    const commissionByVote = await this.loadValidatorsAdvertisedCommission();
+                    const mevCommissionBpsByVote = await this.loadMevCommissionBps();
+                    for (const vote of this.toUniqueList(this.votes)) {
+                        const comm = Number(commissionByVote[vote]);
+                        const mevBps = Number(mevCommissionBpsByVote[vote]);
+                        const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
+                        const useEff = is510 ? eff510 : eff00;
+                        const commLabel = is510 ? '5' : '0';
+                        const mevLabel = is510 ? '10' : '0';
+                        this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
                     }
                     return;
                 }
@@ -495,12 +487,19 @@ export default class Solana extends TargetAbstract {
                     // 캐시에 저장 (1시간)
                     this.sdkEffBidCache = { ts: now, winningTotalPmpe: Number(winningTotalPmpe), inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
 
-                    const pairs: Array<[number, number]> = [ [5, 10] ]; //[ [0, 0], [5, 10] ];
-                    for (const [commissionPct, mevCommissionPct] of pairs) {
-                        const commission = commissionPct / 100;
-                        const mevCommission = mevCommissionPct / 100;
-                        const effBidPmpe = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - commission) + baseMevPmpe * (1 - mevCommission)));
-                        this.marinadeMinEffectiveBidGauge.labels(String(commissionPct), String(mevCommissionPct)).set(effBidPmpe);
+                    // 미리 두 케이스 계산
+                    const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
+                    const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
+                    const commissionByVote = await this.loadValidatorsAdvertisedCommission();
+                    const mevCommissionBpsByVote = await this.loadMevCommissionBps();
+                    for (const vote of this.toUniqueList(this.votes)) {
+                        const comm = Number(commissionByVote[vote]);
+                        const mevBps = Number(mevCommissionBpsByVote[vote]);
+                        const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
+                        const useEff = is510 ? eff510 : eff00;
+                        const commLabel = is510 ? '5' : '0';
+                        const mevLabel = is510 ? '10' : '0';
+                        this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
                     }
                     return;
                 } finally { console.log = origLog; console.warn = origWarn; }
