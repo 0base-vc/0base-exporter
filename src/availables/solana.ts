@@ -446,70 +446,64 @@ export default class Solana extends TargetAbstract {
     private async updateGlobalEffectiveBid(): Promise<void> {
         try {
             this.marinadeMinEffectiveBidGauge.reset();
-            // 0) 먼저 정확도를 위해 ds-sam-sdk가 있으면 그 값을 우선 사용
-            try {
-                // 캐시 체크
-                const now = Date.now();
-                if (this.sdkEffBidCache && (now - this.sdkEffBidCache.ts) < this.SDK_CACHE_TTL_MS) {
-                    const { winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe } = this.sdkEffBidCache;
-                    // 미리 두 케이스 계산
-                    const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
-                    const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
-                    const commissionByVote = await this.loadValidatorsAdvertisedCommission();
-                    const mevCommissionBpsByVote = await this.loadMevCommissionBps();
-                    for (const vote of this.toUniqueList(this.votes)) {
-                        const comm = Number(commissionByVote[vote]);
-                        const mevBps = Number(mevCommissionBpsByVote[vote]);
-                        const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
-                        const useEff = is510 ? eff510 : eff00;
-                        const commLabel = is510 ? '5' : '0';
-                        const mevLabel = is510 ? '10' : '0';
-                        this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
-                    }
-                    return;
-                }
 
-                const configUrl = 'https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json';
-                const config = await this.getWithCache(configUrl, (response: { data: any }) => response.data, 60000);
-                // use require to satisfy TS type resolver while runtime uses monorepo package
-                const req: any = (global as any).require ? (global as any).require : eval('require');
-                const sdkMod: any = req('@marinade.finance/ds-sam-sdk');
-                const dsSam = new sdkMod.DsSamSDK({ ...config, inputsSource: sdkMod.InputsSource.APIS, cacheInputs: false });
-                const origLog = console.log; const origWarn = console.warn;
-                try {
-                    console.log = () => {}; console.warn = () => {};
-                    const runRes = await dsSam.runFinalOnly();
-                    const winningTotalPmpe: number = Number(runRes?.winningTotalPmpe ?? 0);
-                    const aggregated = await dsSam.getAggregatedData();
-                    const baseInflPmpe: number = Number(aggregated?.rewards?.inflationPmpe ?? 0);
-                    const baseMevPmpe: number = Number(aggregated?.rewards?.mevPmpe ?? 0);
+            const now = Date.now();
+            let winningTotalPmpe: number;
+            let baseInflPmpe: number;
+            let baseMevPmpe: number;
 
-                    // 캐시에 저장 (1시간)
-                    this.sdkEffBidCache = { ts: now, winningTotalPmpe: Number(winningTotalPmpe), inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
-
-                    // 미리 두 케이스 계산
-                    const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
-                    const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
-                    const commissionByVote = await this.loadValidatorsAdvertisedCommission();
-                    const mevCommissionBpsByVote = await this.loadMevCommissionBps();
-                    for (const vote of this.toUniqueList(this.votes)) {
-                        const comm = Number(commissionByVote[vote]);
-                        const mevBps = Number(mevCommissionBpsByVote[vote]);
-                        const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
-                        const useEff = is510 ? eff510 : eff00;
-                        const commLabel = is510 ? '5' : '0';
-                        const mevLabel = is510 ? '10' : '0';
-                        this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
-                    }
-                    return;
-                } finally { console.log = origLog; console.warn = origWarn; }
-            } catch (e) {
-                console.error('updateGlobalEffectiveBid', e);
-                // SDK 부재/오류 시 근사치 계산은 수행하지 않음
+            // 1) 캐시 사용 가능하면 활용
+            if (this.sdkEffBidCache && (now - this.sdkEffBidCache.ts) < this.SDK_CACHE_TTL_MS) {
+                ({ winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe } = this.sdkEffBidCache);
+                await this.applyEffBidToVotes(winningTotalPmpe, baseInflPmpe, baseMevPmpe);
                 return;
             }
+
+            // 2) SDK 실행하여 최신 값을 계산
+            const configUrl = 'https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json';
+            const config = await this.getWithCache(configUrl, (response: { data: any }) => response.data, 60000);
+            const req: any = (global as any).require ? (global as any).require : eval('require');
+            const sdkMod: any = req('@marinade.finance/ds-sam-sdk');
+            const dsSam = new sdkMod.DsSamSDK({ ...config, inputsSource: sdkMod.InputsSource.APIS, cacheInputs: false });
+
+            const origLog = console.log; const origWarn = console.warn;
+            try {
+                console.log = () => {}; console.warn = () => {};
+                const runRes = await dsSam.runFinalOnly();
+                winningTotalPmpe = Number(runRes?.winningTotalPmpe ?? 0);
+                const aggregated = await dsSam.getAggregatedData();
+                baseInflPmpe = Number(aggregated?.rewards?.inflationPmpe ?? 0);
+                baseMevPmpe = Number(aggregated?.rewards?.mevPmpe ?? 0);
+            } finally {
+                console.log = origLog; console.warn = origWarn;
+            }
+
+            // 3) 캐시 갱신 및 적용
+            this.sdkEffBidCache = { ts: now, winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
+            await this.applyEffBidToVotes(winningTotalPmpe, baseInflPmpe, baseMevPmpe);
         } catch (e) {
             console.error('updateGlobalEffectiveBid', e);
+        }
+    }
+
+    // Helper: 두 케이스 (0,0), (5,10) 사전계산 후 vote별로 선택하여 게이지 설정
+    private async applyEffBidToVotes(winningTotalPmpe: number, baseInflPmpe: number, baseMevPmpe: number): Promise<void> {
+        const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
+        const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
+
+        const [commissionByVote, mevCommissionBpsByVote] = await Promise.all([
+            this.loadValidatorsAdvertisedCommission(),
+            this.loadMevCommissionBps(),
+        ]);
+
+        for (const vote of this.toUniqueList(this.votes)) {
+            const comm = Number(commissionByVote[vote]);
+            const mevBps = Number(mevCommissionBpsByVote[vote]);
+            const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
+            const useEff = is510 ? eff510 : eff00;
+            const commLabel = is510 ? '5' : '0';
+            const mevLabel = is510 ? '10' : '0';
+            this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
         }
     }
 
