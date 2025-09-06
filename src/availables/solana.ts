@@ -75,7 +75,7 @@ export default class Solana extends TargetAbstract {
     private readonly marinadeMyBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_my_bid_sol`,
         help: 'Current bid value our validator has set in Marinade',
-        labelNames: ['vote', 'commission', 'mev_commission']
+        labelNames: ['vote']
     });
 
     private readonly marinadeMaxStakeWantedGauge = new Gauge({
@@ -358,8 +358,7 @@ export default class Solana extends TargetAbstract {
             const bondsList = bondsResponse?.bonds || [];
 
             // 3. Commission(광고 커미션) / MEV 커미션 로드
-            const commissionByVote = await this.loadValidatorsAdvertisedCommission();
-            const mevCommissionBpsByVote = await this.loadMevCommissionBps();
+            // Commission/MEV 커미션은 현재 my_bid 라벨에서 사용하지 않으므로 로드 생략
             
             if (!Array.isArray(scoringList) || !Array.isArray(bondsList)) return;
             
@@ -371,19 +370,12 @@ export default class Solana extends TargetAbstract {
                 
                 // Bonds API에서 나머지 값들 찾기
                 const bondsFound = bondsList.find((it: any) => it && (it.vote_account === vote));
-                const commissionPctValue = Number(commissionByVote[vote]);
-                const mevCommissionPctValue = (() => {
-                    const bps = Number(mevCommissionBpsByVote[vote]);
-                    return Number.isFinite(bps) ? (bps / 100) : undefined;
-                })();
-                const commissionLabel = Number.isFinite(commissionPctValue) ? String(commissionPctValue) : '0';
-                const mevCommissionLabel = Number.isFinite(mevCommissionPctValue) ? String(mevCommissionPctValue) : '0';
                 if (bondsFound) {
                     const bidPmpe = Number(bondsFound.cpmpe ?? 0) / 1e9; // Convert from lamports to SOL
                     const maxStakeWanted = Number(bondsFound.max_stake_wanted ?? 0) / 1e9; // Convert from lamports to SOL
                     const bondBalanceSol = Number(bondsFound.funded_amount ?? 0) / 1e9; // Convert from lamports to SOL
 
-                    this.marinadeMyBidGauge.labels(vote, commissionLabel, mevCommissionLabel).set(bidPmpe);
+                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 } else if (scoringFound) {
@@ -392,7 +384,7 @@ export default class Solana extends TargetAbstract {
                     const maxStakeWanted = Number(scoringFound?.maxStakeWanted ?? 0);
                     const bondBalanceSol = Number(scoringFound?.values?.bondBalanceSol ?? 0);
 
-                    this.marinadeMyBidGauge.labels(vote, commissionLabel, mevCommissionLabel).set(bidPmpe);
+                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 }
