@@ -75,7 +75,7 @@ export default class Solana extends TargetAbstract {
     private readonly marinadeMyBidGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_my_bid_sol`,
         help: 'Current bid value our validator has set in Marinade',
-        labelNames: ['vote']
+        labelNames: ['vote', 'commission', 'mev_commission']
     });
 
     private readonly marinadeMaxStakeWantedGauge = new Gauge({
@@ -356,6 +356,10 @@ export default class Solana extends TargetAbstract {
             const bondsUrl = 'https://validator-bonds-api.marinade.finance/bonds';
             const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 60000);
             const bondsList = bondsResponse?.bonds || [];
+
+            // 3. Commission(광고 커미션) / MEV 커미션 로드
+            const commissionByVote = await this.loadValidatorsAdvertisedCommission();
+            const mevCommissionBpsByVote = await this.loadMevCommissionBps();
             
             if (!Array.isArray(scoringList) || !Array.isArray(bondsList)) return;
             
@@ -367,12 +371,19 @@ export default class Solana extends TargetAbstract {
                 
                 // Bonds API에서 나머지 값들 찾기
                 const bondsFound = bondsList.find((it: any) => it && (it.vote_account === vote));
+                const commissionPctValue = Number(commissionByVote[vote]);
+                const mevCommissionPctValue = (() => {
+                    const bps = Number(mevCommissionBpsByVote[vote]);
+                    return Number.isFinite(bps) ? (bps / 100) : undefined;
+                })();
+                const commissionLabel = Number.isFinite(commissionPctValue) ? String(commissionPctValue) : '';
+                const mevCommissionLabel = Number.isFinite(mevCommissionPctValue) ? String(mevCommissionPctValue) : '';
                 if (bondsFound) {
                     const bidPmpe = Number(bondsFound.cpmpe ?? 0) / 1e9; // Convert from lamports to SOL
                     const maxStakeWanted = Number(bondsFound.max_stake_wanted ?? 0) / 1e9; // Convert from lamports to SOL
                     const bondBalanceSol = Number(bondsFound.funded_amount ?? 0) / 1e9; // Convert from lamports to SOL
 
-                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
+                    this.marinadeMyBidGauge.labels(vote, commissionLabel, mevCommissionLabel).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 } else if (scoringFound) {
@@ -381,13 +392,61 @@ export default class Solana extends TargetAbstract {
                     const maxStakeWanted = Number(scoringFound?.maxStakeWanted ?? 0);
                     const bondBalanceSol = Number(scoringFound?.values?.bondBalanceSol ?? 0);
 
-                    this.marinadeMyBidGauge.labels(vote).set(bidPmpe);
+                    this.marinadeMyBidGauge.labels(vote, commissionLabel, mevCommissionLabel).set(bidPmpe);
                     this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
                     this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
                 }
             }
         } catch (e) {
             console.error('updateMarinadeScoring', e);
+        }
+    }
+
+    // validators API에서 commission_advertised를 가져와 vote_account별 매핑 생성
+    private async loadValidatorsAdvertisedCommission(): Promise<Record<string, number>> {
+        try {
+            const url = 'https://validators-api.marinade.finance/validators?limit=9999&epochs=1';
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const arr: any[] = Array.isArray(data?.validators) ? data.validators : [];
+            const map: Record<string, number> = {};
+            for (const it of arr) {
+                const vote = String(it?.vote_account || it?.vote || '');
+                if (!vote) continue;
+                const adv = Number(it?.commission_advertised);
+                if (Number.isFinite(adv)) map[vote] = adv;
+            }
+            return map;
+        } catch (e) {
+            console.error('loadValidatorsAdvertisedCommission', e);
+            return {};
+        }
+    }
+
+    // MEV API에서 mev_commission_bps를 가져와 vote_account별 매핑 생성
+    private async loadMevCommissionBps(): Promise<Record<string, number>> {
+        try {
+            const url = 'https://validators-api.marinade.finance/mev';
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            // 다양한 포맷에 대응: 배열 혹은 객체 맵
+            const map: Record<string, number> = {};
+            if (Array.isArray(data)) {
+                for (const it of data) {
+                    const vote = String(it?.vote_account || it?.vote || '');
+                    const bps = Number(it?.mev_commission_bps ?? it?.mevCommissionBps ?? it?.mev_commission);
+                    if (vote && Number.isFinite(bps)) map[vote] = bps;
+                }
+            } else if (data && typeof data === 'object') {
+                for (const key of Object.keys(data)) {
+                    const entry = data[key];
+                    const vote = String(entry?.vote_account || entry?.vote || key || '');
+                    const bps = Number(entry?.mev_commission_bps ?? entry?.mevCommissionBps ?? entry?.mev_commission ?? data[key]);
+                    if (vote && Number.isFinite(bps)) map[vote] = bps;
+                }
+            }
+            return map;
+        } catch (e) {
+            console.error('loadMevCommissionBps', e);
+            return {};
         }
     }
 
