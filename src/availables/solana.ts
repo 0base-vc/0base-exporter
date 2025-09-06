@@ -376,8 +376,8 @@ export default class Solana extends TargetAbstract {
                     const bps = Number(mevCommissionBpsByVote[vote]);
                     return Number.isFinite(bps) ? (bps / 100) : undefined;
                 })();
-                const commissionLabel = Number.isFinite(commissionPctValue) ? String(commissionPctValue) : '';
-                const mevCommissionLabel = Number.isFinite(mevCommissionPctValue) ? String(mevCommissionPctValue) : '';
+                const commissionLabel = Number.isFinite(commissionPctValue) ? String(commissionPctValue) : '0';
+                const mevCommissionLabel = Number.isFinite(mevCommissionPctValue) ? String(mevCommissionPctValue) : '0';
                 if (bondsFound) {
                     const bidPmpe = Number(bondsFound.cpmpe ?? 0) / 1e9; // Convert from lamports to SOL
                     const maxStakeWanted = Number(bondsFound.max_stake_wanted ?? 0) / 1e9; // Convert from lamports to SOL
@@ -436,6 +436,13 @@ export default class Solana extends TargetAbstract {
                     if (vote && Number.isFinite(bps)) map[vote] = bps;
                 }
             } else if (data && typeof data === 'object') {
+                // { validators: [...] } 형태 처리
+                const validatorsArr: any[] = Array.isArray((data as any).validators) ? (data as any).validators : [];
+                for (const it of validatorsArr) {
+                    const vote = String(it?.vote_account || it?.vote || '');
+                    const bps = Number(it?.mev_commission_bps ?? it?.mevCommissionBps ?? it?.mev_commission);
+                    if (vote && Number.isFinite(bps)) map[vote] = bps;
+                }
                 for (const key of Object.keys(data)) {
                     const entry = data[key];
                     const vote = String(entry?.vote_account || entry?.vote || key || '');
