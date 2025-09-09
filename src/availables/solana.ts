@@ -126,6 +126,23 @@ export default class Solana extends TargetAbstract {
         labelNames: ['vote', 'epoch']
     });
 
+    // Epoch-level average of median incomes for top 50 by stake (vx.tools leaderboard)
+    private readonly epochMedianBaseFeesAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_median_base_fees_avg_sol`,
+        help: 'Average of median base fees among top 50 validators by stake for the epoch',
+        labelNames: ['epoch']
+    });
+    private readonly epochMedianPriorityFeesAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_median_priority_fees_avg_sol`,
+        help: 'Average of median priority fees among top 50 validators by stake for the epoch',
+        labelNames: ['epoch']
+    });
+    private readonly epochMedianMevTipsAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_median_mev_tips_avg_sol`,
+        help: 'Average of median MEV tips among top 50 validators by stake for the epoch',
+        labelNames: ['epoch']
+    });
+
     private readonly clusterRequiredVersionGauge = new Gauge({
         name: `${this.metricPrefix}_cluster_required_versions`,
         help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch',
@@ -206,6 +223,9 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.blockTipsMedianGauge);
         this.registry.registerMetric(this.clusterRequiredVersionGauge);
         this.registry.registerMetric(this.validatorReleaseVersionGauge);
+        this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
+        this.registry.registerMetric(this.epochMedianPriorityFeesAvgGauge);
+        this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -224,6 +244,7 @@ export default class Solana extends TargetAbstract {
                 this.updateEpochIncomeFromVx(this.votes),
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
+                this.updateEpochMedianFeesAverages(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -561,6 +582,49 @@ export default class Solana extends TargetAbstract {
                 console.error('updateEpochIncomeFromVx', e);
             }
         }));
+    }
+
+    // vx.tools leaderboard: stake 상위 50명의 medianIncome 평균(baseFees/priorityFees/mevTips)
+    private async updateEpochMedianFeesAverages(): Promise<void> {
+        try {
+            this.epochMedianBaseFeesAvgGauge.reset();
+            this.epochMedianPriorityFeesAvgGauge.reset();
+            this.epochMedianMevTipsAvgGauge.reset();
+
+            const url = 'https://api.vx.tools/epochs/leaderboard/income';
+            const payload = { limit: 50 } as any;
+            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            // expected shape: { epoch: number, records: [] }
+            const epochFromRoot = rows && typeof rows === 'object' ? rows.epoch : undefined;
+            const records: any[] = Array.isArray(rows?.records)
+                ? rows.records
+                : (Array.isArray(rows) ? rows : (Array.isArray(rows?.data) ? rows.data : []));
+            if (!Array.isArray(records) || records.length === 0) return;
+
+            // stake 기준 정렬 후 상위 50
+            const sorted = [...records].sort((a, b) => Number(b?.stake ?? 0) - Number(a?.stake ?? 0));
+            const top = sorted.slice(0, 50);
+            const epochLabel = String(epochFromRoot ?? top[0]?.epoch ?? '');
+            if (!epochLabel) return;
+
+            const toSol = (lamports: number) => lamports / LAMPORTS_PER_SOL;
+            const vals = top.map((it) => ({
+                base: toSol(Number(it?.medianIncome?.baseFees ?? 0)),
+                priority: toSol(Number(it?.medianIncome?.priorityFees ?? 0)),
+                mev: toSol(Number(it?.medianIncome?.mevTips ?? 0)),
+            }));
+
+            const sum = (arr: number[]) => arr.reduce((acc, v) => acc + v, 0);
+            const baseAvg = vals.length ? sum(vals.map(v => v.base)) / vals.length : 0;
+            const priorityAvg = vals.length ? sum(vals.map(v => v.priority)) / vals.length : 0;
+            const mevAvg = vals.length ? sum(vals.map(v => v.mev)) / vals.length : 0;
+
+            this.epochMedianBaseFeesAvgGauge.labels(epochLabel).set(baseAvg);
+            this.epochMedianPriorityFeesAvgGauge.labels(epochLabel).set(priorityAvg);
+            this.epochMedianMevTipsAvgGauge.labels(epochLabel).set(mevAvg);
+        } catch (e) {
+            console.error('updateEpochMedianFeesAverages', e);
+        }
     }
 
     // JPool pending stake: activation/deactivation by source aggregated in SOL
