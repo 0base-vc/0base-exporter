@@ -584,7 +584,7 @@ export default class Solana extends TargetAbstract {
         }));
     }
 
-    // vx.tools leaderboard: stake 상위 50명의 medianIncome 평균(baseFees/priorityFees/mevTips)
+    // vx.tools leaderboard: stake 상위 50명의 totalIncome 합계를 confirmedSlots 합으로 나눈 평균(슬롯당)
     private async updateEpochMedianFeesAverages(): Promise<void> {
         try {
             this.epochMedianBaseFeesAvgGauge.reset();
@@ -592,7 +592,7 @@ export default class Solana extends TargetAbstract {
             this.epochMedianMevTipsAvgGauge.reset();
 
             const url = 'https://api.vx.tools/epochs/leaderboard/income';
-            const payload = { limit: 50 } as any;
+            const payload = {} as any;
             const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             // expected shape: { epoch: number, records: [] }
             const epochFromRoot = rows && typeof rows === 'object' ? rows.epoch : undefined;
@@ -607,17 +607,16 @@ export default class Solana extends TargetAbstract {
             const epochLabel = String(epochFromRoot ?? top[0]?.epoch ?? '');
             if (!epochLabel) return;
 
-            const toSol = (lamports: number) => lamports / LAMPORTS_PER_SOL;
-            const vals = top.map((it) => ({
-                base: toSol(Number(it?.medianIncome?.baseFees ?? 0)),
-                priority: toSol(Number(it?.medianIncome?.priorityFees ?? 0)),
-                mev: toSol(Number(it?.medianIncome?.mevTips ?? 0)),
-            }));
+            const totalBaseLamports = top.reduce((acc, it) => acc + Number(it?.totalIncome?.baseFees ?? 0), 0);
+            const totalPriorityLamports = top.reduce((acc, it) => acc + Number(it?.totalIncome?.priorityFees ?? 0), 0);
+            const totalMevLamports = top.reduce((acc, it) => acc + Number(it?.totalIncome?.mevTips ?? 0), 0);
+            const totalConfirmedSlots = top.reduce((acc, it) => acc + Number(it?.confirmedSlots ?? 0), 0);
 
-            const sum = (arr: number[]) => arr.reduce((acc, v) => acc + v, 0);
-            const baseAvg = vals.length ? sum(vals.map(v => v.base)) / vals.length : 0;
-            const priorityAvg = vals.length ? sum(vals.map(v => v.priority)) / vals.length : 0;
-            const mevAvg = vals.length ? sum(vals.map(v => v.mev)) / vals.length : 0;
+            if (!Number.isFinite(totalConfirmedSlots) || totalConfirmedSlots <= 0) return;
+
+            const baseAvg = (totalBaseLamports / totalConfirmedSlots) / LAMPORTS_PER_SOL;
+            const priorityAvg = (totalPriorityLamports / totalConfirmedSlots) / LAMPORTS_PER_SOL;
+            const mevAvg = (totalMevLamports / totalConfirmedSlots) / LAMPORTS_PER_SOL;
 
             this.epochMedianBaseFeesAvgGauge.labels(epochLabel).set(baseAvg);
             this.epochMedianPriorityFeesAvgGauge.labels(epochLabel).set(priorityAvg);
