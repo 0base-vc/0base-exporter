@@ -78,6 +78,18 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity', 'release_version']
     });
 
+    private readonly tvcEarnedDeltaGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_tvc_earned_delta`,
+        help: 'Earned vote credits delta in finalized window since last scrape',
+        labelNames: ['vote']
+    });
+
+    private readonly tvcMissedDeltaGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_tvc_missed_delta`,
+        help: 'Missed vote credits (expected - earned) in finalized window since last scrape',
+        labelNames: ['vote']
+    });
+
     // private readonly validatorsCount = new Gauge({
     //     name: `${this.metricPrefix}_validators_count`,
     //     help: 'Validators count',
@@ -111,6 +123,8 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.onboardingPriorityGauge);
         this.registry.registerMetric(this.clusterRequiredVersionGauge);
         this.registry.registerMetric(this.validatorReleaseVersionGauge);
+        this.registry.registerMetric(this.tvcEarnedDeltaGauge);
+        this.registry.registerMetric(this.tvcMissedDeltaGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -122,6 +136,7 @@ export default class Solana extends TargetAbstract {
                 this.updateOnboardingPriority(this.identities),
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
+                this.updateTvcDeltas(this.votes),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -275,6 +290,78 @@ export default class Solana extends TargetAbstract {
             }));
         } catch (e) {
             console.error('updateValidatorReleaseVersions', e);
+        }
+    }
+
+    // ---------------------- TVC deltas (earned/missed) ----------------------
+    private readonly tvcStateByVote: Map<string, { epoch: number, finalizedSlot: number, earnedNow: number }> = new Map();
+
+    private async updateTvcDeltas(validators: string): Promise<void> {
+        try {
+            this.tvcEarnedDeltaGauge.reset();
+            this.tvcMissedDeltaGauge.reset();
+
+            // Fetch finalized epoch info and slot with short cache to keep deltas responsive
+            const epoch: number = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'finalized' }] } as any, response => {
+                return Number(response.data?.result?.epoch ?? NaN);
+            });
+            if (!Number.isFinite(epoch)) return;
+
+            const finalizedSlot: number = await this.post(this.rpcUrl, { method: 'getSlot', params: [{ commitment: 'finalized' }] } as any, response => {
+                return Number(response.data?.result ?? NaN);
+            });
+            if (!Number.isFinite(finalizedSlot)) return;
+
+            // Get all vote accounts at finalized commitment
+            const voteAccountsResponse = await this.post(this.rpcUrl, { method: 'getVoteAccounts', params: [{ commitment: 'finalized' }] } as any, response => response.data);
+            const currentList: any[] = Array.isArray(voteAccountsResponse?.result?.current) ? voteAccountsResponse.result.current : [];
+            const delinquentList: any[] = Array.isArray(voteAccountsResponse?.result?.delinquent) ? voteAccountsResponse.result.delinquent : [];
+            const allValidators: any[] = _.concat(currentList.map((i: any) => { i.status = 'current'; return i; }), delinquentList.map((i: any) => { i.status = 'delinquent'; return i; }));
+
+            for (const vote of this.toUniqueList(validators)) {
+                const me: any = _.find(allValidators, (o: any) => o.votePubkey === vote);
+                if (!me) continue;
+
+                const epochCredits = Array.isArray(me.epochCredits) && me.epochCredits.length > 0 ? me.epochCredits[me.epochCredits.length - 1] : null;
+                if (!epochCredits) continue;
+
+                const curEpoch: number = Number(epochCredits[0] ?? NaN);
+                const credits: number = Number(epochCredits[1] ?? 0);
+                const prevCredits: number = Number(epochCredits[2] ?? 0);
+                let earnedNow: number = credits - prevCredits;
+                if (!Number.isFinite(earnedNow) || earnedNow < 0) earnedNow = 0;
+
+                const prevState = this.tvcStateByVote.get(vote);
+                // Initialize state on first run or epoch change or mismatch
+                if (!prevState || prevState.epoch !== epoch || curEpoch !== epoch) {
+                    this.tvcStateByVote.set(vote, {
+                        epoch: epoch,
+                        finalizedSlot: finalizedSlot,
+                        earnedNow: earnedNow
+                    });
+                    continue;
+                }
+
+                let deltaSlots = finalizedSlot - prevState.finalizedSlot;
+                if (!Number.isFinite(deltaSlots) || deltaSlots < 0) deltaSlots = 0;
+                const expectedDelta = deltaSlots * 16; // expected credits per slot window
+                let deltaEarned = earnedNow - prevState.earnedNow;
+                if (!Number.isFinite(deltaEarned) || deltaEarned < 0) deltaEarned = 0;
+                let missedDelta = expectedDelta - deltaEarned;
+                if (!Number.isFinite(missedDelta) || missedDelta < 0) missedDelta = 0;
+
+                this.tvcEarnedDeltaGauge.labels(vote).set(deltaEarned);
+                this.tvcMissedDeltaGauge.labels(vote).set(missedDelta);
+
+                // Update state
+                this.tvcStateByVote.set(vote, {
+                    epoch: epoch,
+                    finalizedSlot: finalizedSlot,
+                    earnedNow: earnedNow
+                });
+            }
+        } catch (e) {
+            console.error('updateTvcDeltas', e);
         }
     }
 
