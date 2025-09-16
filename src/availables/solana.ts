@@ -276,19 +276,8 @@ export default class Solana extends TargetAbstract {
             if (!Number.isFinite(epoch) || !Number.isFinite(absoluteSlot) || !Number.isFinite(slotIndex)) return;
             const epochFirstSlot: number = absoluteSlot - slotIndex;
 
-            // 2) 최근 성능 샘플로 슬롯당 초 계산
-            const samples = await this.post(this.rpcUrl, { method: 'getRecentPerformanceSamples', params: [5] } as any, response => response.data?.result);
-            const arr: any[] = Array.isArray(samples) ? samples : [];
-            let totalSlots = 0; let totalSecs = 0;
-            for (const s of arr) {
-                const ns = Number(s?.numSlots ?? 0);
-                const secs = Number(s?.samplePeriodSecs ?? 0);
-                if (Number.isFinite(ns) && Number.isFinite(secs) && ns > 0 && secs > 0) {
-                    totalSlots += ns; totalSecs += secs;
-                }
-            }
-            if (!(totalSlots > 0 && totalSecs > 0)) return;
-            const secondsPerSlot = totalSecs / totalSlots;
+            // 2) 슬롯당 시간: 고정 0.4초 사용 (요청에 따라 샘플 호출 생략)
+            const secondsPerSlot = 0.4;
             const nowSec = Date.now() / 1000;
 
             // 3) 각 identity의 다음 5개 리더 슬롯 타임스탬프 산출
