@@ -277,7 +277,7 @@ export default class Solana extends TargetAbstract {
             const epochFirstSlot: number = absoluteSlot - slotIndex;
 
             // 2) 최근 성능 샘플로 슬롯당 초 계산
-            const samples = await this.post('https://api.mainnet-beta.solana.com', { method: 'getRecentPerformanceSamples', params: [5] } as any, response => response.data?.result);
+            const samples = await this.postWithCache('https://api.mainnet-beta.solana.com', { method: 'getRecentPerformanceSamples', params: [5] } as any, (response: { data: any }) => response.data?.result, 120000);
             const arr: any[] = Array.isArray(samples) ? samples : [];
             let totalSlots = 0; let totalSecs = 0;
             for (const s of arr) {
@@ -291,7 +291,7 @@ export default class Solana extends TargetAbstract {
             const secondsPerSlot = totalSecs / totalSlots;
             const nowSec = Date.now() / 1000;
 
-            // 3) 각 identity의 다음 5개 리더 슬롯 타임스탬프 산출
+            // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출
             const identities = this.toUniqueList(this.identities);
             await Promise.all(identities.map(async (identity) => {
                 try {
@@ -299,12 +299,18 @@ export default class Solana extends TargetAbstract {
                     if (!schedObj || typeof schedObj !== 'object') return;
                     const slotsRel: number[] = Array.isArray(schedObj[identity]) ? schedObj[identity] : [];
                     if (!Array.isArray(slotsRel) || slotsRel.length === 0) return;
-                    const upcomingRel = slotsRel.filter((i: any) => Number(i) >= slotIndex).sort((a: any, b: any) => Number(a) - Number(b)).slice(0, 5);
-                    for (const rel of upcomingRel) {
-                        const relNum = Number(rel);
-                        const absSlot = epochFirstSlot + relNum;
+                    // 윈도우 시작 슬롯들만 추출: floor(slot/4)*4 기준으로 dedup
+                    const windowStartsRel = Array.from(new Set(
+                        slotsRel
+                            .map((i: any) => Number(i))
+                            .filter((i: number) => Number.isFinite(i) && i >= slotIndex)
+                            .map((i: number) => Math.floor(i / 4) * 4)
+                    )).sort((a: number, b: number) => a - b).slice(0, 20);
+
+                    for (const startRel of windowStartsRel) {
+                        const absSlot = epochFirstSlot + startRel;
                         const deltaSlots = absSlot - absoluteSlot;
-                        const ts = nowSec + (deltaSlots * secondsPerSlot);
+                        const ts = Math.floor(nowSec + (deltaSlots * secondsPerSlot));
                         this.upcomingLeaderSlotTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
                     }
                 } catch (inner) {
