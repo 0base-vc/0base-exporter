@@ -84,6 +84,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity', 'epoch', 'slot', 'rewards']
     });
 
+    private readonly epochEndTsGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_end_timestamp`,
+        help: 'Estimated unix seconds when current epoch ends',
+        labelNames: ['epoch']
+    });
+
     private readonly tvcEarnedDeltaGauge = new Gauge({
         name: `${this.metricPrefix}_validator_tvc_earned_delta`,
         help: 'Earned vote credits delta in finalized window since last scrape',
@@ -132,6 +138,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.tvcEarnedDeltaGauge);
         this.registry.registerMetric(this.tvcMissedDeltaGauge);
         this.registry.registerMetric(this.leaderSlotTsGauge);
+        this.registry.registerMetric(this.epochEndTsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -144,7 +151,7 @@ export default class Solana extends TargetAbstract {
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
                 this.updateTvcDeltas(this.votes),
-                this.updateUpcomingLeaderSlots(),
+                this.updateLeaderWindowsAndEpochEnd(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -156,7 +163,9 @@ export default class Solana extends TargetAbstract {
         return customMetrics + '\n' + await this.loadExistMetrics();
     }
 
-    private async updateUpcomingLeaderSlots(): Promise<void> {
+    // merged into updateLeaderWindowsAndEpochEnd
+
+    private async updateLeaderWindowsAndEpochEnd(): Promise<void> {
         try {
             this.leaderSlotTsGauge.reset();
 
@@ -165,7 +174,8 @@ export default class Solana extends TargetAbstract {
             const epoch: number = Number(epochInfo?.epoch ?? NaN);
             const absoluteSlot: number = Number(epochInfo?.absoluteSlot ?? NaN);
             const slotIndex: number = Number(epochInfo?.slotIndex ?? NaN);
-            if (!Number.isFinite(epoch) || !Number.isFinite(absoluteSlot) || !Number.isFinite(slotIndex)) return;
+            const slotsInEpoch: number = Number(epochInfo?.slotsInEpoch ?? NaN);
+            if (!Number.isFinite(epoch) || !Number.isFinite(absoluteSlot) || !Number.isFinite(slotIndex) || !Number.isFinite(slotsInEpoch)) return;
             const epochFirstSlot: number = absoluteSlot - slotIndex;
 
             // 2) 최근 성능 샘플로 슬롯당 초 계산
@@ -182,6 +192,13 @@ export default class Solana extends TargetAbstract {
             if (!(totalSlots > 0 && totalSecs > 0)) return;
             const secondsPerSlot = totalSecs / totalSlots;
             const nowSec = Date.now() / 1000;
+
+            // Epoch end timestamp
+            const epochEndAbsSlot: number = epochFirstSlot + slotsInEpoch - 1;
+            let deltaToEnd = epochEndAbsSlot - absoluteSlot;
+            if (!Number.isFinite(deltaToEnd) || deltaToEnd < 0) deltaToEnd = 0;
+            const epochEndTs = Math.floor(nowSec + (deltaToEnd * secondsPerSlot));
+            this.epochEndTsGauge.labels(String(epoch)).set(epochEndTs);
 
             // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출 + 과거 2개 보상 계산
             const identities = this.toUniqueList(this.identities);
