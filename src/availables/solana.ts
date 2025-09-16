@@ -155,6 +155,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['vote', 'release_version']
     });
 
+    private readonly upcomingLeaderSlotTsGauge = new Gauge({
+        name: `${this.metricPrefix}_leader_upcoming_slot_timestamp`,
+        help: 'Estimated timestamp (unix seconds) for next leader slots',
+        labelNames: ['identity', 'epoch', 'slot']
+    });
+
     // validator voteAccount -> node identity mapping
     private validatorToIdentityMap: Record<string, string> = {};
 
@@ -226,6 +232,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianPriorityFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
+        this.registry.registerMetric(this.upcomingLeaderSlotTsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -245,6 +252,7 @@ export default class Solana extends TargetAbstract {
                 this.updateClusterRequiredVersions(),
                 this.updateValidatorReleaseVersions(),
                 this.updateEpochMedianFeesAverages(),
+                this.updateUpcomingLeaderSlots(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -254,6 +262,58 @@ export default class Solana extends TargetAbstract {
         }
 
         return customMetrics + '\n' + await this.loadExistMetrics();
+    }
+
+    private async updateUpcomingLeaderSlots(): Promise<void> {
+        try {
+            this.upcomingLeaderSlotTsGauge.reset();
+
+            // 1) 현재 epoch/slot 정보
+            const epochInfo = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'processed' }] } as any, response => response.data?.result);
+            const epoch: number = Number(epochInfo?.epoch ?? NaN);
+            const absoluteSlot: number = Number(epochInfo?.absoluteSlot ?? NaN);
+            const slotIndex: number = Number(epochInfo?.slotIndex ?? NaN);
+            if (!Number.isFinite(epoch) || !Number.isFinite(absoluteSlot) || !Number.isFinite(slotIndex)) return;
+            const epochFirstSlot: number = absoluteSlot - slotIndex;
+
+            // 2) 최근 성능 샘플로 슬롯당 초 계산
+            const samples = await this.post(this.rpcUrl, { method: 'getRecentPerformanceSamples', params: [5] } as any, response => response.data?.result);
+            const arr: any[] = Array.isArray(samples) ? samples : [];
+            let totalSlots = 0; let totalSecs = 0;
+            for (const s of arr) {
+                const ns = Number(s?.numSlots ?? 0);
+                const secs = Number(s?.samplePeriodSecs ?? 0);
+                if (Number.isFinite(ns) && Number.isFinite(secs) && ns > 0 && secs > 0) {
+                    totalSlots += ns; totalSecs += secs;
+                }
+            }
+            if (!(totalSlots > 0 && totalSecs > 0)) return;
+            const secondsPerSlot = totalSecs / totalSlots;
+            const nowSec = Date.now() / 1000;
+
+            // 3) 각 identity의 다음 5개 리더 슬롯 타임스탬프 산출
+            const identities = this.toUniqueList(this.identities);
+            await Promise.all(identities.map(async (identity) => {
+                try {
+                    const schedObj = await this.postWithCache(this.rpcUrl, { method: 'getLeaderSchedule', params: [null, { identity }] } as any, (response: { data: any }) => response.data?.result, 60000);
+                    if (!schedObj || typeof schedObj !== 'object') return;
+                    const slotsRel: number[] = Array.isArray(schedObj[identity]) ? schedObj[identity] : [];
+                    if (!Array.isArray(slotsRel) || slotsRel.length === 0) return;
+                    const upcomingRel = slotsRel.filter((i: any) => Number(i) >= slotIndex).sort((a: any, b: any) => Number(a) - Number(b)).slice(0, 5);
+                    for (const rel of upcomingRel) {
+                        const relNum = Number(rel);
+                        const absSlot = epochFirstSlot + relNum;
+                        const deltaSlots = absSlot - absoluteSlot;
+                        const ts = nowSec + (deltaSlots * secondsPerSlot);
+                        this.upcomingLeaderSlotTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
+                    }
+                } catch (inner) {
+                    console.error('updateUpcomingLeaderSlots identity', identity, inner);
+                }
+            }));
+        } catch (e) {
+            console.error('updateUpcomingLeaderSlots', e);
+        }
     }
 
     private async updateBalance(addresses: string): Promise<void> {
