@@ -206,7 +206,7 @@ export default class Solana extends TargetAbstract {
                             .filter((i: number) => Number.isFinite(i) && i < slotIndex)
                             .map((i: number) => Math.floor(i / 4) * 4)
                     )).sort((a: number, b: number) => a - b);
-                    const lastTwoPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 2));
+                    const lastTwoPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 1));
 
                     // 미래 구간: rewards "0"
                     for (const startRel of windowStartsRel) {
