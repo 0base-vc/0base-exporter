@@ -169,7 +169,7 @@ export default class Solana extends TargetAbstract {
             const epochFirstSlot: number = absoluteSlot - slotIndex;
 
             // 2) 최근 성능 샘플로 슬롯당 초 계산
-            const samples = await this.postWithCache('https://api.testnet.solana.com', { method: 'getRecentPerformanceSamples', params: [5] } as any, (response: { data: any }) => response.data?.result, 120000);
+            const samples = await this.postWithCache('https://api.testnet.solana.com', { method: 'getRecentPerformanceSamples', params: [15] } as any, (response: { data: any }) => response.data?.result, 120000);
             const arr: any[] = Array.isArray(samples) ? samples : [];
             let totalSlots = 0; let totalSecs = 0;
             for (const s of arr) {
