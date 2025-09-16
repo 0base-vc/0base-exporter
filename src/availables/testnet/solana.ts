@@ -90,6 +90,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['epoch']
     });
 
+    private readonly epochStartTsGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_start_timestamp`,
+        help: 'Estimated unix seconds when current epoch starts',
+        labelNames: ['epoch']
+    });
+
     private readonly tvcEarnedDeltaGauge = new Gauge({
         name: `${this.metricPrefix}_validator_tvc_earned_delta`,
         help: 'Earned vote credits delta in finalized window since last scrape',
@@ -139,6 +145,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.tvcMissedDeltaGauge);
         this.registry.registerMetric(this.leaderSlotTsGauge);
         this.registry.registerMetric(this.epochEndTsGauge);
+        this.registry.registerMetric(this.epochStartTsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -199,6 +206,12 @@ export default class Solana extends TargetAbstract {
             if (!Number.isFinite(deltaToEnd) || deltaToEnd < 0) deltaToEnd = 0;
             const epochEndTs = Math.floor(nowSec + (deltaToEnd * secondsPerSlot));
             this.epochEndTsGauge.labels(String(epoch)).set(epochEndTs);
+
+            // Epoch start timestamp
+            let deltaToStart = epochFirstSlot - absoluteSlot; // negative or zero
+            if (!Number.isFinite(deltaToStart)) deltaToStart = 0;
+            const epochStartTs = Math.floor(nowSec + (deltaToStart * secondsPerSlot));
+            this.epochStartTsGauge.labels(String(epoch)).set(epochStartTs);
 
             // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출 + 과거 2개 보상 계산
             const identities = this.toUniqueList(this.identities);
