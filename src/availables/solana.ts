@@ -305,7 +305,7 @@ export default class Solana extends TargetAbstract {
                             .map((i: any) => Number(i))
                             .filter((i: number) => Number.isFinite(i) && i >= slotIndex)
                             .map((i: number) => Math.floor(i / 4) * 4)
-                    )).sort((a: number, b: number) => a - b).slice(0, 20);
+                    )).sort((a: number, b: number) => a - b).slice(0, 5);
 
                     // 과거 2개의 윈도우 시작 슬롯(현재 slotIndex 이전) 추출
                     const pastStartsRelAll = Array.from(new Set(
