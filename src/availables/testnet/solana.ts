@@ -78,10 +78,10 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity', 'release_version']
     });
 
-    private readonly upcomingLeaderSlotTsGauge = new Gauge({
-        name: `${this.metricPrefix}_leader_upcoming_slot_timestamp`,
-        help: 'Estimated timestamp (unix seconds) for next leader slots',
-        labelNames: ['identity', 'epoch', 'slot']
+    private readonly leaderSlotTsGauge = new Gauge({
+        name: `${this.metricPrefix}_leader_slot_timestamp`,
+        help: 'Estimated timestamp (unix seconds) for first slot of each 4-slot leader window; rewards label shows 4-slot rewards in SOL when available',
+        labelNames: ['identity', 'epoch', 'slot', 'rewards']
     });
 
     private readonly tvcEarnedDeltaGauge = new Gauge({
@@ -131,7 +131,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.validatorReleaseVersionGauge);
         this.registry.registerMetric(this.tvcEarnedDeltaGauge);
         this.registry.registerMetric(this.tvcMissedDeltaGauge);
-        this.registry.registerMetric(this.upcomingLeaderSlotTsGauge);
+        this.registry.registerMetric(this.leaderSlotTsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -158,7 +158,7 @@ export default class Solana extends TargetAbstract {
 
     private async updateUpcomingLeaderSlots(): Promise<void> {
         try {
-            this.upcomingLeaderSlotTsGauge.reset();
+            this.leaderSlotTsGauge.reset();
 
             // 1) 현재 epoch/slot 정보
             const epochInfo = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'processed' }] } as any, response => response.data?.result);
@@ -183,7 +183,7 @@ export default class Solana extends TargetAbstract {
             const secondsPerSlot = totalSecs / totalSlots;
             const nowSec = Date.now() / 1000;
 
-            // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출
+            // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출 + 과거 2개 보상 계산
             const identities = this.toUniqueList(this.identities);
             await Promise.all(identities.map(async (identity) => {
                 try {
@@ -199,12 +199,51 @@ export default class Solana extends TargetAbstract {
                             .map((i: number) => Math.floor(i / 4) * 4)
                     )).sort((a: number, b: number) => a - b).slice(0, 20);
 
+                    // 과거 2개의 윈도우 시작 슬롯(현재 slotIndex 이전) 추출
+                    const pastStartsRelAll = Array.from(new Set(
+                        slotsRel
+                            .map((i: any) => Number(i))
+                            .filter((i: number) => Number.isFinite(i) && i < slotIndex)
+                            .map((i: number) => Math.floor(i / 4) * 4)
+                    )).sort((a: number, b: number) => a - b);
+                    const lastTwoPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 2));
+
+                    // 미래 구간: rewards "0"
                     for (const startRel of windowStartsRel) {
                         const absSlot = epochFirstSlot + startRel;
                         const deltaSlots = absSlot - absoluteSlot;
                         const ts = Math.floor(nowSec + (deltaSlots * secondsPerSlot));
-                        this.upcomingLeaderSlotTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
+                        this.leaderSlotTsGauge.labels(identity, String(epoch), String(absSlot), '0').set(ts);
                     }
+
+                    // 과거 2개 구간: 4슬롯 보상 합산 후 rewards 라벨 갱신
+                    await Promise.all(lastTwoPastRel.map(async (relStart) => {
+                        try {
+                            const absStart = epochFirstSlot + relStart;
+                            const slots = [absStart, absStart + 1, absStart + 2, absStart + 3];
+                            const blocks = await Promise.all(slots.map(async (s) => {
+                                return this.postWithCache(this.rpcUrl, {
+                                    method: 'getBlock',
+                                    params: [s, { encoding: 'json', transactionDetails: 'none', rewards: true }]
+                                } as any, (response: { data: any }) => response.data?.result, 300000);
+                            }));
+                            let lamports = 0;
+                            for (const b of blocks) {
+                                const rewardsArr: any[] = Array.isArray(b?.rewards) ? b.rewards : [];
+                                for (const r of rewardsArr) {
+                                    if (String(r?.rewardType || r?.reward_type) === 'Fee') {
+                                        lamports += Number(r?.lamports ?? 0);
+                                    }
+                                }
+                            }
+                            const sol = lamports / Solana.LAMPORTS_PER_SOL;
+                            const deltaSlots = absStart - absoluteSlot;
+                            const ts = Math.floor(nowSec + (deltaSlots * secondsPerSlot));
+                            this.leaderSlotTsGauge.labels(identity, String(epoch), String(absStart), String(sol)).set(ts);
+                        } catch (inner2) {
+                            console.error('leaderSlotTsGauge rewards calc error', identity, relStart, inner2);
+                        }
+                    }));
                 } catch (inner) {
                     console.error('updateUpcomingLeaderSlots identity', identity, inner);
                 }
