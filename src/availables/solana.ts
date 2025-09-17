@@ -345,7 +345,13 @@ export default class Solana extends TargetAbstract {
                 } as any, (response: { data: any }) => response.data?.result, 60000);
                 const firstSlot = Array.isArray(slotsNearStart) && slotsNearStart.length > 0 ? Number(slotsNearStart[0]) : NaN;
                 if (Number.isFinite(firstSlot)) {
-                    const bt = await this.postImmutableWithLRU(this.rpcUrl, { method: 'getBlockTime', params: [firstSlot] } as any, (response: { data: any }) => Number(response.data?.result ?? NaN));
+                    const bt = await this.postImmutableWithLRU(
+                        this.rpcUrl,
+                        { method: 'getBlockTime', params: [firstSlot] } as any,
+                        (response: { data: any }) => Number(response.data?.result ?? NaN),
+                        undefined,
+                        (val) => Number.isFinite(val) && val > 0
+                    );
                     if (Number.isFinite(bt) && bt > 0) epochStartTs = Math.floor(bt);
                 }
             } catch {}
@@ -400,11 +406,16 @@ export default class Solana extends TargetAbstract {
                                 return this.postImmutableWithLRU(this.rpcUrl, {
                                     method: 'getBlock',
                                     params: [s, { encoding: 'json', transactionDetails: 'none', rewards: true }]
-                                } as any, (response: { data: any }) => response.data?.result);
+                                } as any, (response: { data: any }) => response.data?.result,
+                                undefined,
+                                (res) => res && Array.isArray(res.rewards)
+                                );
                             }));
+                            const validBlocks = blocks.filter(b => b && Array.isArray(b.rewards));
+                            if (validBlocks.length === 0) return; // 모든 블록 조회 실패 시 게이지 업데이트 스킵
                             let lamports = 0;
-                            for (const b of blocks) {
-                                const rewardsArr: any[] = Array.isArray(b?.rewards) ? b.rewards : [];
+                            for (const b of validBlocks) {
+                                const rewardsArr: any[] = b.rewards;
                                 for (const r of rewardsArr) {
                                     if (String(r?.rewardType || r?.reward_type) === 'Fee') {
                                         lamports += Number(r?.lamports ?? 0);

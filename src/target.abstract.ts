@@ -151,7 +151,8 @@ export default abstract class TargetAbstract {
         url: string,
         data: any,
         process: (response: { data: any }) => any,
-        maxEntries?: number
+        maxEntries?: number,
+        isCacheable?: (result: any) => boolean
     ) {
         const key = url + ':' + JSON.stringify(data);
         if (this.immutablePostLRU.has(key)) {
@@ -168,6 +169,16 @@ export default abstract class TargetAbstract {
                 : data;
             const response = await axios.post(url, body);
             const result = process(response);
+            // 캐시 가능 판정: 기본은 undefined/null/NaN(숫자) 는 캐시하지 않음
+            const defaultCacheable = (val: any) => {
+                if (val === undefined || val === null) return false;
+                if (typeof val === 'number' && !Number.isFinite(val)) return false;
+                return true;
+            };
+            const canCache = isCacheable ? isCacheable(result) : defaultCacheable(result);
+            if (!canCache) {
+                return result;
+            }
             this.immutablePostLRU.set(key, result);
             const limit = Number.isFinite(maxEntries as number) && (maxEntries as number)! > 0
                 ? (maxEntries as number)
