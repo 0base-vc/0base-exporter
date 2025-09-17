@@ -336,10 +336,24 @@ export default class Solana extends TargetAbstract {
             const epochEndTs = Math.floor(nowSec + (deltaToEnd * secondsPerSlot));
             this.epochEndTsGauge.labels(String(epoch)).set(epochEndTs);
 
-            // Epoch start timestamp
-            let deltaToStart = epochFirstSlot - absoluteSlot; // negative or zero
-            if (!Number.isFinite(deltaToStart)) deltaToStart = 0;
-            const epochStartTs = Math.floor(nowSec + (deltaToStart * secondsPerSlot));
+            // Epoch start timestamp: prefer precise via getBlocksWithLimit(startSlot,1) -> getBlockTime, fallback to estimate
+            let epochStartTs = NaN;
+            try {
+                const slotsNearStart = await this.postWithCache(this.rpcUrl, {
+                    method: 'getBlocksWithLimit',
+                    params: [epochFirstSlot, 1, { commitment: 'processed' }]
+                } as any, (response: { data: any }) => response.data?.result, 60000);
+                const firstSlot = Array.isArray(slotsNearStart) && slotsNearStart.length > 0 ? Number(slotsNearStart[0]) : NaN;
+                if (Number.isFinite(firstSlot)) {
+                    const bt = await this.postWithCache(this.rpcUrl, { method: 'getBlockTime', params: [firstSlot] } as any, (response: { data: any }) => Number(response.data?.result ?? NaN), 300000);
+                    if (Number.isFinite(bt) && bt > 0) epochStartTs = Math.floor(bt);
+                }
+            } catch {}
+            if (!Number.isFinite(epochStartTs)) {
+                let deltaToStart = epochFirstSlot - absoluteSlot; // negative or zero
+                if (!Number.isFinite(deltaToStart)) deltaToStart = 0;
+                epochStartTs = Math.floor(nowSec + (deltaToStart * secondsPerSlot));
+            }
             this.epochStartTsGauge.labels(String(epoch)).set(epochStartTs);
 
             // Epoch state (current/prev)
