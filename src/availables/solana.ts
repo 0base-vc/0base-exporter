@@ -532,8 +532,8 @@ export default class Solana extends TargetAbstract {
     // Marinade scoring API → bid, min effective bid, bonds(=bondBalanceSol)
     private async updateMarinadeScoring(validators: string): Promise<void> {
         try {
-            // 1. Scoring API에서 minEffectiveBid만 가져오기
-            const scoringUrl = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=1';
+            // 1. Scoring API (lastEpochs=4) - getWithCache로 동일 URL은 60s 내 재요청 방지
+            const scoringUrl = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
             const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 60000);
             
             // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
@@ -584,7 +584,7 @@ export default class Solana extends TargetAbstract {
             this.marinadeEffectiveBidEpochGauge.reset();
             const configuredVotes = this.toUniqueList(this.votes);
             if (configuredVotes.length === 0) return;
-            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=8';
+            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
             const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             const arr: any[] = Array.isArray(rows) ? rows : [];
             for (const it of arr) {
