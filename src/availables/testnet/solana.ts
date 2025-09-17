@@ -102,6 +102,11 @@ export default class Solana extends TargetAbstract {
         labelNames: ['epoch']
     });
 
+    private readonly currentEpochGauge = new Gauge({
+        name: `${this.metricPrefix}_current_epoch`,
+        help: 'Current epoch number'
+    });
+
     private readonly tvcEarnedDeltaGauge = new Gauge({
         name: `${this.metricPrefix}_validator_tvc_earned_delta`,
         help: 'Earned vote credits delta in finalized window since last scrape',
@@ -153,6 +158,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.leaderSlotRewardTsGauge);
         this.registry.registerMetric(this.epochEndTsGauge);
         this.registry.registerMetric(this.epochStartTsGauge);
+        this.registry.registerMetric(this.currentEpochGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -220,6 +226,9 @@ export default class Solana extends TargetAbstract {
             if (!Number.isFinite(deltaToStart)) deltaToStart = 0;
             const epochStartTs = Math.floor(nowSec + (deltaToStart * secondsPerSlot));
             this.epochStartTsGauge.labels(String(epoch)).set(epochStartTs);
+
+            // Current epoch gauge
+            this.currentEpochGauge.set(epoch);
 
             // 3) 각 identity의 다음 20개 리더 구간(4-slot 윈도우) 첫 슬롯 타임스탬프 산출 + 과거 2개 보상 계산
             const identities = this.toUniqueList(this.identities);
