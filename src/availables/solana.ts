@@ -345,7 +345,7 @@ export default class Solana extends TargetAbstract {
                 } as any, (response: { data: any }) => response.data?.result, 60000);
                 const firstSlot = Array.isArray(slotsNearStart) && slotsNearStart.length > 0 ? Number(slotsNearStart[0]) : NaN;
                 if (Number.isFinite(firstSlot)) {
-                    const bt = await this.postWithCache(this.rpcUrl, { method: 'getBlockTime', params: [firstSlot] } as any, (response: { data: any }) => Number(response.data?.result ?? NaN), 300000);
+                    const bt = await this.postImmutableWithLRU(this.rpcUrl, { method: 'getBlockTime', params: [firstSlot] } as any, (response: { data: any }) => Number(response.data?.result ?? NaN));
                     if (Number.isFinite(bt) && bt > 0) epochStartTs = Math.floor(bt);
                 }
             } catch {}
@@ -402,10 +402,10 @@ export default class Solana extends TargetAbstract {
                             const absStart = epochFirstSlot + relStart;
                             const slots = [absStart, absStart + 1, absStart + 2, absStart + 3];
                             const blocks = await Promise.all(slots.map(async (s) => {
-                                return this.postWithCache(this.rpcUrl, {
+                                return this.postImmutableWithLRU(this.rpcUrl, {
                                     method: 'getBlock',
                                     params: [s, { encoding: 'json', transactionDetails: 'none', rewards: true }]
-                                } as any, (response: { data: any }) => response.data?.result, 300000);
+                                } as any, (response: { data: any }) => response.data?.result);
                             }));
                             let lamports = 0;
                             for (const b of blocks) {

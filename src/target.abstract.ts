@@ -134,6 +134,59 @@ export default abstract class TargetAbstract {
         }
     }
 
+    // -------------------------- Immutable POST LRU cache --------------------------
+    private immutablePostLRU: Map<string, any> = new Map();
+    private immutablePostLRUMaxEntries: number = 5000;
+
+    /**
+     * 변하지 않는 응답(JSON-RPC getBlock 등)에 대한 LRU 기반 무기한 캐시.
+     * - 히트 시 네트워크 요청 없이 메모리에서 반환
+     * - 용량 초과 시 가장 오래 사용되지 않은 항목부터 제거하여 메모리 릭 방지
+     * @param url 요청 URL
+     * @param data JSON-RPC({ method, params }) 또는 일반 JSON 객체 바디
+     * @param process 응답 처리 함수
+     * @param maxEntries LRU 최대 엔트리 수 (기본 5000)
+     */
+    protected async postImmutableWithLRU(
+        url: string,
+        data: any,
+        process: (response: { data: any }) => any,
+        maxEntries?: number
+    ) {
+        const key = url + ':' + JSON.stringify(data);
+        if (this.immutablePostLRU.has(key)) {
+            const cached = this.immutablePostLRU.get(key);
+            // LRU 갱신: 삭제 후 재삽입으로 최신 사용 처리
+            this.immutablePostLRU.delete(key);
+            this.immutablePostLRU.set(key, cached);
+            return cached;
+        }
+        try {
+            const isJsonRpc = data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'method');
+            const body = isJsonRpc
+                ? { jsonrpc: '2.0', id: 1, method: data.method, params: data.params }
+                : data;
+            const response = await axios.post(url, body);
+            const result = process(response);
+            this.immutablePostLRU.set(key, result);
+            const limit = Number.isFinite(maxEntries as number) && (maxEntries as number)! > 0
+                ? (maxEntries as number)
+                : this.immutablePostLRUMaxEntries;
+            // 용량 초과 시 가장 오래된 항목부터 제거
+            while (this.immutablePostLRU.size > limit) {
+                const oldestKey = this.immutablePostLRU.keys().next().value;
+                this.immutablePostLRU.delete(oldestKey);
+            }
+            return result;
+        } catch (e) {
+            console.error('postImmutableWithLRU', e);
+            if (this.immutablePostLRU.has(key)) {
+                return this.immutablePostLRU.get(key);
+            }
+            return '';
+        }
+    }
+
     private fallbackPostResult: { [key: string]: any } = {};
 
     protected async post(url: string, data: { method: string, params?: string[] }, process: (response: {
