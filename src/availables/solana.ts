@@ -341,7 +341,7 @@ export default class Solana extends TargetAbstract {
             try {
                 const slotsNearStart = await this.postWithCache(this.rpcUrl, {
                     method: 'getBlocksWithLimit',
-                    params: [epochFirstSlot, 1, { commitment: 'processed' }]
+                    params: [epochFirstSlot, 8, { commitment: 'confirmed' }]
                 } as any, (response: { data: any }) => response.data?.result, 60000);
                 const firstSlot = Array.isArray(slotsNearStart) && slotsNearStart.length > 0 ? Number(slotsNearStart[0]) : NaN;
                 if (Number.isFinite(firstSlot)) {
