@@ -186,8 +186,8 @@ export default class Solana extends TargetAbstract {
 
     private readonly marinadeEffectiveBidEpochGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_effective_bid_epoch`,
-        help: 'Marinade effective bid per epoch (pmpe) for target vote account',
-        labelNames: ['epoch']
+        help: 'Marinade effective bid per epoch (pmpe) per vote account',
+        labelNames: ['vote', 'epoch']
     });
 
     // validator voteAccount -> node identity mapping
@@ -573,22 +573,24 @@ export default class Solana extends TargetAbstract {
         }
     }
 
-    // Marinade scoring API: 특정 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 epoch 라벨로 저장
+    // Marinade scoring API: 설정된 모든 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 vote,epoch 라벨로 저장
     private async updateMarinadeEffectiveBidEpoch(): Promise<void> {
         try {
             this.marinadeEffectiveBidEpochGauge.reset();
-            const targetVote = '5BAi9YGCipHq4ZcXuen5vagRQqRTVTRszXNqBZC6uBPZ';
+            const configuredVotes = this.toUniqueList(this.votes);
+            if (configuredVotes.length === 0) return;
             const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=8';
             const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             const arr: any[] = Array.isArray(rows) ? rows : [];
             for (const it of arr) {
                 try {
-                    if (!it || String(it.voteAccount || '') !== targetVote) continue;
-                    const epoch = String(it.epoch ?? '');
+                    const vote = String(it?.voteAccount || '');
+                    if (!vote || !configuredVotes.includes(vote)) continue;
+                    const epoch = String(it?.epoch ?? '');
                     if (!epoch) continue;
-                    const eff = Number(it.effectiveBid ?? 0);
+                    const eff = Number(it?.effectiveBid ?? 0);
                     if (!Number.isFinite(eff)) continue;
-                    this.marinadeEffectiveBidEpochGauge.labels(epoch).set(eff);
+                    this.marinadeEffectiveBidEpochGauge.labels(vote, epoch).set(eff);
                 } catch (inner) {
                     console.error('updateMarinadeEffectiveBidEpoch item error', inner);
                 }
