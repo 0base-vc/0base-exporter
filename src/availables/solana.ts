@@ -561,7 +561,7 @@ export default class Solana extends TargetAbstract {
         try {
             this.marinadeEffectiveBidEpochGauge.reset();
             const targetVote = '5BAi9YGCipHq4ZcXuen5vagRQqRTVTRszXNqBZC6uBPZ';
-            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
+            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=8';
             const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             const arr: any[] = Array.isArray(rows) ? rows : [];
             for (const it of arr) {
