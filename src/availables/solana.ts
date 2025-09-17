@@ -186,8 +186,8 @@ export default class Solana extends TargetAbstract {
 
     private readonly marinadeEffectiveBidEpochGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_effective_bid_epoch`,
-        help: 'Marinade effective bid per epoch (pmpe) per vote account',
-        labelNames: ['vote', 'epoch']
+        help: 'Marinade effective bid per epoch (pmpe) per vote account with unstake priority label',
+        labelNames: ['vote', 'epoch', 'unstake_priority']
     });
 
     // validator voteAccount -> node identity mapping
@@ -573,7 +573,7 @@ export default class Solana extends TargetAbstract {
         }
     }
 
-    // Marinade scoring API: 설정된 모든 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 vote,epoch 라벨로 저장
+    // Marinade scoring API: 설정된 모든 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 vote,epoch,unstake_priority 라벨로 저장
     private async updateMarinadeEffectiveBidEpoch(): Promise<void> {
         try {
             this.marinadeEffectiveBidEpochGauge.reset();
@@ -590,7 +590,9 @@ export default class Solana extends TargetAbstract {
                     if (!epoch) continue;
                     const eff = Number(it?.effectiveBid ?? 0);
                     if (!Number.isFinite(eff)) continue;
-                    this.marinadeEffectiveBidEpochGauge.labels(vote, epoch).set(eff);
+                    const unstake = Number(it?.unstakePriority);
+                    const unstakeLabel = Number.isFinite(unstake) ? String(unstake) : '0';
+                    this.marinadeEffectiveBidEpochGauge.labels(vote, epoch, unstakeLabel).set(eff);
                 } catch (inner) {
                     console.error('updateMarinadeEffectiveBidEpoch item error', inner);
                 }
