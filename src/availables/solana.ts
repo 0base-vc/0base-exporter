@@ -435,7 +435,7 @@ export default class Solana extends TargetAbstract {
 
     private async updateBalance(addresses: string): Promise<void> {
         for (const address of this.toUniqueList(addresses)) {
-            const available = await this.getAmount(this.apiUrl, {
+            const available = await this.getAmount(this.rpcUrl, {
                 method: 'getBalance',
                 params: [address]
             }, (json: any) => json.result.value);
@@ -469,7 +469,7 @@ export default class Solana extends TargetAbstract {
 
     private async updateVoteAccounts(validators: string): Promise<void> {
         const voteAccounts = this.toUniqueList(validators);
-        await this.postWithCache(this.apiUrl, { method: 'getVoteAccounts' }, response => {
+        await this.postWithCache(this.rpcUrl, { method: 'getVoteAccounts' }, response => {
             const allValidators = _.concat(
                 response.data.result.current.map((i: any) => {
                     i.status = 'current';
