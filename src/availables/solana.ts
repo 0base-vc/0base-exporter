@@ -155,9 +155,15 @@ export default class Solana extends TargetAbstract {
         labelNames: ['vote', 'release_version']
     });
 
-    private readonly leaderSlotTsGauge = new Gauge({
-        name: `${this.metricPrefix}_leader_slot_timestamp`,
-        help: 'Estimated timestamp (unix seconds) for first slot of each 4-slot leader window; rewards label shows 4-slot rewards in SOL when available',
+    private readonly leaderSlotNextTsGauge = new Gauge({
+        name: `${this.metricPrefix}_leader_slot_next_timestamp`,
+        help: 'Estimated timestamp (unix seconds) for first slot of upcoming 4-slot leader windows',
+        labelNames: ['identity', 'epoch', 'slot']
+    });
+
+    private readonly leaderSlotRewardTsGauge = new Gauge({
+        name: `${this.metricPrefix}_leader_slot_reward_timestamp`,
+        help: 'Timestamp for past 4-slot leader window starts with summed Fee rewards (SOL) as label',
         labelNames: ['identity', 'epoch', 'slot', 'rewards']
     });
 
@@ -250,7 +256,8 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianPriorityFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
-        this.registry.registerMetric(this.leaderSlotTsGauge);
+        this.registry.registerMetric(this.leaderSlotNextTsGauge);
+        this.registry.registerMetric(this.leaderSlotRewardTsGauge);
         this.registry.registerMetric(this.epochEndTsGauge);
         this.registry.registerMetric(this.epochStartTsGauge);
         this.registry.registerMetric(this.marinadeEffectiveBidEpochGauge);
@@ -288,7 +295,8 @@ export default class Solana extends TargetAbstract {
 
     private async updateLeaderWindowsAndEpochEnd(): Promise<void> {
         try {
-            this.leaderSlotTsGauge.reset();
+            this.leaderSlotNextTsGauge.reset();
+            this.leaderSlotRewardTsGauge.reset();
 
             // 1) 현재 epoch/slot 정보
             const epochInfo = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'processed' }] } as any, response => response.data?.result);
@@ -350,18 +358,18 @@ export default class Solana extends TargetAbstract {
                             .filter((i: number) => Number.isFinite(i) && i < slotIndex)
                             .map((i: number) => Math.floor(i / 4) * 4)
                     )).sort((a: number, b: number) => a - b);
-                    const lastTwoPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 1));
 
-                    // 미래 구간: rewards "0"
+                    // 미래 구간: next 전용 지표
                     for (const startRel of windowStartsRel) {
                         const absSlot = epochFirstSlot + startRel;
                         const deltaSlots = absSlot - absoluteSlot;
                         const ts = Math.floor(nowSec + (deltaSlots * secondsPerSlot));
-                        this.leaderSlotTsGauge.labels(identity, String(epoch), String(absSlot), '0').set(ts);
+                        this.leaderSlotNextTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
                     }
 
-                    // 과거 2개 구간: 4슬롯 보상 합산 후 rewards 라벨 갱신
-                    await Promise.all(lastTwoPastRel.map(async (relStart) => {
+                    // 과거 구간: 최대 최근 40개 윈도우에 대해 4슬롯 보상 합산 후 rewards 라벨 갱신
+                    const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 40));
+                    await Promise.all(lastPastRel.map(async (relStart) => {
                         try {
                             const absStart = epochFirstSlot + relStart;
                             const slots = [absStart, absStart + 1, absStart + 2, absStart + 3];
@@ -383,7 +391,7 @@ export default class Solana extends TargetAbstract {
                             const sol = lamports / LAMPORTS_PER_SOL;
                             const deltaSlots = absStart - absoluteSlot;
                             const ts = Math.floor(nowSec + (deltaSlots * secondsPerSlot));
-                            this.leaderSlotTsGauge.labels(identity, String(epoch), String(absStart), String(sol)).set(ts);
+                            this.leaderSlotRewardTsGauge.labels(identity, String(epoch), String(absStart), String(sol)).set(ts);
                         } catch (inner2) {
                             console.error('leaderSlotTsGauge rewards calc error', identity, relStart, inner2);
                         }
