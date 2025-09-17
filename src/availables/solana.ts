@@ -349,11 +349,6 @@ export default class Solana extends TargetAbstract {
                     if (Number.isFinite(bt) && bt > 0) epochStartTs = Math.floor(bt);
                 }
             } catch {}
-            if (!Number.isFinite(epochStartTs)) {
-                let deltaToStart = epochFirstSlot - absoluteSlot; // negative or zero
-                if (!Number.isFinite(deltaToStart)) deltaToStart = 0;
-                epochStartTs = Math.floor(nowSec + (deltaToStart * secondsPerSlot));
-            }
             this.epochStartTsGauge.labels(String(epoch)).set(epochStartTs);
 
             // Epoch state (current/prev)
