@@ -281,8 +281,8 @@ export default class Solana extends TargetAbstract {
                         this.leaderSlotNextTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
                     }
 
-                    // 과거 구간: 최대 최근 40개 윈도우에 대해 보상 합산
-                    const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 40));
+                    // 과거 구간: 최대 최근 10개 윈도우에 대해 보상 합산
+                    const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 10));
                     await Promise.all(lastPastRel.map(async (relStart) => {
                         try {
                             const absStart = epochFirstSlot + relStart;
