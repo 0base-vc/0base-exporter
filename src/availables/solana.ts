@@ -173,6 +173,12 @@ export default class Solana extends TargetAbstract {
         labelNames: ['epoch']
     });
 
+    private readonly marinadeEffectiveBidEpochGauge = new Gauge({
+        name: `${this.metricPrefix}_marinade_effective_bid_epoch`,
+        help: 'Marinade effective bid per epoch (pmpe) for target vote account',
+        labelNames: ['epoch']
+    });
+
     // validator voteAccount -> node identity mapping
     private validatorToIdentityMap: Record<string, string> = {};
 
@@ -247,6 +253,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.leaderSlotTsGauge);
         this.registry.registerMetric(this.epochEndTsGauge);
         this.registry.registerMetric(this.epochStartTsGauge);
+        this.registry.registerMetric(this.marinadeEffectiveBidEpochGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -267,6 +274,7 @@ export default class Solana extends TargetAbstract {
                 this.updateValidatorReleaseVersions(),
                 this.updateEpochMedianFeesAverages(),
                 this.updateLeaderWindowsAndEpochEnd(),
+                this.updateMarinadeEffectiveBidEpoch(),
             ]);
 
             customMetrics = await this.registry.metrics();
@@ -545,6 +553,31 @@ export default class Solana extends TargetAbstract {
             }
         } catch (e) {
             console.error('updateMarinadeScoring', e);
+        }
+    }
+
+    // Marinade scoring API: 특정 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 epoch 라벨로 저장
+    private async updateMarinadeEffectiveBidEpoch(): Promise<void> {
+        try {
+            this.marinadeEffectiveBidEpochGauge.reset();
+            const targetVote = '5BAi9YGCipHq4ZcXuen5vagRQqRTVTRszXNqBZC6uBPZ';
+            const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
+            const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const arr: any[] = Array.isArray(rows) ? rows : [];
+            for (const it of arr) {
+                try {
+                    if (!it || String(it.voteAccount || '') !== targetVote) continue;
+                    const epoch = String(it.epoch ?? '');
+                    if (!epoch) continue;
+                    const eff = Number(it.effectiveBid ?? 0);
+                    if (!Number.isFinite(eff)) continue;
+                    this.marinadeEffectiveBidEpochGauge.labels(epoch).set(eff);
+                } catch (inner) {
+                    console.error('updateMarinadeEffectiveBidEpoch item error', inner);
+                }
+            }
+        } catch (e) {
+            console.error('updateMarinadeEffectiveBidEpoch', e);
         }
     }
 
