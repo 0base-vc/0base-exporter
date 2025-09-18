@@ -167,7 +167,13 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity', 'epoch', 'slot', 'rewards']
     });
 
+    private readonly epochEndTsGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_end_timestamp`,
+        help: 'Estimated unix seconds when current epoch ends',
+        labelNames: ['epoch']
+    });
 
+    
 
     private readonly epochStateGauge = new Gauge({
         name: `${this.metricPrefix}_epoch_state`,
@@ -254,6 +260,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
         this.registry.registerMetric(this.leaderSlotNextTsGauge);
         this.registry.registerMetric(this.leaderSlotRewardTsGauge);
+        this.registry.registerMetric(this.epochEndTsGauge);
         this.registry.registerMetric(this.marinadeEffectiveBidEpochGauge);
         this.registry.registerMetric(this.epochStateGauge);
     }
@@ -316,6 +323,14 @@ export default class Solana extends TargetAbstract {
             if (!(totalSlots > 0 && totalSecs > 0)) return;
             const secondsPerSlot = totalSecs / totalSlots;
             const nowSec = Date.now() / 1000;
+
+            // Epoch end timestamp (reuse secondsPerSlot, epochFirstSlot)
+            const epochEndAbsSlot: number = epochFirstSlot + slotsInEpoch - 1;
+            let deltaToEnd = epochEndAbsSlot - absoluteSlot;
+            if (!Number.isFinite(deltaToEnd) || deltaToEnd < 0) deltaToEnd = 0;
+            const epochEndTs = Math.floor(nowSec + (deltaToEnd * secondsPerSlot));
+            this.epochEndTsGauge.labels(String(epoch)).set(epochEndTs);
+
 
             // Epoch state (current/prev)
             this.epochStateGauge.reset();
