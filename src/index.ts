@@ -1,3 +1,4 @@
+import './lib/prom-perf';
 import Server from "./server";
 
 process.on('uncaughtException', error => {
