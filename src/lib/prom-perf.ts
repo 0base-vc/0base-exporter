@@ -34,7 +34,7 @@ export function patchPromClientGaugeTiming(): void {
 
         const selfGauge = this as Gauge;
         const setFn = labeled.set;
-        labeled.set = function patchedSet(this: any, value: number) {
+        labeled.set = function patchedSet(this: any, ...args: any[]) {
             const start = gaugeStartTimes.get(selfGauge);
             if (typeof start === 'number') {
                 const duration = Date.now() - start;
@@ -42,21 +42,21 @@ export function patchPromClientGaugeTiming(): void {
                 tryEmitPerfMetric(selfGauge, duration, selfGauge['name']);
                 gaugeStartTimes.delete(selfGauge);
             }
-            return setFn.call(this, value);
+            return setFn.apply(this, args);
         };
         return labeled;
     } as any;
 
     // Also patch direct gauge.set(value) without labels
     if (originalSet) {
-        promClient.Gauge.prototype.set = function patchedDirectSet(this: Gauge, value: number) {
+        promClient.Gauge.prototype.set = function patchedDirectSet(this: Gauge, ...args: any[]) {
             const start = gaugeStartTimes.get(this);
             if (typeof start === 'number') {
                 const duration = Date.now() - start;
                 tryEmitPerfMetric(this, duration, (this as any)['name']);
                 gaugeStartTimes.delete(this);
             }
-            return (originalSet as any).call(this, value);
+            return (originalSet as any).apply(this, args);
         } as any;
     }
 }
