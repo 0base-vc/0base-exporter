@@ -19,6 +19,15 @@ export function patchPromClientGaugeTiming(): void {
     if (patched) return;
     patched = true;
 
+    // Patch Registry.registerMetric to attach back-reference to the registry
+    const origRegisterMetric = promClient.Registry?.prototype?.registerMetric as ((metric: any) => void) | undefined;
+    if (origRegisterMetric) {
+        promClient.Registry.prototype.registerMetric = function patchedRegisterMetric(this: any, metric: any) {
+            try { (metric as any).__registry = this; } catch {}
+            return origRegisterMetric.call(this, metric);
+        } as any;
+    }
+
     // Patch reset: mark start time
     promClient.Gauge.prototype.reset = function patchedReset(this: Gauge) {
         gaugeStartTimes.set(this, Date.now());
@@ -81,7 +90,11 @@ function getOrCreatePerfGauge(registry: Registry): Gauge {
 // Try to emit the timing using the gauge's private registry reference if available
 function tryEmitPerfMetric(sourceGauge: Gauge, durationMs: number, metricName: string) {
     try {
-        const registry: Registry | undefined = (sourceGauge as any).registry || (sourceGauge as any).register;
+        const registry: Registry | undefined =
+            (sourceGauge as any).__registry ||
+            ((sourceGauge as any).registers && (sourceGauge as any).registers[0]) ||
+            (sourceGauge as any).registry ||
+            (sourceGauge as any).register;
         if (!registry) return;
         const perf = getOrCreatePerfGauge(registry);
         perf.labels(metricName).set(durationMs);
