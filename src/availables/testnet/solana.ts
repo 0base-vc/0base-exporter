@@ -90,17 +90,7 @@ export default class Solana extends TargetAbstract {
         labelNames: ['identity', 'epoch', 'slot', 'rewards']
     });
 
-    private readonly epochEndTsGauge = new Gauge({
-        name: `${this.metricPrefix}_epoch_end_timestamp`,
-        help: 'Estimated unix seconds when current epoch ends',
-        labelNames: ['epoch']
-    });
-
-    private readonly epochStartTsGauge = new Gauge({
-        name: `${this.metricPrefix}_epoch_start_timestamp`,
-        help: 'Estimated unix seconds when current epoch starts',
-        labelNames: ['epoch']
-    });
+    
 
     private readonly epochStateGauge = new Gauge({
         name: `${this.metricPrefix}_epoch_state`,
@@ -157,8 +147,7 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.tvcMissedDeltaGauge);
         this.registry.registerMetric(this.leaderSlotNextTsGauge);
         this.registry.registerMetric(this.leaderSlotRewardTsGauge);
-        this.registry.registerMetric(this.epochEndTsGauge);
-        this.registry.registerMetric(this.epochStartTsGauge);
+        
         this.registry.registerMetric(this.epochStateGauge);
     }
 
@@ -215,34 +204,6 @@ export default class Solana extends TargetAbstract {
             const secondsPerSlot = totalSecs / totalSlots;
             const nowSec = Date.now() / 1000;
 
-            // Epoch end timestamp
-            const epochEndAbsSlot: number = epochFirstSlot + slotsInEpoch - 1;
-            let deltaToEnd = epochEndAbsSlot - absoluteSlot;
-            if (!Number.isFinite(deltaToEnd) || deltaToEnd < 0) deltaToEnd = 0;
-            const epochEndTs = Math.floor(nowSec + (deltaToEnd * secondsPerSlot));
-            this.epochEndTsGauge.labels(String(epoch)).set(epochEndTs);
-
-            // Epoch start timestamp: prefer precise via getBlocksWithLimit(startSlot,1) -> getBlockTime, fallback to estimate
-            let epochStartTs = NaN;
-            try {
-                const slotsNearStart = await this.postWithCache(this.rpcUrl, {
-                    method: 'getBlocksWithLimit',
-                    params: [epochFirstSlot, 8, { commitment: 'confirmed' }]
-                } as any, (response: { data: any }) => response.data?.result, 60000);
-                const firstSlot = Array.isArray(slotsNearStart) && slotsNearStart.length > 0 ? Number(slotsNearStart[0]) : NaN;
-                if (Number.isFinite(firstSlot)) {
-                    const bt = await this.postImmutableWithLRU(
-                        this.rpcUrl,
-                        { method: 'getBlockTime', params: [firstSlot] } as any,
-                        (response: { data: any }) => Number(response.data?.result ?? NaN),
-                        undefined,
-                        (val) => Number.isFinite(val) && val > 0
-                    );
-                    if (Number.isFinite(bt) && bt > 0) epochStartTs = Math.floor(bt);
-                }
-            } catch {}
-            this.epochStartTsGauge.labels(String(epoch)).set(epochStartTs);
-
             // Epoch state (current/prev)
             this.epochStateGauge.reset();
             this.epochStateGauge.labels('current', String(epoch)).set(1);
@@ -282,8 +243,8 @@ export default class Solana extends TargetAbstract {
                         this.leaderSlotNextTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
                     }
 
-                    // 과거 구간: 최대 최근 5개 윈도우에 대해 보상 합산
-                    const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 5));
+                    // 과거 구간: 최대 최근 3개 윈도우에 대해 보상 합산
+                    const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 3));
                     await Promise.all(lastPastRel.map(async (relStart) => {
                         try {
                             const absStart = epochFirstSlot + relStart;
