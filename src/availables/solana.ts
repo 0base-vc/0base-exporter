@@ -299,6 +299,7 @@ export default class Solana extends TargetAbstract {
         try {
             this.leaderSlotNextTsGauge.reset();
             this.leaderSlotRewardTsGauge.reset();
+            this.epochEndTsGauge.reset();
 
             // 1) 현재 epoch/slot 정보
             const epochInfo = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'processed' }] } as any, response => response.data?.result);
@@ -415,13 +416,15 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateBalance(addresses: string): Promise<void> {
+        this.availableGauge.reset();
+        this.balanceGauge.reset();
+
         for (const address of this.toUniqueList(addresses)) {
             const available = await this.getAmount(this.rpcUrl, {
                 method: 'getBalance',
                 params: [address]
             }, (json: any) => json.result.value);
             this.availableGauge.labels(address).set(available);
-
             this.balanceGauge.labels(address).set(available);
         }
     }
@@ -449,6 +452,11 @@ export default class Solana extends TargetAbstract {
     }
 
     private async updateVoteAccounts(validators: string): Promise<void> {
+        this.activatedStakeGauge.reset();
+        this.activeGauge.reset();
+        this.commissionGauge.reset();
+        this.lastVoteGauge.reset();
+
         const voteAccounts = this.toUniqueList(validators);
         await this.postWithCache(this.rpcUrl, { method: 'getVoteAccounts' }, response => {
             const allValidators = _.concat(
@@ -527,13 +535,17 @@ export default class Solana extends TargetAbstract {
     // Marinade scoring API → bid, min effective bid, bonds(=bondBalanceSol)
     private async updateMarinadeScoring(validators: string): Promise<void> {
         try {
+            this.marinadeMyBidGauge.reset();
+            this.marinadeMaxStakeWantedGauge.reset();
+            this.validatorBondsGauge.reset();
+
             // 1. Scoring API (lastEpochs=4) - getWithCache로 동일 URL은 60s 내 재요청 방지
             const scoringUrl = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
-            const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 60000);
+            const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 30 * 60 * 1000);
             
             // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
             const bondsUrl = 'https://validator-bonds-api.marinade.finance/bonds';
-            const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 60000);
+            const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 30 * 60 * 1000);
             const bondsList = bondsResponse?.bonds || [];
 
             // 3. Commission(광고 커미션) / MEV 커미션 로드

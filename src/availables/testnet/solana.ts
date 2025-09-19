@@ -185,6 +185,7 @@ export default class Solana extends TargetAbstract {
         try {
             this.leaderSlotNextTsGauge.reset();
             this.leaderSlotRewardTsGauge.reset();
+            this.epochEndTsGauge.reset();
 
             // 1) 현재 epoch/slot 정보
             const epochInfo = await this.post(this.rpcUrl, { method: 'getEpochInfo', params: [{ commitment: 'processed' }] } as any, response => response.data?.result);
