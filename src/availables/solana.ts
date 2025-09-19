@@ -792,7 +792,7 @@ export default class Solana extends TargetAbstract {
 
             const url = 'https://api.vx.tools/epochs/leaderboard/income';
             const payload = {} as any;
-            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(5*60*1000, 60*1000));
             // expected shape: { epoch: number, records: [] }
             const epochFromRoot = rows && typeof rows === 'object' ? rows.epoch : undefined;
             const records: any[] = Array.isArray(rows?.records)
