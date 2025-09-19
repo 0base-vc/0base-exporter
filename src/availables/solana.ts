@@ -196,7 +196,7 @@ export default class Solana extends TargetAbstract {
 
     // SDK 기반 Eff. Bid 계산 결과 캐시
     private sdkEffBidCache: { ts: number, winningTotalPmpe: number, inflationPmpe: number, mevPmpe: number } | null = null;
-    private readonly SDK_CACHE_TTL_MS = 10 * 60 * 1000;
+    private readonly SDK_CACHE_TTL_MS = 30 * 60 * 1000;
 
     private toUniqueList(csv: string): string[] {
         return Array.from(new Set(csv.split(',').map(v => v.trim()).filter(Boolean)));
@@ -592,7 +592,7 @@ export default class Solana extends TargetAbstract {
             const configuredVotes = this.toUniqueList(this.votes);
             if (configuredVotes.length === 0) return;
             const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
-            const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(30*60*1000, 15*1000));
             const arr: any[] = Array.isArray(rows) ? rows : [];
             for (const it of arr) {
                 try {
