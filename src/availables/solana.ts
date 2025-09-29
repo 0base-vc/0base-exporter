@@ -837,18 +837,18 @@ export default class Solana extends TargetAbstract {
                 const name = String(it?.nodeName || '');
                 const stakeLabel = String(Number(it?.stake ?? 0));
 
-                const baseMedianSol = Number(it?.medianIncome?.baseFees ?? 0) / LAMPORTS_PER_SOL;
-                const priorityMedianSol = Number(it?.medianIncome?.priorityFees ?? 0) / LAMPORTS_PER_SOL;
-                const mevMedianSol = Number(it?.medianIncome?.mevTips ?? 0) / LAMPORTS_PER_SOL;
+                const baseTotalSol = Number(it?.totalIncome?.baseFees ?? 0) / LAMPORTS_PER_SOL;
+                const priorityTotalSol = Number(it?.totalIncome?.priorityFees ?? 0) / LAMPORTS_PER_SOL;
+                const mevTotalSol = Number(it?.totalIncome?.mevTips ?? 0) / LAMPORTS_PER_SOL;
 
-                if (Number.isFinite(baseMedianSol)) {
-                    this.epochTop50ValidatorBaseFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(baseMedianSol);
+                if (Number.isFinite(baseTotalSol)) {
+                    this.epochTop50ValidatorBaseFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(baseTotalSol);
                 }
-                if (Number.isFinite(priorityMedianSol)) {
-                    this.epochTop50ValidatorPriorityFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(priorityMedianSol);
+                if (Number.isFinite(priorityTotalSol)) {
+                    this.epochTop50ValidatorPriorityFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(priorityTotalSol);
                 }
-                if (Number.isFinite(mevMedianSol)) {
-                    this.epochTop50ValidatorMevTipsAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(mevMedianSol);
+                if (Number.isFinite(mevTotalSol)) {
+                    this.epochTop50ValidatorMevTipsAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(mevTotalSol);
                 }
             }
 
