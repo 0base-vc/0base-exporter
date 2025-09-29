@@ -143,6 +143,23 @@ export default class Solana extends TargetAbstract {
         labelNames: ['epoch']
     });
 
+    // Top-50 by stake: per-validator median income gauges (labels: epoch, rank, validator, name, stake)
+    private readonly epochTop50ValidatorBaseFeesAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_top50_validator_base_fees_avg_sol`,
+        help: 'Per-validator median base fees among top 50 validators by stake for the epoch',
+        labelNames: ['epoch', 'rank', 'validator', 'name', 'stake']
+    });
+    private readonly epochTop50ValidatorPriorityFeesAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_top50_validator_priority_fees_avg_sol`,
+        help: 'Per-validator median priority fees among top 50 validators by stake for the epoch',
+        labelNames: ['epoch', 'rank', 'validator', 'name', 'stake']
+    });
+    private readonly epochTop50ValidatorMevTipsAvgGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_top50_validator_mev_tips_avg_sol`,
+        help: 'Per-validator median MEV tips among top 50 validators by stake for the epoch',
+        labelNames: ['epoch', 'rank', 'validator', 'name', 'stake']
+    });
+
     private readonly clusterRequiredVersionGauge = new Gauge({
         name: `${this.metricPrefix}_cluster_required_versions`,
         help: 'Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch',
@@ -258,6 +275,9 @@ export default class Solana extends TargetAbstract {
         this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianPriorityFeesAvgGauge);
         this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
+        this.registry.registerMetric(this.epochTop50ValidatorBaseFeesAvgGauge);
+        this.registry.registerMetric(this.epochTop50ValidatorPriorityFeesAvgGauge);
+        this.registry.registerMetric(this.epochTop50ValidatorMevTipsAvgGauge);
         this.registry.registerMetric(this.leaderSlotNextTsGauge);
         this.registry.registerMetric(this.leaderSlotRewardTsGauge);
         this.registry.registerMetric(this.epochEndTsGauge);
@@ -789,6 +809,9 @@ export default class Solana extends TargetAbstract {
             this.epochMedianBaseFeesAvgGauge.reset();
             this.epochMedianPriorityFeesAvgGauge.reset();
             this.epochMedianMevTipsAvgGauge.reset();
+            this.epochTop50ValidatorBaseFeesAvgGauge.reset();
+            this.epochTop50ValidatorPriorityFeesAvgGauge.reset();
+            this.epochTop50ValidatorMevTipsAvgGauge.reset();
 
             const url = 'https://api.vx.tools/epochs/leaderboard/income';
             const payload = {} as any;
@@ -805,6 +828,29 @@ export default class Solana extends TargetAbstract {
             const top = sorted.slice(0, 50);
             const epochLabel = String(epochFromRoot ?? top[0]?.epoch ?? '');
             if (!epochLabel) return;
+
+            // Emit per-validator median incomes for top 50 with rank by stake
+            for (let i = 0; i < top.length; i++) {
+                const it = top[i];
+                const rank = String(i + 1);
+                const validator = String(it?.nodeAddress || '');
+                const name = String(it?.nodeName || '');
+                const stakeLabel = String(Number(it?.stake ?? 0));
+
+                const baseMedianSol = Number(it?.medianIncome?.baseFees ?? 0) / LAMPORTS_PER_SOL;
+                const priorityMedianSol = Number(it?.medianIncome?.priorityFees ?? 0) / LAMPORTS_PER_SOL;
+                const mevMedianSol = Number(it?.medianIncome?.mevTips ?? 0) / LAMPORTS_PER_SOL;
+
+                if (Number.isFinite(baseMedianSol)) {
+                    this.epochTop50ValidatorBaseFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(baseMedianSol);
+                }
+                if (Number.isFinite(priorityMedianSol)) {
+                    this.epochTop50ValidatorPriorityFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(priorityMedianSol);
+                }
+                if (Number.isFinite(mevMedianSol)) {
+                    this.epochTop50ValidatorMevTipsAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(mevMedianSol);
+                }
+            }
 
             const totalBaseLamports = top.reduce((acc, it) => acc + Number(it?.totalIncome?.baseFees ?? 0), 0);
             const totalPriorityLamports = top.reduce((acc, it) => acc + Number(it?.totalIncome?.priorityFees ?? 0), 0);
