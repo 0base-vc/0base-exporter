@@ -837,9 +837,11 @@ export default class Solana extends TargetAbstract {
                 const name = String(it?.nodeName || '');
                 const stakeLabel = String(Number(it?.stake ?? 0));
 
-                const baseTotalSol = Number(it?.totalIncome?.baseFees ?? 0) / LAMPORTS_PER_SOL;
-                const priorityTotalSol = Number(it?.totalIncome?.priorityFees ?? 0) / LAMPORTS_PER_SOL;
-                const mevTotalSol = Number(it?.totalIncome?.mevTips ?? 0) / LAMPORTS_PER_SOL;
+                if (!Number.isFinite(it?.confirmedSlots) || it?.confirmedSlots <= 0) continue;
+
+                const baseTotalSol = Number(it?.totalIncome?.baseFees ?? 0) / Number(it?.confirmedSlots ?? 0) / LAMPORTS_PER_SOL;
+                const priorityTotalSol = Number(it?.totalIncome?.priorityFees ?? 0) / Number(it?.confirmedSlots ?? 0) / LAMPORTS_PER_SOL;
+                const mevTotalSol = Number(it?.totalIncome?.mevTips ?? 0) / Number(it?.confirmedSlots ?? 0) / LAMPORTS_PER_SOL;
 
                 if (Number.isFinite(baseTotalSol)) {
                     this.epochTop50ValidatorBaseFeesAvgGauge.labels(epochLabel, rank, validator, name, stakeLabel).set(baseTotalSol);
