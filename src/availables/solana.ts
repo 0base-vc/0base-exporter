@@ -200,8 +200,8 @@ export default class Solana extends TargetAbstract {
 
     private readonly marinadeEffectiveBidEpochGauge = new Gauge({
         name: `${this.metricPrefix}_marinade_effective_bid_epoch`,
-        help: 'Marinade effective bid per epoch (pmpe) per vote account with unstake priority label',
-        labelNames: ['vote', 'epoch', 'unstake_priority']
+        help: 'Marinade effective bid per epoch (pmpe) per vote account with unstake priority and stake priority labels',
+        labelNames: ['vote', 'epoch', 'unstake_priority', 'stake_priority']
     });
 
     // validator voteAccount -> node identity mapping
@@ -624,7 +624,9 @@ export default class Solana extends TargetAbstract {
                     if (!Number.isFinite(eff)) continue;
                     const unstake = Number(it?.unstakePriority);
                     const unstakeLabel = Number.isFinite(unstake) ? String(unstake) : '0';
-                    this.marinadeEffectiveBidEpochGauge.labels(vote, epoch, unstakeLabel).set(eff);
+                    const stake = Number(it?.stakePriority);
+                    const stakeLabel = Number.isFinite(stake) ? String(stake) : '0';
+                    this.marinadeEffectiveBidEpochGauge.labels(vote, epoch, unstakeLabel, stakeLabel).set(eff);
                 } catch (inner) {
                     console.error('updateMarinadeEffectiveBidEpoch item error', inner);
                 }
