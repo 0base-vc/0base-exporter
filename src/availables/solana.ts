@@ -215,6 +215,11 @@ export default class Solana extends TargetAbstract {
     private sdkEffBidCache: { ts: number, winningTotalPmpe: number, inflationPmpe: number, mevPmpe: number } | null = null;
     private readonly SDK_CACHE_TTL_MS = 30 * 60 * 1000;
 
+    // Marinade 메타데이터 캐시 (광고 커미션 / MEV BPS)
+    private validatorsAdvCache: { ts: number, map: Record<string, number> } | null = null;
+    private mevBpsCache: { ts: number, map: Record<string, number> } | null = null;
+    private readonly META_TTL_MS = 10 * 60 * 1000;
+
     private toUniqueList(csv: string): string[] {
         return Array.from(new Set(csv.split(',').map(v => v.trim()).filter(Boolean)));
     }
@@ -392,9 +397,9 @@ export default class Solana extends TargetAbstract {
                         this.leaderSlotNextTsGauge.labels(identity, String(epoch), String(absSlot)).set(ts);
                     }
 
-                    // 과거 구간: 최대 최근 3개 윈도우에 대해 4슬롯 보상 합산 후 rewards 라벨 갱신
+                    // 과거 구간: 최대 최근 3개 윈도우에 대해 4슬롯 보상 합산 후 rewards 라벨 갱신 (동시성 제한)
                     const lastPastRel = pastStartsRelAll.slice(Math.max(0, pastStartsRelAll.length - 3));
-                    await Promise.all(lastPastRel.map(async (relStart) => {
+                    await this.mapWithConcurrency(lastPastRel, 2, async (relStart) => {
                         try {
                             const absStart = epochFirstSlot + relStart;
                             const slots = [absStart, absStart + 1, absStart + 2, absStart + 3];
@@ -425,7 +430,7 @@ export default class Solana extends TargetAbstract {
                         } catch (inner2) {
                             console.error('leaderSlotTsGauge rewards calc error', identity, relStart, inner2);
                         }
-                    }));
+                    });
                 } catch (inner) {
                     console.error('updateUpcomingLeaderSlots identity', identity, inner);
                 }
@@ -439,14 +444,14 @@ export default class Solana extends TargetAbstract {
         this.availableGauge.reset();
         this.balanceGauge.reset();
 
-        for (const address of this.toUniqueList(addresses)) {
+        await Promise.all(this.toUniqueList(addresses).map(async (address) => {
             const available = await this.getAmount(this.rpcUrl, {
                 method: 'getBalance',
                 params: [address]
             }, (json: any) => json.result.value);
             this.availableGauge.labels(address).set(available);
             this.balanceGauge.labels(address).set(available);
-        }
+        }));
     }
 
     // JPool: validator별 위임 출처별 합계를 수집
@@ -639,6 +644,10 @@ export default class Solana extends TargetAbstract {
     // validators API에서 commission_advertised를 가져와 vote_account별 매핑 생성
     private async loadValidatorsAdvertisedCommission(): Promise<Record<string, number>> {
         try {
+            const now = Date.now();
+            if (this.validatorsAdvCache && (now - this.validatorsAdvCache.ts) < this.META_TTL_MS) {
+                return this.validatorsAdvCache.map;
+            }
             const url = 'https://validators-api.marinade.finance/validators?limit=9999&epochs=1';
             const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             const arr: any[] = Array.isArray(data?.validators) ? data.validators : [];
@@ -649,6 +658,7 @@ export default class Solana extends TargetAbstract {
                 const adv = Number(it?.commission_advertised);
                 if (Number.isFinite(adv)) map[vote] = adv;
             }
+            this.validatorsAdvCache = { ts: now, map };
             return map;
         } catch (e) {
             console.error('loadValidatorsAdvertisedCommission', e);
@@ -659,6 +669,10 @@ export default class Solana extends TargetAbstract {
     // MEV API에서 mev_commission_bps를 가져와 vote_account별 매핑 생성
     private async loadMevCommissionBps(): Promise<Record<string, number>> {
         try {
+            const now = Date.now();
+            if (this.mevBpsCache && (now - this.mevBpsCache.ts) < this.META_TTL_MS) {
+                return this.mevBpsCache.map;
+            }
             const url = 'https://validators-api.marinade.finance/mev';
             const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
             // { validators: [ { vote_account, mev_commission_bps, ... }, ... ] } 형태만 처리
@@ -669,11 +683,27 @@ export default class Solana extends TargetAbstract {
                 const bps = Number(it?.mev_commission_bps);
                 if (vote && Number.isFinite(bps)) out[vote] = bps;
             }
+            this.mevBpsCache = { ts: now, map: out };
             return out;
         } catch (e) {
             console.error('loadMevCommissionBps', e);
             return {};
         }
+    }
+
+    // 간단한 동시성 제한 병렬 map 유틸리티
+    private async mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+        const results: R[] = new Array(items.length);
+        let cursor = 0;
+        const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+            while (true) {
+                const idx = cursor++;
+                if (idx >= items.length) break;
+                results[idx] = await mapper(items[idx]);
+            }
+        });
+        await Promise.all(workers);
+        return results;
     }
 
     // Global effective bid (pmpe) 계산 후 commission/mev_commission 라벨로 게이지에 설정
