@@ -20,8 +20,8 @@ export default class Server {
         if (!Server.singletonInstance) {
             console.log('BLOCKCHAIN', process.env.BLOCKCHAIN || './availables/tendermint.ts');
             const Cls = require(process.env.BLOCKCHAIN || './availables/tendermint.ts').default;
-            const addressesArg = [process.env.ADDRESS, process.env.VOTE].filter(Boolean).join(',');
-            const validatorArg = [process.env.VALIDATOR, process.env.IDENTITY].filter(Boolean).join(',');
+            const addressesArg = (process.env.VOTE ? [process.env.VOTE] : [process.env.ADDRESS]).filter(Boolean).join(',');
+            const validatorArg = (process.env.VALIDATOR ? [process.env.VALIDATOR] : [process.env.IDENTITY]).filter(Boolean).join(',');
             Server.singletonInstance = new Cls(
                 process.env.EXISTING_METRICS_URL,
                 process.env.API_URL,
