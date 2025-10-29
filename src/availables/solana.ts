@@ -3,6 +3,9 @@ import { Gauge, Registry } from 'prom-client';
 import * as _ from 'lodash';
 // axios 제거: TargetAbstract의 getWithCache/postWithCache 사용
 
+// Global env is always available in runtime; declare minimal typing for TS
+declare const process: { env: Record<string, string | undefined> };
+
 const LAMPORTS_PER_SOL = 1e9;
 
 export default class Solana extends TargetAbstract {
@@ -297,8 +300,12 @@ export default class Solana extends TargetAbstract {
             await this.updateVoteAccounts(this.votes);
 
             // 2) 독립 작업 병렬 수행
+            const envAddress = process.env.ADDRESS || '';
+            const balanceTargets = [this.votes, this.identities, envAddress]
+                .filter(Boolean)
+                .join(',');
             await Promise.all([
-                this.updateBalance(this.votes + (this.identities ? ',' + this.identities : '')),
+                this.updateBalance(balanceTargets),
                 this.updateDelegationsFromJPool(this.votes),
                 this.updatePendingStakeFromJPool(this.votes),
                 this.updateMarinadeScoring(this.votes),
