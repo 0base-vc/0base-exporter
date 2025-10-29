@@ -300,10 +300,7 @@ export default class Solana extends TargetAbstract {
             await this.updateVoteAccounts(this.votes);
 
             // 2) 독립 작업 병렬 수행
-            const envAddress = process.env.ADDRESS || '';
-            const balanceTargets = [this.votes, this.identities, envAddress]
-                .filter(Boolean)
-                .join(',');
+            const balanceTargets = [this.votes, this.identities, process.env.ADDRESS || ''].filter(Boolean).join(',');
             await Promise.all([
                 this.updateBalance(balanceTargets),
                 this.updateDelegationsFromJPool(this.votes),
