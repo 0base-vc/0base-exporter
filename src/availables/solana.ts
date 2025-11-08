@@ -210,8 +210,7 @@ export default class Solana extends TargetAbstract {
     // validator voteAccount -> node identity mapping
     private validatorToIdentityMap: Record<string, string> = {};
 
-    // vx.tools 응답 캐시 (identity 기준)
-    private vxIncomeCache: Map<string, { ts: number, rows: any[] }> = new Map();
+    // vx.tools 캐시 TTL (postWithCache가 캐시 관리)
     private readonly VX_CACHE_TTL_MS = 60000;
 
     // SDK 기반 Eff. Bid 계산 결과 캐시
@@ -465,7 +464,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/delegation?vote=${vote}`;
-                const arr = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+                const arr = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 5000);
                 if (Array.isArray(arr)) {
                     for (const item of arr) {
                         const source = String(item.stake_type || item.stakeType || 'unknown');
@@ -547,7 +546,7 @@ export default class Solana extends TargetAbstract {
             await Promise.all(voteAccounts.map(async (vote) => {
                 try {
                     const url = `https://api.jpool.one/validators/${encodeURIComponent(vote)}`;
-                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000);
+                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000, 5000);
                     const releaseVersion: string = String(data?.version ?? '');
                     if (releaseVersion) {
                         this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
@@ -788,22 +787,16 @@ export default class Solana extends TargetAbstract {
         this.blockTipsMedianGauge.reset();
 
         const voteAccounts = this.toUniqueList(validators);
+        // postWithCache가 이미 캐시 우선 전략을 사용하므로 일반적인 사용
         await Promise.all(voteAccounts.map(async (vote) => {
             const identity = this.validatorToIdentityMap[vote];
             if (!identity) return;
             try {
-                const now = Date.now();
-                const cached = this.vxIncomeCache.get(identity);
-                let rows: any[] = [];
-                if (cached && (now - cached.ts) < this.VX_CACHE_TTL_MS) {
-                    rows = cached.rows;
-                } else {
-                    const url = 'https://api.vx.tools/epochs/income';
-                    const payload = { identity, limit: 1 };
-                    const data = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.VX_CACHE_TTL_MS);
-                    rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-                    this.vxIncomeCache.set(identity, { ts: now, rows });
-                }
+                const url = 'https://api.vx.tools/epochs/income';
+                const payload = { identity, limit: 1 };
+                // postWithCache가 캐시 우선 전략 사용 (캐시 있으면 즉시 반환, 없으면 요청)
+                const data = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.VX_CACHE_TTL_MS, 10000);
+                const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
                 if (!Array.isArray(rows) || rows.length === 0) return;
                 const latest = rows[rows.length - 1];
                 const epochLabel = String(latest?.epoch ?? '');
@@ -851,7 +844,7 @@ export default class Solana extends TargetAbstract {
 
             const url = 'https://api.vx.tools/epochs/leaderboard/income';
             const payload = {} as any;
-            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(5*60*1000, 60*1000));
+            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(5*60*1000, 60*1000), 10000);
             // expected shape: { epoch: number, records: [] }
             const epochFromRoot = rows && typeof rows === 'object' ? rows.epoch : undefined;
             const records: any[] = Array.isArray(rows?.records)
@@ -917,7 +910,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/validators/${vote}/pending-stake`;
-                const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+                const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 5000);
                 const accounts: any[] = Array.isArray(data?.stake_accounts) ? data.stake_accounts : [];
                 if (accounts.length === 0) return;
 

@@ -29,35 +29,66 @@ export default abstract class TargetAbstract {
 
     /**
      * 1분 캐시가 적용된 GET 요청 함수. 모든 하위 클래스에서 사용 가능.
+     * 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신 시도.
+     * 캐시 우선 전략으로 대부분 즉시 반환되므로 타임아웃은 선택적.
      * @param url 요청 URL
      * @param process 응답 처리 함수
      * @param cacheDurationMs 캐시 유지 시간(ms), 기본 1분
+     * @param timeoutMs 요청 타임아웃(ms), undefined면 타임아웃 없음
      */
     protected async getWithCache(
         url: string,
         process: (response: { data: any }) => any,
-        cacheDurationMs: number = 60000
+        cacheDurationMs: number = 60000,
+        timeoutMs?: number
     ) {
         const now = Date.now();
-        if (
-            this.getCache[url] !== undefined &&
-            this.getCacheTimestamps[url] !== undefined &&
-            now - this.getCacheTimestamps[url] < cacheDurationMs
-        ) {
-            return this.getCache[url];
+        const cached = this.getCache[url];
+        const cachedTs = this.getCacheTimestamps[url];
+        
+        // 캐시가 있고 유효하면 즉시 반환
+        if (cached !== undefined && cachedTs !== undefined && now - cachedTs < cacheDurationMs) {
+            return cached;
         }
+        
+        // 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신
+        if (cached !== undefined) {
+            // 백그라운드에서 갱신 시도 (응답 대기 안 함)
+            this.refreshGetCacheInBackground(url, process, cacheDurationMs, timeoutMs).catch(e => {
+                // 백그라운드 갱신 실패는 무시
+            });
+            return cached;
+        }
+        
+        // 캐시가 없을 때만 동기적으로 요청
         try {
-            const response = await axios.get(url);
+            const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+            const response = await axios.get(url, config);
             const result = process(response);
             this.getCache[url] = result;
             this.getCacheTimestamps[url] = now;
             return result;
         } catch (e) {
             console.error('getWithCache', e);
-            if (this.getCache[url] !== undefined) {
-                return this.getCache[url];
-            }
             return '';
+        }
+    }
+
+    // 백그라운드에서 GET 캐시 갱신
+    private async refreshGetCacheInBackground(
+        url: string,
+        process: (response: { data: any }) => any,
+        cacheDurationMs: number,
+        timeoutMs?: number
+    ): Promise<void> {
+        try {
+            const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+            const response = await axios.get(url, config);
+            const result = process(response);
+            this.getCache[url] = result;
+            this.getCacheTimestamps[url] = Date.now();
+        } catch (e) {
+            // 백그라운드 갱신 실패는 무시
         }
     }
 
@@ -72,9 +103,10 @@ export default abstract class TargetAbstract {
         return Math.max(baseDurationMs + randomOffset, baseDurationMs / 2);
     }
 
-    protected async get(url: string, process: (response: { data: any }) => any) {
+    protected async get(url: string, process: (response: { data: any }) => any, timeoutMs?: number) {
         const fallbackKey = url;
-        return axios.get(url).then(response => {
+        const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+        return axios.get(url, config).then(response => {
             const result = process(response);
             this.fallbackGetResult[fallbackKey] = result;
             return result;
@@ -95,42 +127,79 @@ export default abstract class TargetAbstract {
 
     /**
      * 1분 캐시가 적용된 POST 요청 함수. JSON-RPC({ method, params }) 또는 일반 JSON 바디 모두 지원.
+     * 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신 시도.
+     * 캐시 우선 전략으로 대부분 즉시 반환되므로 타임아웃은 선택적.
      * @param url 요청 URL
      * @param data JSON-RPC({ method, params }) 또는 일반 JSON 객체 바디
      * @param process 응답 처리 함수
      * @param cacheDurationMs 캐시 유지 시간(ms), 기본 1분
+     * @param timeoutMs 요청 타임아웃(ms), undefined면 타임아웃 없음
      */
     protected async postWithCache(
         url: string,
         data: any,
         process: (response: { data: any }) => any,
-        cacheDurationMs: number = 60000
+        cacheDurationMs: number = 60000,
+        timeoutMs?: number
     ) {
         const key = url + ':' + JSON.stringify(data);
         const now = Date.now();
-        if (
-            this.postCache[key] !== undefined &&
-            this.postCacheTimestamps[key] !== undefined &&
-            now - this.postCacheTimestamps[key] < cacheDurationMs
-        ) {
-            return this.postCache[key];
+        const cached = this.postCache[key];
+        const cachedTs = this.postCacheTimestamps[key];
+        
+        // 캐시가 있고 유효하면 즉시 반환
+        if (cached !== undefined && cachedTs !== undefined && now - cachedTs < cacheDurationMs) {
+            return cached;
         }
+        
+        // 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신
+        if (cached !== undefined) {
+            // 백그라운드에서 갱신 시도 (응답 대기 안 함)
+            this.refreshPostCacheInBackground(url, data, process, cacheDurationMs, timeoutMs).catch(e => {
+                // 백그라운드 갱신 실패는 무시
+            });
+            return cached;
+        }
+        
+        // 캐시가 없을 때만 동기적으로 요청
         try {
             const isJsonRpc = data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'method');
             const body = isJsonRpc
                 ? { jsonrpc: '2.0', id: 1, method: data.method, params: data.params }
                 : data;
-            const response = await axios.post(url, body);
+            const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+            const response = await axios.post(url, body, config);
             const result = process(response);
             this.postCache[key] = result;
             this.postCacheTimestamps[key] = now;
             return result;
         } catch (e) {
             console.error('postWithCache', e);
-            if (this.postCache[key] !== undefined) {
-                return this.postCache[key];
-            }
             return '';
+        }
+    }
+
+    // 백그라운드에서 POST 캐시 갱신
+    private async refreshPostCacheInBackground(
+        url: string,
+        data: any,
+        process: (response: { data: any }) => any,
+        cacheDurationMs: number,
+        timeoutMs?: number
+    ): Promise<void> {
+        try {
+            const isJsonRpc = data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'method');
+            const body = isJsonRpc
+                ? { jsonrpc: '2.0', id: 1, method: data.method, params: data.params }
+                : data;
+            const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+            const response = await axios.post(url, body, config);
+            const result = process(response);
+            const key = url + ':' + JSON.stringify(data);
+            this.postCache[key] = result;
+            this.postCacheTimestamps[key] = Date.now();
+        } catch (e) {
+            // 백그라운드 갱신 실패는 무시
         }
     }
 
@@ -146,13 +215,15 @@ export default abstract class TargetAbstract {
      * @param data JSON-RPC({ method, params }) 또는 일반 JSON 객체 바디
      * @param process 응답 처리 함수
      * @param maxEntries LRU 최대 엔트리 수 (기본 5000)
+     * @param timeoutMs 요청 타임아웃(ms), undefined면 타임아웃 없음
      */
     protected async postImmutableWithLRU(
         url: string,
         data: any,
         process: (response: { data: any }) => any,
         maxEntries?: number,
-        isCacheable?: (result: any) => boolean
+        isCacheable?: (result: any) => boolean,
+        timeoutMs?: number
     ) {
         const key = url + ':' + JSON.stringify(data);
         if (this.immutablePostLRU.has(key)) {
@@ -167,7 +238,8 @@ export default abstract class TargetAbstract {
             const body = isJsonRpc
                 ? { jsonrpc: '2.0', id: 1, method: data.method, params: data.params }
                 : data;
-            const response = await axios.post(url, body);
+            const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+            const response = await axios.post(url, body, config);
             const result = process(response);
             // 캐시 가능 판정: 기본은 undefined/null/NaN(숫자) 는 캐시하지 않음
             const defaultCacheable = (val: any) => {
@@ -202,10 +274,11 @@ export default abstract class TargetAbstract {
 
     protected async post(url: string, data: { method: string, params?: string[] }, process: (response: {
         data: any
-    }) => any) {
+    }) => any, timeoutMs?: number) {
         const fallbackKey = JSON.stringify(data);
         //const fallbackKey = data.method + data.params && data.params.length >= 0 ? data.params.join(',') : '';
-        return axios.post(url, {jsonrpc: '2.0', id: 1, method: data.method, params: data.params}).then(response => {
+        const config = timeoutMs !== undefined ? { timeout: timeoutMs } : {};
+        return axios.post(url, {jsonrpc: '2.0', id: 1, method: data.method, params: data.params}, config).then(response => {
             const result = process(response);
             this.fallbackPostResult[fallbackKey] = result;
             return result;
