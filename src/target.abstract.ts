@@ -54,7 +54,7 @@ export default abstract class TargetAbstract {
         // 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신
         if (cached !== undefined) {
             // 백그라운드에서 갱신 시도 (응답 대기 안 함)
-            this.refreshGetCacheInBackground(url, process, cacheDurationMs, timeoutMs).catch(e => {
+            this.refreshGetCacheInBackground(url, process, timeoutMs).catch(() => {
                 // 백그라운드 갱신 실패는 무시
             });
             return cached;
@@ -78,7 +78,6 @@ export default abstract class TargetAbstract {
     private async refreshGetCacheInBackground(
         url: string,
         process: (response: { data: any }) => any,
-        cacheDurationMs: number,
         timeoutMs?: number
     ): Promise<void> {
         try {
@@ -155,7 +154,7 @@ export default abstract class TargetAbstract {
         // 캐시가 있으면 (만료되었어도) 즉시 반환하고 백그라운드에서 갱신
         if (cached !== undefined) {
             // 백그라운드에서 갱신 시도 (응답 대기 안 함)
-            this.refreshPostCacheInBackground(url, data, process, cacheDurationMs, timeoutMs).catch(e => {
+            this.refreshPostCacheInBackground(url, data, process, timeoutMs).catch(() => {
                 // 백그라운드 갱신 실패는 무시
             });
             return cached;
@@ -184,7 +183,6 @@ export default abstract class TargetAbstract {
         url: string,
         data: any,
         process: (response: { data: any }) => any,
-        cacheDurationMs: number,
         timeoutMs?: number
     ): Promise<void> {
         try {
