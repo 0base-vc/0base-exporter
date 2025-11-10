@@ -464,7 +464,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/delegation?vote=${vote}`;
-                const arr = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 5000);
+                const arr = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 10000);
                 if (Array.isArray(arr)) {
                     for (const item of arr) {
                         const source = String(item.stake_type || item.stakeType || 'unknown');
@@ -546,7 +546,7 @@ export default class Solana extends TargetAbstract {
             await Promise.all(voteAccounts.map(async (vote) => {
                 try {
                     const url = `https://api.jpool.one/validators/${encodeURIComponent(vote)}`;
-                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000, 5000);
+                    const data = await this.getWithCache(url, (response: { data: any }) => response.data, 60000, 10000);
                     const releaseVersion: string = String(data?.version ?? '');
                     if (releaseVersion) {
                         this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
@@ -569,11 +569,11 @@ export default class Solana extends TargetAbstract {
 
             // 1. Scoring API (lastEpochs=4) - getWithCache로 동일 URL은 60s 내 재요청 방지
             const scoringUrl = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
-            const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 30 * 60 * 1000);
+            const scoringList = await this.getWithCache(scoringUrl, (response: { data: any }) => response.data, 30 * 60 * 1000, 25000);
             
             // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
             const bondsUrl = 'https://validator-bonds-api.marinade.finance/bonds';
-            const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 30 * 60 * 1000);
+            const bondsResponse = await this.getWithCache(bondsUrl, (response: { data: any }) => response.data, 30 * 60 * 1000, 25000);
             const bondsList = bondsResponse?.bonds || [];
 
             // 3. Commission(광고 커미션) / MEV 커미션 로드
@@ -620,7 +620,7 @@ export default class Solana extends TargetAbstract {
             const configuredVotes = this.toUniqueList(this.votes);
             if (configuredVotes.length === 0) return;
             const url = 'https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4';
-            const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(30*60*1000, 15*1000));
+            const rows = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(30*60*1000, 15*1000), 25000);
             const arr: any[] = Array.isArray(rows) ? rows : [];
             for (const it of arr) {
                 try {
@@ -652,7 +652,7 @@ export default class Solana extends TargetAbstract {
                 return this.validatorsAdvCache.map;
             }
             const url = 'https://validators-api.marinade.finance/validators?limit=9999&epochs=1';
-            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 25000);
             const arr: any[] = Array.isArray(data?.validators) ? data.validators : [];
             const map: Record<string, number> = {};
             for (const it of arr) {
@@ -677,7 +677,7 @@ export default class Solana extends TargetAbstract {
                 return this.mevBpsCache.map;
             }
             const url = 'https://validators-api.marinade.finance/mev';
-            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000));
+            const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 25000);
             // { validators: [ { vote_account, mev_commission_bps, ... }, ... ] } 형태만 처리
             const out: Record<string, number> = {};
             const arr: any[] = Array.isArray((data as any)?.validators) ? (data as any).validators : [];
@@ -728,7 +728,7 @@ export default class Solana extends TargetAbstract {
 
             // 2) SDK 실행하여 최신 값을 계산
             const configUrl = 'https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json';
-            const config = await this.getWithCache(configUrl, (response: { data: any }) => response.data, 60000);
+            const config = await this.getWithCache(configUrl, (response: { data: any }) => response.data, 60000, 10000);
             const req: any = (global as any).require ? (global as any).require : eval('require');
             const sdkMod: any = req('@marinade.finance/ds-sam-sdk');
             const dsSam = new sdkMod.DsSamSDK({ ...config, inputsSource: sdkMod.InputsSource.APIS, cacheInputs: false });
@@ -910,7 +910,7 @@ export default class Solana extends TargetAbstract {
         await Promise.all(voteAccounts.map(async (vote) => {
             try {
                 const url = `https://api.jpool.one/validators/${vote}/pending-stake`;
-                const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 5000);
+                const data = await this.getWithCache(url, (response: { data: any }) => response.data, this.getRandomCacheDuration(60000, 15000), 10000);
                 const accounts: any[] = Array.isArray(data?.stake_accounts) ? data.stake_accounts : [];
                 if (accounts.length === 0) return;
 
