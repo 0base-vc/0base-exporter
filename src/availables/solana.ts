@@ -795,7 +795,7 @@ export default class Solana extends TargetAbstract {
                 const url = 'https://api.vx.tools/epochs/income';
                 const payload = { identity, limit: 1 };
                 // postWithCache가 캐시 우선 전략 사용 (캐시 있으면 즉시 반환, 없으면 요청)
-                const data = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.VX_CACHE_TTL_MS, 10000);
+                const data = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.VX_CACHE_TTL_MS, 25000);
                 const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
                 if (!Array.isArray(rows) || rows.length === 0) return;
                 const latest = rows[rows.length - 1];
@@ -844,7 +844,7 @@ export default class Solana extends TargetAbstract {
 
             const url = 'https://api.vx.tools/epochs/leaderboard/income';
             const payload = {} as any;
-            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(5*60*1000, 60*1000), 10000);
+            const rows = await this.postWithCache(url, payload, (response: { data: any }) => response.data, this.getRandomCacheDuration(5*60*1000, 60*1000), 25000);
             // expected shape: { epoch: number, records: [] }
             const epochFromRoot = rows && typeof rows === 'object' ? rows.epoch : undefined;
             const records: any[] = Array.isArray(rows?.records)
