@@ -1,9 +1,23 @@
 import {Web3} from "web3";
-import Tendermint from "./tendermint-v1";
+import TargetAbstract from "../target.abstract";
+import {Gauge, Registry} from "prom-client";
 
-export default class Monad extends Tendermint {
+export default class Monad extends TargetAbstract {
     public readonly web3: Web3;
 
+    private readonly metricPrefix = 'monad';
+    protected readonly decimalPlaces = parseInt(process.env.DECIMAL_PLACES as any) || 18;
+    private readonly registry = new Registry();
+    private readonly availableGauge = new Gauge({
+        name: `${this.metricPrefix}_address_available`,
+        help: 'Available balance of address',
+        labelNames: ['address', 'denom']
+    });
+    private readonly rewardsGauge = new Gauge({
+        name: `${this.metricPrefix}_address_rewards`,
+        help: 'Rewards of address',
+        labelNames: ['address', 'denom']
+    });
     // Monad validator/reward manager contract (read-only)
     private readonly validatorContractAddress: string = '0x0000000000000000000000000000000000001000';
     // Prefer ENV-provided validatorId if available (only for Monad)
@@ -49,6 +63,8 @@ export default class Monad extends Tendermint {
                        protected readonly validator: string) {
         super(existMetrics, apiUrl, rpcUrl, addresses, validator);
         this.web3 = new Web3(process.env.EVM_API_URL);
+        this.registry.registerMetric(this.availableGauge);
+        this.registry.registerMetric(this.rewardsGauge);
     }
 
     public async makeMetrics(): Promise<string> {
