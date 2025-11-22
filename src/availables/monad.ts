@@ -18,6 +18,100 @@ export default class Monad extends TargetAbstract {
         help: 'Rewards of address',
         labelNames: ['address', 'denom']
     });
+    private readonly stakeGauge = new Gauge({
+        name: `${this.metricPrefix}_address_stake`,
+        help: 'Stake (delegated amount) of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly commissionGauge = new Gauge({
+        name: `${this.metricPrefix}_address_commission`,
+        help: 'Commission of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly delegatedGauge = new Gauge({
+        name: `${this.metricPrefix}_address_delegated`,
+        help: 'Delegated balance of address',
+        labelNames: ['address', 'denom']
+    });
+    private readonly unbondingGauge = new Gauge({
+        name: `${this.metricPrefix}_address_unbonding`,
+        help: 'Unbonding (withdrawal pending) balance of address',
+        labelNames: ['address', 'denom']
+    });
+    private readonly epochGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch`,
+        help: 'Current epoch number',
+    });
+    private readonly delegatorsCountGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_delegators_count`,
+        help: 'Number of delegators for validator',
+        labelNames: ['address']
+    });
+    private readonly consensusStakeGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_consensus_stake`,
+        help: 'Consensus stake of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly consensusCommissionGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_consensus_commission`,
+        help: 'Consensus commission of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly snapshotStakeGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_snapshot_stake`,
+        help: 'Snapshot stake of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly snapshotCommissionGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_snapshot_commission`,
+        help: 'Snapshot commission of validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly validatorFlagsGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_flags`,
+        help: 'Validator status flags',
+        labelNames: ['address']
+    });
+    private readonly accRewardPerTokenGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_acc_reward_per_token`,
+        help: 'Accumulated reward per token for validator',
+        labelNames: ['address', 'denom']
+    });
+    private readonly delegatorRewardsGauge = new Gauge({
+        name: `${this.metricPrefix}_address_delegator_rewards`,
+        help: 'Unclaimed rewards for delegator address',
+        labelNames: ['address', 'denom']
+    });
+    private readonly deltaStakeGauge = new Gauge({
+        name: `${this.metricPrefix}_address_delta_stake`,
+        help: 'Delta stake (pending change) for delegator address',
+        labelNames: ['address', 'denom']
+    });
+    private readonly epochDelayPeriodGauge = new Gauge({
+        name: `${this.metricPrefix}_epoch_delay_period`,
+        help: 'Whether in epoch delay period (1 = yes, 0 = no)',
+    });
+    private readonly consensusValidatorSetCountGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_set_consensus_count`,
+        help: 'Number of validators in consensus validator set',
+    });
+    private readonly executionValidatorSetCountGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_set_execution_count`,
+        help: 'Number of validators in execution validator set',
+    });
+    private readonly snapshotValidatorSetCountGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_set_snapshot_count`,
+        help: 'Number of validators in snapshot validator set',
+    });
+    private readonly validatorRankGauge = new Gauge({
+        name: `${this.metricPrefix}_validator_rank`,
+        help: 'Rank of validator by stake',
+        labelNames: ['address']
+    });
+    private readonly proposerValIdGauge = new Gauge({
+        name: `${this.metricPrefix}_proposer_validator_id`,
+        help: 'Current proposer validator ID',
+    });
     // Monad validator/reward manager contract (read-only)
     private readonly validatorContractAddress: string = '0x0000000000000000000000000000000000001000';
     // Prefer ENV-provided validatorId if available (only for Monad)
@@ -65,6 +159,26 @@ export default class Monad extends TargetAbstract {
         this.web3 = new Web3(process.env.EVM_API_URL);
         this.registry.registerMetric(this.availableGauge);
         this.registry.registerMetric(this.rewardsGauge);
+        this.registry.registerMetric(this.stakeGauge);
+        this.registry.registerMetric(this.commissionGauge);
+        this.registry.registerMetric(this.delegatedGauge);
+        this.registry.registerMetric(this.unbondingGauge);
+        this.registry.registerMetric(this.epochGauge);
+        this.registry.registerMetric(this.delegatorsCountGauge);
+        this.registry.registerMetric(this.consensusStakeGauge);
+        this.registry.registerMetric(this.consensusCommissionGauge);
+        this.registry.registerMetric(this.snapshotStakeGauge);
+        this.registry.registerMetric(this.snapshotCommissionGauge);
+        this.registry.registerMetric(this.validatorFlagsGauge);
+        this.registry.registerMetric(this.accRewardPerTokenGauge);
+        this.registry.registerMetric(this.delegatorRewardsGauge);
+        this.registry.registerMetric(this.deltaStakeGauge);
+        this.registry.registerMetric(this.epochDelayPeriodGauge);
+        this.registry.registerMetric(this.consensusValidatorSetCountGauge);
+        this.registry.registerMetric(this.executionValidatorSetCountGauge);
+        this.registry.registerMetric(this.snapshotValidatorSetCountGauge);
+        this.registry.registerMetric(this.validatorRankGauge);
+        this.registry.registerMetric(this.proposerValIdGauge);
     }
 
     public async makeMetrics(): Promise<string> {
@@ -72,7 +186,14 @@ export default class Monad extends TargetAbstract {
         try {
             await Promise.all([
                 this.updateEvmAddressBalance(this.addresses),
-                this.updateValidatorRewards(this.validator)
+                this.updateValidatorRewards(this.validator),
+                this.updateAddressDelegations(this.addresses),
+                this.updateAddressUnbonding(this.addresses),
+                this.updateEpoch(),
+                this.updateDelegatorsCount(this.validator),
+                this.updateAddressDelegatorRewards(this.addresses),
+                this.updateValidatorSets(),
+                this.updateProposerValId()
             ]);
             customMetrics = await this.registry.metrics();
         } catch (e) {
@@ -90,23 +211,73 @@ export default class Monad extends TargetAbstract {
         }
     }
 
-    // Read validator unclaimed rewards via getValidator(validatorId) using ENV-provided validatorId
+    // Read validator unclaimed rewards, stake, and commission via getValidator(validatorId) using ENV-provided validatorId
     protected async updateValidatorRewards(validatorAddress: string): Promise<void> {
         try {
             const contract = this.getValidatorContract();
             const validatorId = this.validatorIdEnv?.trim();
             if (!validatorId || validatorId.length === 0) {
                 this.rewardsGauge.labels(validatorAddress, 'MON').set(0);
+                this.stakeGauge.labels(validatorAddress, 'MON').set(0);
+                this.commissionGauge.labels(validatorAddress, 'MON').set(0);
                 return;
             }
             const res = await contract.methods.getValidator(validatorId).call();
             // res.unclaimedRewards is BigInt-like string
             const unclaimed: bigint = BigInt(res.unclaimedRewards?.toString?.() ?? res.unclaimedRewards ?? 0);
-            const amount = parseInt(unclaimed.toString()) / Math.pow(10, this.decimalPlaces);
-            this.rewardsGauge.labels(validatorAddress, 'MON').set(amount);
+            const rewardsAmount = parseInt(unclaimed.toString()) / Math.pow(10, this.decimalPlaces);
+            this.rewardsGauge.labels(validatorAddress, 'MON').set(rewardsAmount);
+            
+            // res.stake is BigInt-like string
+            const stake: bigint = BigInt(res.stake?.toString?.() ?? res.stake ?? 0);
+            const stakeAmount = parseInt(stake.toString()) / Math.pow(10, this.decimalPlaces);
+            this.stakeGauge.labels(validatorAddress, 'MON').set(stakeAmount);
+            
+            // res.commission is BigInt-like string (typically in basis points, e.g., 10000 = 100%)
+            const commission: bigint = BigInt(res.commission?.toString?.() ?? res.commission ?? 0);
+            // Commission is usually stored as basis points (10000 = 100%), convert to percentage
+            const commissionAmount = parseInt(commission.toString()) / 100;
+            this.commissionGauge.labels(validatorAddress, 'MON').set(commissionAmount);
+            
+            // res.consensusStake
+            const consensusStake: bigint = BigInt(res.consensusStake?.toString?.() ?? res.consensusStake ?? 0);
+            const consensusStakeAmount = parseInt(consensusStake.toString()) / Math.pow(10, this.decimalPlaces);
+            this.consensusStakeGauge.labels(validatorAddress, 'MON').set(consensusStakeAmount);
+            
+            // res.consensusCommission
+            const consensusCommission: bigint = BigInt(res.consensusCommission?.toString?.() ?? res.consensusCommission ?? 0);
+            const consensusCommissionAmount = parseInt(consensusCommission.toString()) / 100;
+            this.consensusCommissionGauge.labels(validatorAddress, 'MON').set(consensusCommissionAmount);
+            
+            // res.snapshotStake
+            const snapshotStake: bigint = BigInt(res.snapshotStake?.toString?.() ?? res.snapshotStake ?? 0);
+            const snapshotStakeAmount = parseInt(snapshotStake.toString()) / Math.pow(10, this.decimalPlaces);
+            this.snapshotStakeGauge.labels(validatorAddress, 'MON').set(snapshotStakeAmount);
+            
+            // res.snapshotCommission
+            const snapshotCommission: bigint = BigInt(res.snapshotCommission?.toString?.() ?? res.snapshotCommission ?? 0);
+            const snapshotCommissionAmount = parseInt(snapshotCommission.toString()) / 100;
+            this.snapshotCommissionGauge.labels(validatorAddress, 'MON').set(snapshotCommissionAmount);
+            
+            // res.flags
+            const flags: bigint = BigInt(res.flags?.toString?.() ?? res.flags ?? 0);
+            this.validatorFlagsGauge.labels(validatorAddress).set(parseInt(flags.toString()));
+            
+            // res.accRewardPerToken
+            const accRewardPerToken: bigint = BigInt(res.accRewardPerToken?.toString?.() ?? res.accRewardPerToken ?? 0);
+            const accRewardPerTokenAmount = parseInt(accRewardPerToken.toString()) / Math.pow(10, this.decimalPlaces);
+            this.accRewardPerTokenGauge.labels(validatorAddress, 'MON').set(accRewardPerTokenAmount);
         } catch (e) {
             console.error('updateValidatorRewards error', e);
             this.rewardsGauge.labels(validatorAddress, 'MON').set(0);
+            this.stakeGauge.labels(validatorAddress, 'MON').set(0);
+            this.commissionGauge.labels(validatorAddress, 'MON').set(0);
+            this.consensusStakeGauge.labels(validatorAddress, 'MON').set(0);
+            this.consensusCommissionGauge.labels(validatorAddress, 'MON').set(0);
+            this.snapshotStakeGauge.labels(validatorAddress, 'MON').set(0);
+            this.snapshotCommissionGauge.labels(validatorAddress, 'MON').set(0);
+            this.validatorFlagsGauge.labels(validatorAddress).set(0);
+            this.accRewardPerTokenGauge.labels(validatorAddress, 'MON').set(0);
         }
     }
 
@@ -126,6 +297,251 @@ export default class Monad extends TargetAbstract {
         } catch (e) {
             console.error(e);
             return { amount: 0 };
+        }
+    }
+
+    // Update delegated balance for each address by querying all delegations
+    protected async updateAddressDelegations(addresses: string): Promise<void> {
+        const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
+        const contract = this.getValidatorContract();
+        
+        for (const address of evmAddresses) {
+            try {
+                let totalDelegated = 0;
+                let startValId = 0;
+                let isDone = false;
+                
+                // Iterate through all delegations for this address
+                while (!isDone) {
+                    const res = await contract.methods.getDelegations(address, startValId).call();
+                    isDone = res.isDone;
+                    startValId = parseInt(res.nextValId?.toString() ?? res.nextValId ?? 0);
+                    
+                    // For each validator ID, get the delegator's stake
+                    for (const valId of res.valIds || []) {
+                        try {
+                            const delegatorRes = await contract.methods.getDelegator(valId, address).call();
+                            const stake: bigint = BigInt(delegatorRes.stake?.toString?.() ?? delegatorRes.stake ?? 0);
+                            totalDelegated += parseInt(stake.toString()) / Math.pow(10, this.decimalPlaces);
+                        } catch (e) {
+                            console.error(`Error getting delegator info for validator ${valId}`, e);
+                        }
+                    }
+                }
+                
+                this.delegatedGauge.labels(address, 'MON').set(totalDelegated);
+            } catch (e) {
+                console.error(`Error updating delegations for address ${address}`, e);
+                this.delegatedGauge.labels(address, 'MON').set(0);
+            }
+        }
+    }
+
+    // Update unbonding (withdrawal pending) balance for each address
+    protected async updateAddressUnbonding(addresses: string): Promise<void> {
+        const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
+        const contract = this.getValidatorContract();
+        const validatorId = this.validatorIdEnv?.trim();
+        
+        if (!validatorId || validatorId.length === 0) {
+            // If no validator ID, set all to 0
+            for (const address of evmAddresses) {
+                this.unbondingGauge.labels(address, 'MON').set(0);
+            }
+            return;
+        }
+        
+        for (const address of evmAddresses) {
+            try {
+                let totalUnbonding = 0;
+                // Check withdrawal requests (withdrawId can be 0-255, but typically 0-2 are used)
+                // We'll check common withdrawId values (0, 1, 2)
+                for (let withdrawId = 0; withdrawId < 3; withdrawId++) {
+                    try {
+                        const res = await contract.methods.getWithdrawalRequest(validatorId, address, withdrawId).call();
+                        const withdrawalAmount: bigint = BigInt(res.withdrawalAmount?.toString?.() ?? res.withdrawalAmount ?? 0);
+                        if (withdrawalAmount > 0) {
+                            totalUnbonding += parseInt(withdrawalAmount.toString()) / Math.pow(10, this.decimalPlaces);
+                        }
+                    } catch (e) {
+                        // Withdrawal request might not exist for this withdrawId, continue
+                    }
+                }
+                
+                this.unbondingGauge.labels(address, 'MON').set(totalUnbonding);
+            } catch (e) {
+                console.error(`Error updating unbonding for address ${address}`, e);
+                this.unbondingGauge.labels(address, 'MON').set(0);
+            }
+        }
+    }
+
+    // Update current epoch information
+    protected async updateEpoch(): Promise<void> {
+        try {
+            const contract = this.getValidatorContract();
+            const res = await contract.methods.getEpoch().call();
+            const epoch: bigint = BigInt(res.epoch?.toString?.() ?? res.epoch ?? 0);
+            this.epochGauge.set(parseInt(epoch.toString()));
+            
+            // inEpochDelayPeriod
+            const inDelayPeriod = res.inEpochDelayPeriod === true || res.inEpochDelayPeriod === 'true' || res.inEpochDelayPeriod === 1;
+            this.epochDelayPeriodGauge.set(inDelayPeriod ? 1 : 0);
+        } catch (e) {
+            console.error('updateEpoch error', e);
+        }
+    }
+
+    // Update delegators count for validator
+    protected async updateDelegatorsCount(validatorAddress: string): Promise<void> {
+        try {
+            const contract = this.getValidatorContract();
+            const validatorId = this.validatorIdEnv?.trim();
+            if (!validatorId || validatorId.length === 0) {
+                this.delegatorsCountGauge.labels(validatorAddress).set(0);
+                return;
+            }
+            
+            let totalDelegators = 0;
+            let startDelegator = '0x0000000000000000000000000000000000000000';
+            let isDone = false;
+            
+            // Iterate through all delegators
+            while (!isDone) {
+                const res = await contract.methods.getDelegators(validatorId, startDelegator).call();
+                isDone = res.isDone;
+                startDelegator = res.nextDelegator || '0x0000000000000000000000000000000000000000';
+                totalDelegators += (res.delegators || []).length;
+            }
+            
+            this.delegatorsCountGauge.labels(validatorAddress).set(totalDelegators);
+        } catch (e) {
+            console.error('updateDelegatorsCount error', e);
+            this.delegatorsCountGauge.labels(validatorAddress).set(0);
+        }
+    }
+
+    // Update delegator rewards and delta stake for each address
+    protected async updateAddressDelegatorRewards(addresses: string): Promise<void> {
+        const evmAddresses = addresses.split(',').filter((address) => address.startsWith('0x'));
+        const contract = this.getValidatorContract();
+        const validatorId = this.validatorIdEnv?.trim();
+        
+        if (!validatorId || validatorId.length === 0) {
+            for (const address of evmAddresses) {
+                this.delegatorRewardsGauge.labels(address, 'MON').set(0);
+                this.deltaStakeGauge.labels(address, 'MON').set(0);
+            }
+            return;
+        }
+        
+        for (const address of evmAddresses) {
+            try {
+                const res = await contract.methods.getDelegator(validatorId, address).call();
+                
+                // unclaimedRewards
+                const unclaimedRewards: bigint = BigInt(res.unclaimedRewards?.toString?.() ?? res.unclaimedRewards ?? 0);
+                const rewardsAmount = parseInt(unclaimedRewards.toString()) / Math.pow(10, this.decimalPlaces);
+                this.delegatorRewardsGauge.labels(address, 'MON').set(rewardsAmount);
+                
+                // deltaStake
+                const deltaStake: bigint = BigInt(res.deltaStake?.toString?.() ?? res.deltaStake ?? 0);
+                const deltaStakeAmount = parseInt(deltaStake.toString()) / Math.pow(10, this.decimalPlaces);
+                this.deltaStakeGauge.labels(address, 'MON').set(deltaStakeAmount);
+            } catch (e) {
+                console.error(`Error updating delegator rewards for address ${address}`, e);
+                this.delegatorRewardsGauge.labels(address, 'MON').set(0);
+                this.deltaStakeGauge.labels(address, 'MON').set(0);
+            }
+        }
+    }
+
+    // Update validator set counts and validator rank
+    protected async updateValidatorSets(): Promise<void> {
+        try {
+            const contract = this.getValidatorContract();
+            const validatorId = this.validatorIdEnv?.trim();
+            
+            // Get all validators from each set and count them
+            const consensusValidators = await this.getAllValidatorsFromSet(contract, 'getConsensusValidatorSet');
+            this.consensusValidatorSetCountGauge.set(consensusValidators.length);
+            
+            const executionValidators = await this.getAllValidatorsFromSet(contract, 'getExecutionValidatorSet');
+            this.executionValidatorSetCountGauge.set(executionValidators.length);
+            
+            const snapshotValidators = await this.getAllValidatorsFromSet(contract, 'getSnapshotValidatorSet');
+            this.snapshotValidatorSetCountGauge.set(snapshotValidators.length);
+            
+            // Calculate validator rank based on stake (using consensus set)
+            if (validatorId && consensusValidators.length > 0) {
+                // Get stake for each validator and sort
+                const validatorStakes: Array<{ id: string, stake: number }> = [];
+                for (const valId of consensusValidators) {
+                    try {
+                        const res = await contract.methods.getValidator(valId).call();
+                        const stake: bigint = BigInt(res.stake?.toString?.() ?? res.stake ?? 0);
+                        validatorStakes.push({
+                            id: valId.toString(),
+                            stake: parseInt(stake.toString())
+                        });
+                    } catch (e) {
+                        // Skip if can't get validator info
+                    }
+                }
+                
+                // Sort by stake descending
+                validatorStakes.sort((a, b) => b.stake - a.stake);
+                
+                // Find rank (1-based)
+                const rank = validatorStakes.findIndex(v => v.id === validatorId) + 1;
+                if (rank > 0) {
+                    this.validatorRankGauge.labels(this.validator).set(rank);
+                } else {
+                    this.validatorRankGauge.labels(this.validator).set(0);
+                }
+            } else {
+                this.validatorRankGauge.labels(this.validator).set(0);
+            }
+        } catch (e) {
+            console.error('updateValidatorSets error', e);
+        }
+    }
+
+    // Helper method to get all validators from a validator set
+    private async getAllValidatorsFromSet(contract: any, methodName: string): Promise<string[]> {
+        const allValidators: string[] = [];
+        let startIndex = 0;
+        let isDone = false;
+        
+        while (!isDone) {
+            try {
+                const res = await contract.methods[methodName](startIndex).call();
+                isDone = res.isDone;
+                startIndex = parseInt(res.nextIndex?.toString() ?? res.nextIndex ?? 0);
+                
+                if (res.valIds && Array.isArray(res.valIds)) {
+                    for (const valId of res.valIds) {
+                        allValidators.push(valId.toString());
+                    }
+                }
+            } catch (e) {
+                console.error(`Error getting validators from ${methodName}`, e);
+                break;
+            }
+        }
+        
+        return allValidators;
+    }
+
+    // Update current proposer validator ID
+    protected async updateProposerValId(): Promise<void> {
+        try {
+            const contract = this.getValidatorContract();
+            const res = await contract.methods.getProposerValId().call();
+            const proposerValId: bigint = BigInt(res.val_id?.toString() ?? res.val_id ?? 0);
+            this.proposerValIdGauge.set(parseInt(proposerValId.toString()));
+        } catch (e) {
+            console.error('updateProposerValId error', e);
         }
     }
 }
