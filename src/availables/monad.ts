@@ -307,7 +307,7 @@ export default class Monad extends TargetAbstract {
         
         for (const address of evmAddresses) {
             try {
-                let totalDelegated = 0;
+                let totalDelegatedBigInt = BigInt(0);
                 let startValId = 0;
                 let isDone = false;
                 
@@ -322,13 +322,15 @@ export default class Monad extends TargetAbstract {
                         try {
                             const delegatorRes = await contract.methods.getDelegator(valId, address).call();
                             const stake: bigint = BigInt(delegatorRes.stake?.toString?.() ?? delegatorRes.stake ?? 0);
-                            totalDelegated += parseInt(stake.toString()) / Math.pow(10, this.decimalPlaces);
+                            totalDelegatedBigInt += stake;
                         } catch (e) {
                             console.error(`Error getting delegator info for validator ${valId}`, e);
                         }
                     }
                 }
                 
+                // Convert to decimal only once at the end to avoid floating point errors
+                const totalDelegated = Number(totalDelegatedBigInt) / Math.pow(10, this.decimalPlaces);
                 this.delegatedGauge.labels(address, 'MON').set(totalDelegated);
             } catch (e) {
                 console.error(`Error updating delegations for address ${address}`, e);
@@ -353,7 +355,7 @@ export default class Monad extends TargetAbstract {
         
         for (const address of evmAddresses) {
             try {
-                let totalUnbonding = 0;
+                let totalUnbondingBigInt = BigInt(0);
                 // Check withdrawal requests (withdrawId can be 0-255, but typically 0-2 are used)
                 // We'll check common withdrawId values (0, 1, 2)
                 for (let withdrawId = 0; withdrawId < 3; withdrawId++) {
@@ -361,13 +363,15 @@ export default class Monad extends TargetAbstract {
                         const res = await contract.methods.getWithdrawalRequest(validatorId, address, withdrawId).call();
                         const withdrawalAmount: bigint = BigInt(res.withdrawalAmount?.toString?.() ?? res.withdrawalAmount ?? 0);
                         if (withdrawalAmount > 0) {
-                            totalUnbonding += parseInt(withdrawalAmount.toString()) / Math.pow(10, this.decimalPlaces);
+                            totalUnbondingBigInt += withdrawalAmount;
                         }
                     } catch (e) {
                         // Withdrawal request might not exist for this withdrawId, continue
                     }
                 }
                 
+                // Convert to decimal only once at the end to avoid floating point errors
+                const totalUnbonding = Number(totalUnbondingBigInt) / Math.pow(10, this.decimalPlaces);
                 this.unbondingGauge.labels(address, 'MON').set(totalUnbonding);
             } catch (e) {
                 console.error(`Error updating unbonding for address ${address}`, e);
