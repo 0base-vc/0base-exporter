@@ -24,8 +24,8 @@ export default class Monad extends TargetAbstract {
         labelNames: ['address', 'denom']
     });
     private readonly commissionGauge = new Gauge({
-        name: `${this.metricPrefix}_address_commission`,
-        help: 'Commission of validator',
+        name: `${this.metricPrefix}_address_commission_rate`,
+        help: 'Commission rate of validator (percentage)',
         labelNames: ['address', 'denom']
     });
     private readonly delegatedGauge = new Gauge({
@@ -53,8 +53,8 @@ export default class Monad extends TargetAbstract {
         labelNames: ['address', 'denom']
     });
     private readonly consensusCommissionGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_consensus_commission`,
-        help: 'Consensus commission of validator',
+        name: `${this.metricPrefix}_validator_consensus_commission_rate`,
+        help: 'Consensus commission rate of validator (percentage)',
         labelNames: ['address', 'denom']
     });
     private readonly snapshotStakeGauge = new Gauge({
@@ -63,8 +63,8 @@ export default class Monad extends TargetAbstract {
         labelNames: ['address', 'denom']
     });
     private readonly snapshotCommissionGauge = new Gauge({
-        name: `${this.metricPrefix}_validator_snapshot_commission`,
-        help: 'Snapshot commission of validator',
+        name: `${this.metricPrefix}_validator_snapshot_commission_rate`,
+        help: 'Snapshot commission rate of validator (percentage)',
         labelNames: ['address', 'denom']
     });
     private readonly validatorFlagsGauge = new Gauge({
@@ -233,10 +233,10 @@ export default class Monad extends TargetAbstract {
             const stakeAmount = parseInt(stake.toString()) / Math.pow(10, this.decimalPlaces);
             this.stakeGauge.labels(validatorAddress, 'MON').set(stakeAmount);
             
-            // res.commission is BigInt-like string (typically in basis points, e.g., 10000 = 100%)
+            // res.commission is BigInt-like string (stored with 18 decimals, convert to percentage)
             const commission: bigint = BigInt(res.commission?.toString?.() ?? res.commission ?? 0);
-            // Commission is usually stored as basis points (10000 = 100%), convert to percentage
-            const commissionAmount = parseInt(commission.toString()) / 100;
+            // Commission is stored with 18 decimals, convert to percentage rate
+            const commissionAmount = parseInt(commission.toString()) * 100 / 1e18;
             this.commissionGauge.labels(validatorAddress, 'MON').set(commissionAmount);
             
             // res.consensusStake
@@ -246,7 +246,7 @@ export default class Monad extends TargetAbstract {
             
             // res.consensusCommission
             const consensusCommission: bigint = BigInt(res.consensusCommission?.toString?.() ?? res.consensusCommission ?? 0);
-            const consensusCommissionAmount = parseInt(consensusCommission.toString()) / 100;
+            const consensusCommissionAmount = parseInt(consensusCommission.toString()) * 100 / 1e18;
             this.consensusCommissionGauge.labels(validatorAddress, 'MON').set(consensusCommissionAmount);
             
             // res.snapshotStake
@@ -256,7 +256,7 @@ export default class Monad extends TargetAbstract {
             
             // res.snapshotCommission
             const snapshotCommission: bigint = BigInt(res.snapshotCommission?.toString?.() ?? res.snapshotCommission ?? 0);
-            const snapshotCommissionAmount = parseInt(snapshotCommission.toString()) / 100;
+            const snapshotCommissionAmount = parseInt(snapshotCommission.toString()) * 100 / 1e18;
             this.snapshotCommissionGauge.labels(validatorAddress, 'MON').set(snapshotCommissionAmount);
             
             // res.flags
