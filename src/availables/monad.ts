@@ -225,38 +225,38 @@ export default class Monad extends TargetAbstract {
             const res = await contract.methods.getValidator(validatorId).call();
             // res.unclaimedRewards is BigInt-like string
             const unclaimed: bigint = BigInt(res.unclaimedRewards?.toString?.() ?? res.unclaimedRewards ?? 0);
-            const rewardsAmount = parseInt(unclaimed.toString()) / Math.pow(10, this.decimalPlaces);
+            const rewardsAmount = this.bigIntToDecimal(unclaimed, this.decimalPlaces);
             this.rewardsGauge.labels(validatorAddress, 'MON').set(rewardsAmount);
             
             // res.stake is BigInt-like string
             const stake: bigint = BigInt(res.stake?.toString?.() ?? res.stake ?? 0);
-            const stakeAmount = parseInt(stake.toString()) / Math.pow(10, this.decimalPlaces);
+            const stakeAmount = this.bigIntToDecimal(stake, this.decimalPlaces);
             this.stakeGauge.labels(validatorAddress, 'MON').set(stakeAmount);
             
             // res.commission is BigInt-like string (stored with 18 decimals, convert to percentage)
             const commission: bigint = BigInt(res.commission?.toString?.() ?? res.commission ?? 0);
             // Commission is stored with 18 decimals, convert to percentage rate
-            const commissionAmount = parseInt(commission.toString()) * 100 / 1e18;
+            const commissionAmount = this.bigIntCommissionToRate(commission);
             this.commissionGauge.labels(validatorAddress, 'MON').set(commissionAmount);
             
             // res.consensusStake
             const consensusStake: bigint = BigInt(res.consensusStake?.toString?.() ?? res.consensusStake ?? 0);
-            const consensusStakeAmount = parseInt(consensusStake.toString()) / Math.pow(10, this.decimalPlaces);
+            const consensusStakeAmount = this.bigIntToDecimal(consensusStake, this.decimalPlaces);
             this.consensusStakeGauge.labels(validatorAddress, 'MON').set(consensusStakeAmount);
             
             // res.consensusCommission
             const consensusCommission: bigint = BigInt(res.consensusCommission?.toString?.() ?? res.consensusCommission ?? 0);
-            const consensusCommissionAmount = parseInt(consensusCommission.toString()) * 100 / 1e18;
+            const consensusCommissionAmount = this.bigIntCommissionToRate(consensusCommission);
             this.consensusCommissionGauge.labels(validatorAddress, 'MON').set(consensusCommissionAmount);
             
             // res.snapshotStake
             const snapshotStake: bigint = BigInt(res.snapshotStake?.toString?.() ?? res.snapshotStake ?? 0);
-            const snapshotStakeAmount = parseInt(snapshotStake.toString()) / Math.pow(10, this.decimalPlaces);
+            const snapshotStakeAmount = this.bigIntToDecimal(snapshotStake, this.decimalPlaces);
             this.snapshotStakeGauge.labels(validatorAddress, 'MON').set(snapshotStakeAmount);
             
             // res.snapshotCommission
             const snapshotCommission: bigint = BigInt(res.snapshotCommission?.toString?.() ?? res.snapshotCommission ?? 0);
-            const snapshotCommissionAmount = parseInt(snapshotCommission.toString()) * 100 / 1e18;
+            const snapshotCommissionAmount = this.bigIntCommissionToRate(snapshotCommission);
             this.snapshotCommissionGauge.labels(validatorAddress, 'MON').set(snapshotCommissionAmount);
             
             // res.flags
@@ -265,7 +265,7 @@ export default class Monad extends TargetAbstract {
             
             // res.accRewardPerToken
             const accRewardPerToken: bigint = BigInt(res.accRewardPerToken?.toString?.() ?? res.accRewardPerToken ?? 0);
-            const accRewardPerTokenAmount = parseInt(accRewardPerToken.toString()) / Math.pow(10, this.decimalPlaces);
+            const accRewardPerTokenAmount = this.bigIntToDecimal(accRewardPerToken, this.decimalPlaces);
             this.accRewardPerTokenGauge.labels(validatorAddress, 'MON').set(accRewardPerTokenAmount);
         } catch (e) {
             console.error('updateValidatorRewards error', e);
@@ -288,11 +288,51 @@ export default class Monad extends TargetAbstract {
         return this.validatorContract;
     }
 
+    // Helper function to convert BigInt to decimal number with precise string manipulation
+    private bigIntToDecimal(bigIntValue: bigint, decimalPlaces: number): number {
+        const str = bigIntValue.toString();
+        if (str === '0') {
+            return 0;
+        } else if (str.length <= decimalPlaces) {
+            // Number is smaller than decimal places, pad with zeros
+            const padded = str.padStart(decimalPlaces, '0');
+            return parseFloat('0.' + padded);
+        } else {
+            // Split into integer and decimal parts
+            const integerPart = str.slice(0, -decimalPlaces);
+            const decimalPart = str.slice(-decimalPlaces);
+            return parseFloat(integerPart + '.' + decimalPart);
+        }
+    }
+
+    // Helper function to convert BigInt commission (18 decimals) to percentage rate with precise calculation
+    private bigIntCommissionToRate(commissionBigInt: bigint): number {
+        // Commission is stored with 18 decimals, multiply by 100 to get percentage
+        // Use BigInt multiplication to avoid precision loss
+        const multiplied = commissionBigInt * BigInt(100);
+        const str = multiplied.toString();
+        const decimalPlaces = 18;
+        
+        if (str === '0') {
+            return 0;
+        } else if (str.length <= decimalPlaces) {
+            // Number is smaller than decimal places, pad with zeros
+            const padded = str.padStart(decimalPlaces, '0');
+            return parseFloat('0.' + padded);
+        } else {
+            // Split into integer and decimal parts
+            const integerPart = str.slice(0, -decimalPlaces);
+            const decimalPart = str.slice(-decimalPlaces);
+            return parseFloat(integerPart + '.' + decimalPart);
+        }
+    }
+
     protected async getEVMAmount(address: string): Promise<{ amount: number }> {
         try {
             const amount = await this.web3.eth.getBalance(address);
+            const amountBigInt = BigInt(amount.toString());
             return {
-                amount: parseInt(amount.toString()) / Math.pow(10, this.decimalPlaces)
+                amount: this.bigIntToDecimal(amountBigInt, this.decimalPlaces)
             };
         } catch (e) {
             console.error(e);
@@ -330,7 +370,7 @@ export default class Monad extends TargetAbstract {
                 }
                 
                 // Convert to decimal only once at the end to avoid floating point errors
-                const totalDelegated = Number(totalDelegatedBigInt) / Math.pow(10, this.decimalPlaces);
+                const totalDelegated = this.bigIntToDecimal(totalDelegatedBigInt, this.decimalPlaces);
                 this.delegatedGauge.labels(address, 'MON').set(totalDelegated);
             } catch (e) {
                 console.error(`Error updating delegations for address ${address}`, e);
@@ -371,7 +411,7 @@ export default class Monad extends TargetAbstract {
                 }
                 
                 // Convert to decimal only once at the end to avoid floating point errors
-                const totalUnbonding = Number(totalUnbondingBigInt) / Math.pow(10, this.decimalPlaces);
+                const totalUnbonding = this.bigIntToDecimal(totalUnbondingBigInt, this.decimalPlaces);
                 this.unbondingGauge.labels(address, 'MON').set(totalUnbonding);
             } catch (e) {
                 console.error(`Error updating unbonding for address ${address}`, e);
@@ -445,12 +485,12 @@ export default class Monad extends TargetAbstract {
                 
                 // unclaimedRewards
                 const unclaimedRewards: bigint = BigInt(res.unclaimedRewards?.toString?.() ?? res.unclaimedRewards ?? 0);
-                const rewardsAmount = parseInt(unclaimedRewards.toString()) / Math.pow(10, this.decimalPlaces);
+                const rewardsAmount = this.bigIntToDecimal(unclaimedRewards, this.decimalPlaces);
                 this.delegatorRewardsGauge.labels(address, 'MON').set(rewardsAmount);
                 
                 // deltaStake
                 const deltaStake: bigint = BigInt(res.deltaStake?.toString?.() ?? res.deltaStake ?? 0);
-                const deltaStakeAmount = parseInt(deltaStake.toString()) / Math.pow(10, this.decimalPlaces);
+                const deltaStakeAmount = this.bigIntToDecimal(deltaStake, this.decimalPlaces);
                 this.deltaStakeGauge.labels(address, 'MON').set(deltaStakeAmount);
             } catch (e) {
                 console.error(`Error updating delegator rewards for address ${address}`, e);
@@ -479,22 +519,26 @@ export default class Monad extends TargetAbstract {
             // Calculate validator rank based on stake (using consensus set)
             if (validatorId && consensusValidators.length > 0) {
                 // Get stake for each validator and sort
-                const validatorStakes: Array<{ id: string, stake: number }> = [];
+                const validatorStakes: Array<{ id: string, stake: bigint }> = [];
                 for (const valId of consensusValidators) {
                     try {
                         const res = await contract.methods.getValidator(valId).call();
                         const stake: bigint = BigInt(res.stake?.toString?.() ?? res.stake ?? 0);
                         validatorStakes.push({
                             id: valId.toString(),
-                            stake: parseInt(stake.toString())
+                            stake: stake
                         });
                     } catch (e) {
                         // Skip if can't get validator info
                     }
                 }
                 
-                // Sort by stake descending
-                validatorStakes.sort((a, b) => b.stake - a.stake);
+                // Sort by stake descending (using BigInt comparison for accuracy)
+                validatorStakes.sort((a, b) => {
+                    if (b.stake > a.stake) return 1;
+                    if (b.stake < a.stake) return -1;
+                    return 0;
+                });
                 
                 // Find rank (1-based)
                 const rank = validatorStakes.findIndex(v => v.id === validatorId) + 1;
