@@ -753,23 +753,25 @@ export default class Solana extends TargetAbstract {
         }
     }
 
-    // Helper: 두 케이스 (0,0), (5,10) 사전계산 후 vote별로 선택하여 게이지 설정
+    // Helper: 두 케이스 (5,0), (5,2) 사전계산 후 vote별로 선택하여 게이지 설정
     private async applyEffBidToVotes(winningTotalPmpe: number, baseInflPmpe: number, baseMevPmpe: number): Promise<void> {
-        const eff00 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0) + baseMevPmpe * (1 - 0)));
-        const eff510 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.10)));
+        // (5,0): commission 5%, mev_commission 0%
+        const eff50 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0)));
+        // (5,2): commission 5%, mev_commission 2%
+        const eff52 = Math.max(0, Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.02)));
 
-        const [commissionByVote, mevCommissionBpsByVote] = await Promise.all([
+        const [, mevCommissionBpsByVote] = await Promise.all([
             this.loadValidatorsAdvertisedCommission(),
             this.loadMevCommissionBps(),
         ]);
 
         for (const vote of this.toUniqueList(this.votes)) {
-            const comm = Number(commissionByVote[vote]);
             const mevBps = Number(mevCommissionBpsByVote[vote]);
-            const is510 = Number.isFinite(comm) && Number.isFinite(mevBps) && Math.round(comm) === 5 && Math.round(mevBps) === 1000;
-            const useEff = is510 ? eff510 : eff00;
-            const commLabel = is510 ? '5' : '0';
-            const mevLabel = is510 ? '10' : '0';
+            // mev_commission_bps가 100 bps (1%) 미만이면 0%로 취급, 그 외는 2%로 취급
+            const isMev0 = Number.isFinite(mevBps) && mevBps < 100;
+            const useEff = isMev0 ? eff50 : eff52;
+            const commLabel = '5';
+            const mevLabel = isMev0 ? '0' : '2';
             this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
         }
     }
