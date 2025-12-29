@@ -745,6 +745,9 @@ export default class Solana extends TargetAbstract {
                 console.log = origLog; console.warn = origWarn;
             }
 
+            // DEBUG: Marinade SDK 결과값 확인
+            console.log('[Marinade SDK] winningTotalPmpe:', winningTotalPmpe, 'inflationPmpe:', baseInflPmpe, 'mevPmpe:', baseMevPmpe);
+
             // 3) 캐시 갱신 및 적용
             this.sdkEffBidCache = { ts: now, winningTotalPmpe, inflationPmpe: baseInflPmpe, mevPmpe: baseMevPmpe };
             await this.applyEffBidToVotes(winningTotalPmpe, baseInflPmpe, baseMevPmpe);
