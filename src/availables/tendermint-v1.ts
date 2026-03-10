@@ -212,7 +212,7 @@ export default class Tendermint extends TargetAbstract {
         });
     }
 
-    private async updateProposalsCount(): Promise<void> {
+    protected async updateProposalsCount(): Promise<void> {
         const url = `${this.apiUrl}/cosmos/gov/v1/proposals?proposal_status=2`;
 
         return this.get(url, response => {
