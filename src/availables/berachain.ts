@@ -208,7 +208,7 @@ export default class Berachain extends Tendermint {
         const now = Math.floor(Date.now() / 1000);
         const fromTimestamp = (now - daysAgo * 24 * 60 * 60) * 1_000_000;
         // Goldsky GraphQL 쿼리
-        const goldskyUrl = 'https://api.goldsky.com/api/public/project_clq1h5ct0g4a201x18tfte5iv/subgraphs/pol-subgraph/mainnet-v1.5.2/gn';
+        const goldskyUrl = 'https://api.goldsky.com/api/public/project_clq1h5ct0g4a201x18tfte5iv/subgraphs/pol-subgraph/mainnet-latest/gn';
         const query = {
             operationName: 'GetValidatorAnalytics',
             variables: {
