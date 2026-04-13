@@ -1,0 +1,22 @@
+# Supported Chains
+
+| `CHAIN`              | Family | Legacy `BLOCKCHAIN`                  |
+| -------------------- | ------ | ------------------------------------ |
+| `tendermint`         | Cosmos | `./availables/tendermint.ts`         |
+| `tendermint-v1`      | Cosmos | `./availables/tendermint-v1.ts`      |
+| `tendermint-v1beta1` | Cosmos | `./availables/tendermint-v1beta1.ts` |
+| `terra`              | Cosmos | `./availables/terra.ts`              |
+| `terra-v2`           | Cosmos | `./availables/terra-v2.ts`           |
+| `atomone`            | Cosmos | `./availables/atomone.ts`            |
+| `tgrade`             | Cosmos | `./availables/tendermint-tgrade.ts`  |
+| `tendermint-umee`    | Cosmos | `./availables/tendermint-umee.ts`    |
+| `initia-testnet`     | Cosmos | `./availables/testnet/initia.ts`     |
+| `solana`             | Solana | `./availables/solana.ts`             |
+| `solana-testnet`     | Solana | `./availables/testnet/solana.ts`     |
+| `monad`              | EVM    | `./availables/monad.ts`              |
+| `monad-testnet`      | EVM    | `./availables/testnet/monad.ts`      |
+| `berachain`          | Hybrid | `./availables/berachain.ts`          |
+| `mitosis`            | Hybrid | `./availables/mitosis.ts`            |
+| `mitosis-testnet`    | Hybrid | `./availables/testnet/mitosis.ts`    |
+| `story-testnet`      | EVM    | `./availables/testnet/story.ts`      |
+| `canopy-testnet`     | Hybrid | `./availables/testnet/canopy.ts`     |
