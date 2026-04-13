@@ -1,15 +1,29 @@
-import './lib/prom-perf';
-import Server from "./server";
+import { bootstrap } from "./core/bootstrap";
+import { logger } from "./core/logger";
 
-process.on('uncaughtException', error => {
-    console.log('uncaughtException', error);
+process.on("uncaughtException", (error) => {
+  logger.error("uncaughtException", {
+    error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+  });
+  process.exit(1);
 });
 
-process.on('unhandledRejection', error => {
-    console.log('unhandledRejection', error);
+process.on("unhandledRejection", (error) => {
+  logger.error("unhandledRejection", {
+    error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+  });
+  process.exit(1);
 });
 
-const server = new Server();
-server.start().then(({server, port}) => {
-    if (server.listening) console.log(`Listen ${port}`);
-});
+void bootstrap()
+  .then(({ server, port }) => {
+    if (server.listening) {
+      logger.info("Exporter listening", { port });
+    }
+  })
+  .catch((error) => {
+    logger.error("Failed to bootstrap exporter", {
+      error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+    });
+    process.exit(1);
+  });
