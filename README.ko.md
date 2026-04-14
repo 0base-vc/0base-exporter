@@ -29,11 +29,11 @@ curl http://localhost:27770/metrics
 
 가능하면 `BLOCKCHAIN` 대신 `CHAIN`을 사용하세요.
 
-| 계열                | 권장 `CHAIN` 값                                                                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tgrade`, `tendermint-umee`, `initia-testnet` |
-| Solana              | `solana`, `solana-testnet`                                                                                                         |
-| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet`                             |
+| 계열                | 권장 `CHAIN` 값                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee` |
+| Solana              | `solana`, `solana-testnet`                                                                             |
+| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet` |
 
 기존 `BLOCKCHAIN=./availables/...` 값도 계속 지원됩니다.
 

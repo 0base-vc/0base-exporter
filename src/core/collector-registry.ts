@@ -4,14 +4,12 @@ import Mitosis from "../availables/mitosis";
 import Monad from "../availables/monad";
 import Solana from "../availables/solana";
 import Tendermint from "../availables/tendermint";
-import TendermintTgrade from "../availables/tendermint-tgrade";
 import TendermintUmee from "../availables/tendermint-umee";
 import TendermintV1 from "../availables/tendermint-v1";
 import TendermintV1beta1 from "../availables/tendermint-v1beta1";
 import TerraV2 from "../availables/terra-v2";
 import Terra from "../availables/terra";
 import CanopyTestnet from "../availables/testnet/canopy";
-import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
 import SolanaTestnet from "../availables/testnet/solana";
@@ -100,16 +98,6 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
     factory: createFactory(TendermintV1beta1),
-  },
-  {
-    id: "tgrade",
-    family: "cosmos",
-    description: "Tgrade collector",
-    aliases: ["tendermint-tgrade"],
-    legacyModulePaths: ["./availables/tendermint-tgrade.ts"],
-    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
-    factory: createFactory(TendermintTgrade),
   },
   {
     id: "terra",
@@ -240,16 +228,6 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
     factory: createFactory(CanopyTestnet),
-  },
-  {
-    id: "initia-testnet",
-    family: "cosmos",
-    description: "Initia testnet collector",
-    aliases: ["testnet/initia"],
-    legacyModulePaths: ["./availables/testnet/initia.ts"],
-    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
-    factory: createFactory(InitiaTestnet),
   },
 ];
 

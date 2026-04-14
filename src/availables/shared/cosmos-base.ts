@@ -519,24 +519,6 @@ export const cosmosV1Profile: CosmosCollectorProfile = {
   },
 };
 
-export const tgradeProfile: CosmosCollectorProfile = {
-  ...cosmosV1beta1Profile,
-  filterAddress: () => true,
-  rank: {
-    url: (apiUrl) => `${apiUrl}/cosmos/staking/v1beta1/validators?pagination.limit=256`,
-    selector: (json) =>
-      json.validators.map((entry: any) => ({
-        operatorAddress: entry.operator_address,
-        tokens: normalizeInteger(entry.tokens),
-      })),
-  },
-  proposals: {
-    url: () => null,
-    selector: () => 0,
-    fallbackValue: 0,
-  },
-};
-
 export const terraV2Profile: CosmosCollectorProfile = {
   ...cosmosV1beta1Profile,
   filterAddress: () => true,
@@ -552,81 +534,6 @@ export const terraV2Profile: CosmosCollectorProfile = {
   },
   proposals: {
     url: (apiUrl) => `${apiUrl}/cosmos/gov/v1beta1/proposals?proposal_status=2`,
-    selector: (json) => json.proposals.length,
-  },
-};
-
-export const initiaProfile: CosmosCollectorProfile = {
-  filterAddress: (address) => !address.startsWith("0x"),
-  balances: {
-    url: (apiUrl, address) => `${apiUrl}/cosmos/bank/v1beta1/balances/${address}`,
-    selector: cosmosBalanceSelector,
-  },
-  delegations: {
-    url: (apiUrl, address) => `${apiUrl}/initia/mstaking/v1/delegations/${address}`,
-    selector: (json) =>
-      json.delegation_responses.length === 0
-        ? []
-        : [
-            json.delegation_responses.reduce(
-              (state: any, item: any) => {
-                state.amount += normalizeInteger(item.balance[0].amount);
-                return state;
-              },
-              {
-                denom: json.delegation_responses[0].balance[0].denom,
-                amount: 0,
-              },
-            ),
-          ],
-  },
-  unbondings: {
-    url: (apiUrl, address) =>
-      `${apiUrl}/initia/mstaking/v1/delegators/${address}/unbonding_delegations`,
-    selector: (json) =>
-      json.unbonding_responses.length === 0
-        ? []
-        : [
-            json.unbonding_responses.reduce(
-              (state: any, item: any) => {
-                state.amount += item.entries.reduce(
-                  (sum: number, entry: any) => sum + normalizeInteger(entry.balance[0]),
-                  0,
-                );
-                return state;
-              },
-              {
-                amount: 0,
-              },
-            ),
-          ],
-  },
-  rewards: {
-    url: (apiUrl, address) => `${apiUrl}/cosmos/distribution/v1beta1/delegators/${address}/rewards`,
-    selector: (json) => (json.total == null || json.total.length === 0 ? [] : json.total),
-  },
-  commission: {
-    url: (apiUrl, validator) =>
-      `${apiUrl}/cosmos/distribution/v1beta1/validators/${validator}/commission`,
-    selector: cosmosCommissionSelector,
-  },
-  rank: {
-    url: (apiUrl) =>
-      `${apiUrl}/initia/mstaking/v1/validators?status=BOND_STATUS_BONDED&pagination.limit=256`,
-    selector: (json) =>
-      json.validators.map((entry: any) => ({
-        operatorAddress: entry.operator_address,
-        tokens: normalizeInteger(
-          entry.tokens.filter((token: any) => token.denom === "uinit")[0].amount,
-        ),
-      })),
-  },
-  maxValidators: {
-    url: (apiUrl) => `${apiUrl}/initia/mstaking/v1/params`,
-    selector: (json) => json.params.max_validators,
-  },
-  proposals: {
-    url: (apiUrl) => `${apiUrl}/cosmos/gov/v1/proposals?proposal_status=2`,
     selector: (json) => json.proposals.length,
   },
 };
