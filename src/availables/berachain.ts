@@ -42,10 +42,10 @@ export default class Berachain extends Tendermint {
     labelNames: ["address", "contractAddress", "token", "symbol"],
   });
 
-  // 날짜별 인센티브(USD) 기록용 Gauge
+  // Gauge for daily incentive rewards in USD.
   protected readonly incentiveByDateGauge = new Gauge({
     name: `${this.metricPrefix}_incentive_rewards_by_date`,
-    help: "날짜별 인센티브 총합(USD)",
+    help: "Daily incentive reward totals in USD",
     labelNames: ["date", "currency"],
   });
 
@@ -117,7 +117,7 @@ export default class Berachain extends Tendermint {
     return customMetrics + "\n" + (await this.loadExistMetrics());
   }
 
-  // ERC20 토큰 스캔 메서드
+  // Periodically discover ERC20 tokens for configured addresses.
   private async scanERC20Tokens(): Promise<void> {
     if (!this.alchemyApiKey) {
       return;
@@ -138,7 +138,7 @@ export default class Berachain extends Tendermint {
           for (const token of response.data.result.tokenBalances) {
             const contractAddress = token.contractAddress;
 
-            // 토큰 메타데이터가 아직 저장되지 않은 경우에만 조회
+            // Only fetch token metadata when it has not been cached yet.
             if (!this.erc20Metadata.has(contractAddress)) {
               await this.fetchTokenMetadata(contractAddress);
             }
@@ -152,10 +152,10 @@ export default class Berachain extends Tendermint {
     }
   }
 
-  // 토큰 메타데이터 조회 함수
+  // Fetch token metadata for a discovered contract address.
   private async fetchTokenMetadata(contractAddress: string): Promise<void> {
     if (this.erc20Metadata.has(contractAddress)) {
-      return; // 이미 메타데이터가 있으면 스킵
+      return; // Skip requests for metadata that is already cached.
     }
 
     try {
@@ -176,7 +176,7 @@ export default class Berachain extends Tendermint {
       }
     } catch (e) {
       console.error(`Error fetching metadata for token ${contractAddress}:`, e);
-      // 에러 발생 시 기본 메타데이터 설정
+      // Fall back to default metadata when the upstream request fails.
       this.erc20Metadata.set(contractAddress, {
         name: "Unknown",
         symbol: "UNKNOWN",
@@ -197,15 +197,15 @@ export default class Berachain extends Tendermint {
 
     const evmAddresses = addresses.split(",").filter((address) => address.startsWith("0x"));
     for (const address of evmAddresses) {
-      // BERA 네이티브 토큰 조회
+      // Fetch the native BERA balance.
       const bera = await this.getEVMAmount(address);
       this.availableGauge.labels(address, "BERA").set(bera.amount);
 
-      // BGT 밸런스 조회 (ERC20 아님)
+      // Fetch the BGT balance, which is not exposed as a generic ERC20 token here.
       const bgt = await this.getBGTAmount(address);
       this.availableGauge.labels(address, "BGT").set(bgt.amount);
 
-      // ERC20 토큰 밸런스 조회
+      // Fetch cached ERC20 token balances.
       for (const [tokenAddress, metadata] of this.erc20Metadata.entries()) {
         try {
           const tokenContract = new this.web3.eth.Contract(
@@ -223,24 +223,25 @@ export default class Berachain extends Tendermint {
         }
       }
 
-      // 스테이킹으로 얻은 Honey 조회
+      // Fetch Honey rewards earned through staking.
       const earnedHoney = await this.getBGTStakerEarnedAmount(address, this.decimalPlaces);
       this.earnedHoneyGauge.labels(address, "Honey").set(earnedHoney.amount);
     }
   }
 
   /**
-   * 날짜별 인센티브(USD) 집계 및 Gauge 기록
-   * Goldsky GraphQL API에서 incentiveDistributionByValidators를 가져오고, 토큰 가격을 Berachain API에서 받아와 USD로 환산하여 날짜별로 합산 후 Gauge에 기록
+   * Aggregate daily incentives in USD and publish them to the gauge.
+   * Loads incentiveDistributionByValidators from Goldsky, resolves token prices from
+   * the Berachain API, converts the token amounts to USD, and records daily totals.
    */
   private async fetchDailyIncentives(): Promise<void> {
-    // validator publicKey, timestamp 설정
+    // Prepare validator public key and timestamp filters.
     const pubKey = this.validator;
-    // 30일 전부터 조회 (timestamp: 마이크로초 단위)
+    // Query the last 30 days using microsecond timestamps.
     const daysAgo = 30;
     const now = Math.floor(Date.now() / 1000);
     const fromTimestamp = (now - daysAgo * 24 * 60 * 60) * 1_000_000;
-    // Goldsky GraphQL 쿼리
+    // Goldsky GraphQL query.
     const goldskyUrl =
       "https://api.goldsky.com/api/public/project_clq1h5ct0g4a201x18tfte5iv/subgraphs/pol-subgraph/mainnet-latest/gn";
     const query = {
@@ -261,7 +262,7 @@ export default class Berachain extends Tendermint {
       console.error("Goldsky incentiveDistributionByValidators error", e);
       return;
     }
-    // 날짜별, 토큰별 집계
+    // Aggregate amounts by day and token.
     const dailyTokenMap: Record<string, Record<string, { amount: number; decimals: number }>> = {};
     for (const item of incentiveList) {
       const date = new Date(Number(item.timestamp) / 1000).toISOString().slice(0, 10); // YYYY-MM-DD
@@ -272,7 +273,7 @@ export default class Berachain extends Tendermint {
       if (!dailyTokenMap[date][tokenAddr]) dailyTokenMap[date][tokenAddr] = { amount: 0, decimals };
       dailyTokenMap[date][tokenAddr].amount += amount;
     }
-    // 토큰 가격 조회 (Berachain API)
+    // Fetch token prices from the Berachain API.
     const tokenAddresses = Array.from(
       new Set(Object.values(dailyTokenMap).flatMap((tokens) => Object.keys(tokens))),
     );
@@ -299,7 +300,7 @@ export default class Berachain extends Tendermint {
         console.error("Berachain price fetch error", e);
       }
     }
-    // 날짜별 USD 집계 및 Gauge 기록
+    // Convert each day to USD totals and record them in Prometheus.
     for (const date of Object.keys(dailyTokenMap)) {
       let usdSum = 0;
       for (const tokenAddr of Object.keys(dailyTokenMap[date])) {
@@ -307,7 +308,7 @@ export default class Berachain extends Tendermint {
         const price = priceMap[tokenAddr] || 0;
         usdSum += amount * price;
       }
-      // Prometheus Gauge 기록 (date, USD)
+      // Emit the Prometheus gauge using the day and USD currency label.
       this.incentiveByDateGauge.labels(date, "USD").set(usdSum);
     }
   }

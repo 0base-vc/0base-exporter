@@ -69,10 +69,10 @@ export default class Canopy extends TargetAbstract {
     return customMetrics + "\n" + (await this.loadExistMetrics());
   }
 
-  // Canopy는 위임/언본딩/리워드 개념이 없으므로 0으로 처리
+  // Canopy does not expose delegation, unbonding, or rewards, so only balances are emitted.
   protected async updateAddressBalance(addresses: string): Promise<void> {
     for (const address of addresses.split(",").filter((address) => !address.startsWith("0x"))) {
-      // 잔액 조회
+      // Fetch the account balance.
       try {
         const res = await axios.post(`${this.apiUrl}/v1/query/account`, { address });
         const amount = scaleAmount(res.data.amount, this.decimalPlaces);
@@ -84,11 +84,11 @@ export default class Canopy extends TargetAbstract {
     }
   }
 
-  // Validator 랭킹 및 rivals power
+  // Compute validator rank and neighboring rival power.
   protected async updateRank(validator: string): Promise<void> {
     try {
       const validators = await this.fetchAllValidators(0);
-      // stakedAmount 내림차순 정렬
+      // Sort validators by stakedAmount descending.
       const sorted = validators
         .filter((v) => v && typeof v === "object")
         .map((v) => ({ ...v, stakedAmount: Number((v as any).stakedAmount ?? 0) }))
@@ -179,7 +179,7 @@ export default class Canopy extends TargetAbstract {
     return Array.isArray(data.results) ? data.results : [];
   }
 
-  // 최대 validator 수
+  // Fetch the maximum validator count from chain parameters.
   protected async updateMaxValidator(): Promise<void> {
     try {
       const res = await axios.post(`${this.apiUrl}/v1/query/params`, { height: 0 });
@@ -193,7 +193,7 @@ export default class Canopy extends TargetAbstract {
     }
   }
 
-  // proposal 개수
+  // Count proposals returned by the governance API.
   private async updateProposalsCount(): Promise<void> {
     try {
       const res = await axios.get(`${this.apiUrl}/v1/gov/proposals`);

@@ -7,7 +7,7 @@ import {
   updateSolanaLeaderWindowsAndEpochEnd,
   updateSolanaVoteAccounts,
 } from "./shared/solana-common";
-// axios 제거: TargetAbstract의 getWithCache/postWithCache 사용
+// Uses TargetAbstract caching helpers instead of axios directly.
 
 const LAMPORTS_PER_SOL = 1e9;
 
@@ -209,10 +209,10 @@ export default class Solana extends TargetAbstract {
   // validator voteAccount -> node identity mapping
   private validatorToIdentityMap: Record<string, string> = {};
 
-  // vx.tools 캐시 TTL (postWithCache가 캐시 관리)
+  // vx.tools cache TTL handled through postWithCache.
   private readonly VX_CACHE_TTL_MS = 60000;
 
-  // SDK 기반 Eff. Bid 계산 결과 캐시
+  // Cache for effective bid values computed from the Marinade SDK.
   private sdkEffBidCache: {
     ts: number;
     winningTotalPmpe: number;
@@ -221,7 +221,7 @@ export default class Solana extends TargetAbstract {
   } | null = null;
   private readonly SDK_CACHE_TTL_MS = 30 * 60 * 1000;
 
-  // Marinade 메타데이터 캐시 (광고 커미션 / MEV BPS)
+  // Cached Marinade metadata such as advertised commission and MEV BPS.
   private validatorsAdvCache: { ts: number; map: Record<string, number> } | null = null;
   private mevBpsCache: { ts: number; map: Record<string, number> } | null = null;
   private readonly META_TTL_MS = 10 * 60 * 1000;
@@ -309,10 +309,10 @@ export default class Solana extends TargetAbstract {
   public async makeMetrics(): Promise<string> {
     let customMetrics = "";
     try {
-      // 1) 먼저 vote account -> identity 매핑 생성 (getVoteAccounts 1회 호출)
+      // 1) Build the vote-account to identity mapping first with a single getVoteAccounts call.
       await this.updateVoteAccounts(this.votes);
 
-      // 2) 독립 작업 병렬 수행
+      // 2) Run independent tasks in parallel.
       const balanceTargets = [this.votes, this.identities, this.walletAddresses]
         .filter(Boolean)
         .join(",");
@@ -363,7 +363,7 @@ export default class Solana extends TargetAbstract {
     });
   }
 
-  // JPool: validator별 위임 출처별 합계를 수집
+  // Collect delegation totals by source for each validator from JPool.
   private async updateDelegationsFromJPool(validators: string): Promise<void> {
     this.delegationBySourceGauge.reset();
     const voteAccounts = this.toUniqueList(validators);
@@ -407,7 +407,7 @@ export default class Solana extends TargetAbstract {
     });
   }
 
-  // Epoch 값은 updateEpochIncomeFromVx에서만 갱신한다.
+  // Epoch-scoped gauges are updated only by updateEpochIncomeFromVx.
 
   private async updateClusterRequiredVersions(): Promise<void> {
     await updateSolanaClusterRequiredVersions({
@@ -452,7 +452,7 @@ export default class Solana extends TargetAbstract {
       this.marinadeMaxStakeWantedGauge.reset();
       this.validatorBondsGauge.reset();
 
-      // 1. Scoring API (lastEpochs=4) - getWithCache로 동일 URL은 60s 내 재요청 방지
+      // 1. Fetch the scoring API with cache protection to avoid repeated requests.
       const scoringUrl = "https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4";
       const scoringList = await this.getWithCache(
         scoringUrl,
@@ -461,7 +461,7 @@ export default class Solana extends TargetAbstract {
         25000,
       );
 
-      // 2. Validator bonds API에서 bidPmpe, maxStakeWanted, bondBalanceSol 가져오기
+      // 2. Fetch bidPmpe, maxStakeWanted, and bondBalanceSol from the bonds API.
       const bondsUrl = "https://validator-bonds-api.marinade.finance/bonds";
       const bondsResponse = await this.getWithCache(
         bondsUrl,
@@ -471,8 +471,8 @@ export default class Solana extends TargetAbstract {
       );
       const bondsList = bondsResponse?.bonds || [];
 
-      // 3. Commission(광고 커미션) / MEV 커미션 로드
-      // Commission/MEV 커미션은 현재 my_bid 라벨에서 사용하지 않으므로 로드 생략
+      // 3. Commission and MEV commission loading is intentionally skipped for now because
+      // they are not currently used in the my_bid labels.
 
       if (!Array.isArray(scoringList) || !Array.isArray(bondsList)) return;
 
@@ -482,10 +482,10 @@ export default class Solana extends TargetAbstract {
         .filter(Boolean);
 
       for (const vote of voteAccounts) {
-        // Scoring API에서 minEffectiveBid 찾기
+        // Find the minEffectiveBid entry from the scoring API.
         const scoringFound = scoringList.find((it: any) => it && it.voteAccount === vote);
 
-        // Bonds API에서 나머지 값들 찾기
+        // Find the remaining values in the bonds API payload.
         const bondsFound = bondsList.find((it: any) => it && it.vote_account === vote);
         if (bondsFound) {
           const bidPmpe = Number(bondsFound.cpmpe ?? 0) / 1e9; // Convert from lamports to SOL
@@ -496,7 +496,7 @@ export default class Solana extends TargetAbstract {
           this.marinadeMaxStakeWantedGauge.labels(vote).set(maxStakeWanted);
           this.validatorBondsGauge.labels(vote).set(bondBalanceSol);
         } else if (scoringFound) {
-          // Bonds API에서 찾지 못한 경우 scoring API의 기존 값 사용
+          // Fall back to the scoring API values when the bonds API has no entry.
           const bidPmpe = Number(scoringFound?.revShare?.bidPmpe ?? 0);
           const maxStakeWanted = Number(scoringFound?.maxStakeWanted ?? 0);
           const bondBalanceSol = Number(scoringFound?.values?.bondBalanceSol ?? 0);
@@ -511,7 +511,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Marinade scoring API: 설정된 모든 voteAccount의 최근 epoch들 effectiveBid(pmpe)를 vote,epoch,unstake_priority 라벨로 저장
+  // Store recent effectiveBid values from the Marinade scoring API for configured vote accounts.
   private async updateMarinadeEffectiveBidEpoch(): Promise<void> {
     try {
       this.marinadeEffectiveBidEpochGauge.reset();
@@ -549,7 +549,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // validators API에서 commission_advertised를 가져와 vote_account별 매핑 생성
+  // Build a vote-account map from commission_advertised values in the validators API.
   private async loadValidatorsAdvertisedCommission(): Promise<Record<string, number>> {
     try {
       const now = Date.now();
@@ -579,7 +579,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // MEV API에서 mev_commission_bps를 가져와 vote_account별 매핑 생성
+  // Build a vote-account map from mev_commission_bps values in the MEV API.
   private async loadMevCommissionBps(): Promise<Record<string, number>> {
     try {
       const now = Date.now();
@@ -593,7 +593,7 @@ export default class Solana extends TargetAbstract {
         this.getRandomCacheDuration(60000, 15000),
         25000,
       );
-      // { validators: [ { vote_account, mev_commission_bps, ... }, ... ] } 형태만 처리
+      // Only process the expected `{ validators: [{ vote_account, mev_commission_bps, ... }] }` shape.
       const out: Record<string, number> = {};
       const arr: any[] = Array.isArray((data as any)?.validators) ? (data as any).validators : [];
       for (const it of arr) {
@@ -609,7 +609,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Global effective bid (pmpe) 계산 후 commission/mev_commission 라벨로 게이지에 설정
+  // Compute the global effective bid and expose it with commission and mev_commission labels.
   private async updateGlobalEffectiveBid(): Promise<void> {
     try {
       this.marinadeMinEffectiveBidGauge.reset();
@@ -619,7 +619,7 @@ export default class Solana extends TargetAbstract {
       let baseInflPmpe: number;
       let baseMevPmpe: number;
 
-      // 1) 캐시 사용 가능하면 활용
+      // 1) Reuse cached SDK output when it is still fresh.
       if (this.sdkEffBidCache && now - this.sdkEffBidCache.ts < this.SDK_CACHE_TTL_MS) {
         ({
           winningTotalPmpe,
@@ -630,7 +630,7 @@ export default class Solana extends TargetAbstract {
         return;
       }
 
-      // 2) SDK 실행하여 최신 값을 계산
+      // 2) Run the SDK to compute fresh values.
       const configUrl =
         "https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json";
       const config = await this.getWithCache(
@@ -662,7 +662,7 @@ export default class Solana extends TargetAbstract {
         console.warn = origWarn;
       }
 
-      // DEBUG: Marinade SDK 결과값 확인
+      // Debug log for Marinade SDK output values.
       console.log(
         "[Marinade SDK] winningTotalPmpe:",
         winningTotalPmpe,
@@ -672,7 +672,7 @@ export default class Solana extends TargetAbstract {
         baseMevPmpe,
       );
 
-      // 3) 캐시 갱신 및 적용
+      // 3) Refresh the cache and apply the computed values.
       this.sdkEffBidCache = {
         ts: now,
         winningTotalPmpe,
@@ -685,7 +685,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Helper: 두 케이스 (5,0), (5,2) 사전계산 후 vote별로 선택하여 게이지 설정
+  // Precompute the (5,0) and (5,2) cases, then apply the appropriate one per vote account.
   private async applyEffBidToVotes(
     winningTotalPmpe: number,
     baseInflPmpe: number,
@@ -709,7 +709,7 @@ export default class Solana extends TargetAbstract {
 
     for (const vote of this.toUniqueList(this.votes)) {
       const mevBps = Number(mevCommissionBpsByVote[vote]);
-      // mev_commission_bps가 100 bps (1%) 미만이면 0%로 취급, 그 외는 2%로 취급
+      // Treat MEV commission below 100 bps (1%) as 0%, otherwise treat it as 2%.
       const isMev0 = Number.isFinite(mevBps) && mevBps < 100;
       const useEff = isMev0 ? eff50 : eff52;
       const commLabel = "5";
@@ -718,10 +718,9 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // vx.tools epoch income → slots/fees/tips 집계
+  // Aggregate slots, fees, and tips from vx.tools epoch income data.
   private async updateEpochIncomeFromVx(validators: string): Promise<void> {
-    // epoch 스코프 지표는 이전 epoch 라벨이 남지 않도록 매 호출마다 리셋
-    // (현재 epoch 데이터만 노출되게 함)
+    // Reset epoch-scoped gauges on every scrape so stale epoch labels do not remain visible.
     this.slotsAssignedGauge.reset();
     this.slotsProducedGauge.reset();
     this.slotsSkippedGauge.reset();
@@ -731,7 +730,7 @@ export default class Solana extends TargetAbstract {
     this.blockTipsMedianGauge.reset();
 
     const voteAccounts = this.toUniqueList(validators);
-    // postWithCache가 이미 캐시 우선 전략을 사용하므로 일반적인 사용
+    // postWithCache already follows a cache-first strategy, so default usage is fine here.
     await Promise.all(
       voteAccounts.map(async (vote) => {
         const identity = this.validatorToIdentityMap[vote];
@@ -739,7 +738,7 @@ export default class Solana extends TargetAbstract {
         try {
           const url = "https://api.vx.tools/epochs/income";
           const payload = { identity, limit: 1 };
-          // postWithCache가 캐시 우선 전략 사용 (캐시 있으면 즉시 반환, 없으면 요청)
+          // postWithCache returns cached data immediately when available and fetches otherwise.
           const data = await this.postWithCache(
             url,
             payload,
@@ -786,7 +785,7 @@ export default class Solana extends TargetAbstract {
     );
   }
 
-  // vx.tools leaderboard: stake 상위 50명의 totalIncome 합계를 confirmedSlots 합으로 나눈 평균(슬롯당)
+  // vx.tools leaderboard average for the top 50 validators by stake, normalized per slot.
   private async updateEpochMedianFeesAverages(): Promise<void> {
     try {
       this.epochMedianBaseFeesAvgGauge.reset();
@@ -816,7 +815,7 @@ export default class Solana extends TargetAbstract {
             : [];
       if (!Array.isArray(records) || records.length === 0) return;
 
-      // stake 기준 정렬 후 상위 50
+      // Sort by stake and keep only the top 50 validators.
       const sorted = [...records].sort((a, b) => Number(b?.stake ?? 0) - Number(a?.stake ?? 0));
       const top = sorted.slice(0, 50);
       const epochLabel = String(epochFromRoot ?? top[0]?.epoch ?? "");

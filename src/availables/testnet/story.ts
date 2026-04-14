@@ -102,7 +102,7 @@ export default class Story extends Tendermint {
 
     const evmAddresses = addresses.split(",").filter((address) => address.startsWith("0x"));
     for (const address of evmAddresses) {
-      // 네이티브 토큰 조회
+      // Fetch the native token balance.
       const ip = await this.getEVMAmount(address);
       this.availableGauge.labels(address, "IP").set(ip.amount);
     }

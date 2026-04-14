@@ -47,7 +47,7 @@ export default class Monad extends TargetAbstract {
     labelNames: ["address", "contractAddress", "token", "symbol"],
   });
 
-  // 누락된 gauge들 정의
+  // Additional gauges used by the testnet collector.
   protected readonly availableGauge = new Gauge({
     name: `${this.metricPrefix}_address_available`,
     help: "Available balance of address",
@@ -77,7 +77,7 @@ export default class Monad extends TargetAbstract {
     labelNames: ["address"],
   });
 
-  // 새로 추가할 gauge들
+  // Extra gauges sourced from forkpoint.toml.
   protected readonly epochGauge = new Gauge({
     name: `${this.metricPrefix}_current_epoch`,
     help: "Current epoch from forkpoint.toml",
@@ -100,7 +100,7 @@ export default class Monad extends TargetAbstract {
     this.evmClient = new EvmClient(getEvmApiUrl());
     this.web3 = this.evmClient.web3;
 
-    // 모든 gauge를 registry에 등록
+    // Register every gauge in the shared registry.
     this.registry.registerMetric(this.erc20BalanceGauge);
     this.registry.registerMetric(this.availableGauge);
     this.registry.registerMetric(this.rankGauge);
@@ -131,34 +131,34 @@ export default class Monad extends TargetAbstract {
     return customMetrics + "\n" + (await this.loadExistMetrics());
   }
 
-  // TOML 파일을 안전하게 읽는 메서드
+  // Read the TOML file safely, using a temp copy to avoid file-lock issues.
   private async readForkpointToml(retryCount: number = 3): Promise<ForkpointData | null> {
     const forkpointPath = "/home/monad/monad-bft/config/forkpoint/forkpoint.toml";
 
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
-        // 임시 파일 경로 생성
+        // Create a temporary file path.
         const tempPath = path.join("/tmp", `forkpoint_${Date.now()}_${attempt}.toml`);
 
-        // 파일을 임시 위치로 복사 (lock 회피)
+        // Copy the file to a temporary location to avoid lock contention.
         await fs.promises.copyFile(forkpointPath, tempPath);
 
-        // 임시 파일 읽기
+        // Read the temporary file.
         const content = await fs.promises.readFile(tempPath, "utf8");
 
-        // 임시 파일 삭제
+        // Remove the temporary file.
         await fs.promises.unlink(tempPath).catch(() => {
-          // 삭제 실패는 무시
+          // Ignore cleanup failures.
         });
 
-        // TOML 파싱
+        // Parse the TOML payload.
         const data = TOML.parse(content) as unknown as ForkpointData;
         return data;
       } catch (error) {
         console.error(`Attempt ${attempt + 1} to read forkpoint.toml failed:`, error);
 
         if (attempt < retryCount - 1) {
-          // 재시도 전 잠시 대기
+          // Wait briefly before retrying.
           await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
         }
       }
@@ -235,7 +235,7 @@ export default class Monad extends TargetAbstract {
 
     const evmAddresses = addresses.split(",").filter((address) => address.startsWith("0x"));
     for (const address of evmAddresses) {
-      // 네이티브 토큰 조회
+      // Fetch the native token balance.
       const mito = await this.getEVMAmount(address);
       this.availableGauge.labels(address, "MON").set(mito.amount);
     }

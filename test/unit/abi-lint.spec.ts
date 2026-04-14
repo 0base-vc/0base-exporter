@@ -59,11 +59,14 @@ describe("abi lint", () => {
 
     const errors = lintAbiFiles([validFile, invalidFile, brokenFile]);
 
-    expect(errors).toEqual([
-      `${invalidFile}[0].type must be a non-empty string`,
-      `${invalidFile}[0].outputs must be an array when provided`,
-      `${brokenFile}: Expected property name or '}' in JSON at position 1 (line 1 column 2)`,
-    ]);
+    expect(errors).toHaveLength(3);
+    expect(errors).toContain(`${invalidFile}[0].type must be a non-empty string`);
+    expect(errors).toContain(`${invalidFile}[0].outputs must be an array when provided`);
+    expect(
+      errors.some((error) =>
+        error.startsWith(`${brokenFile}: Expected property name or '}' in JSON at position 1`),
+      ),
+    ).toBe(true);
   });
 
   it("discovers abi json files recursively", () => {

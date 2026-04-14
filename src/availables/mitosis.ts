@@ -150,7 +150,7 @@ export default class Mitosis extends Tendermint {
     return this.get(url, async (response: { data: any }) => {
       const validators = response.data.validators;
       for (const validator of validators) {
-        // 스마트 컨트랙트에서 모든 정보 가져오기 (한 번의 호출로 최적화)
+        // Fetch all validator details in a single contract call.
         await this.updateValidatorInfo(validator);
       }
     });
@@ -161,11 +161,11 @@ export default class Mitosis extends Tendermint {
 
     const evmAddresses = addresses.split(",").filter((address) => address.startsWith("0x"));
     for (const address of evmAddresses) {
-      // 네이티브 토큰 조회
+      // Fetch the native token balance.
       const mito = await this.getEVMAmount(address);
       this.availableGauge.labels(address, "MITO").set(mito.amount);
 
-      // gMITO(ERC20) 토큰 조회 (contract address는 환경변수로 주입)
+      // Fetch the gMITO ERC20 balance using the configured contract address.
       if (this.gMitoContractAddress) {
         try {
           const tokenContract = new this.web3.eth.Contract(
@@ -215,10 +215,10 @@ export default class Mitosis extends Tendermint {
     }
   }
 
-  // 컨트랙트 인스턴스 재사용
+  // Reuse the validator manager contract instance across scrapes.
   private validatorManagerContract?: any;
 
-  // ERC20 ABI 정의 (필요한 함수들만)
+  // Minimal ERC20 ABI for the functions used by this collector.
   private readonly erc20Abi = [
     {
       inputs: [],
@@ -236,7 +236,7 @@ export default class Mitosis extends Tendermint {
     },
   ];
 
-  // Validator Manager ABI 정의
+  // Minimal validator manager ABI used to load validator metadata.
   private readonly validatorManagerAbi = [
     {
       type: "function",
@@ -313,15 +313,15 @@ export default class Mitosis extends Tendermint {
 
   private async updateValidatorInfo(validator: any): Promise<void> {
     try {
-      // 스마트 컨트랙트에서 정보 가져오기
+      // Load validator details from the smart contract.
       const contract = this.getValidatorManagerContract();
       const result = await contract.methods.validatorInfo(validator.addr).call();
 
-      // Metadata에서 moniker 추출 (JSON 파싱)
+      // Parse metadata and extract the moniker when possible.
       const metadata = this.parseMetadataToJson(result.metadata);
       const moniker = metadata?.name || "Unknown";
 
-      // API 데이터로 기본 validator power 정보 업데이트 (moniker 포함)
+      // Update the base validator power gauges from API data, including the moniker label.
       this.validatorsGauge.labels(validator.addr).set(parseInteger(validator.collateral_shares));
       this.validatorsCollateralGauge
         .labels(validator.addr, moniker)
@@ -333,7 +333,7 @@ export default class Mitosis extends Tendermint {
         .labels(validator.addr, moniker)
         .set(parseInteger(validator.voting_power));
 
-      // 컨트랙트 데이터로 commission rate 정보 업데이트
+      // Update commission-rate gauges from contract data.
       const commissionRatePercent = Number((parseInteger(result.commissionRate) / 100).toFixed(2));
       const pendingCommissionRatePercent = Number(
         (parseInteger(result.pendingCommissionRate) / 100).toFixed(2),
@@ -351,7 +351,7 @@ export default class Mitosis extends Tendermint {
         .set(pendingCommissionRateUpdateEpoch);
     } catch (e) {
       console.error(`Error fetching validator info for ${validator.addr}:`, e);
-      // 에러 발생 시 기본값으로 설정
+      // Fall back to default values when contract reads fail.
       const fallbackMoniker = "Unknown";
       this.validatorsGauge.labels(validator.addr).set(parseInteger(validator.collateral_shares));
       this.validatorsCollateralGauge
@@ -377,22 +377,22 @@ export default class Mitosis extends Tendermint {
         return null;
       }
 
-      // bytes를 string으로 변환
-      const hex = metadataHex.slice(2); // 0x 제거
+      // Convert bytes to a UTF-8 string.
+      const hex = metadataHex.slice(2); // Remove the 0x prefix.
       const metadataString = Buffer.from(hex, "hex").toString("utf8");
 
-      // null byte 제거
+      // Remove null bytes before parsing.
       const cleanedString = metadataString.replace(/\0/g, "");
 
       if (!cleanedString.trim()) {
         return null;
       }
 
-      // JSON 파싱 시도
+      // Attempt to parse JSON metadata first.
       return JSON.parse(cleanedString);
     } catch (e) {
       console.error("Metadata JSON parsing error:", e);
-      // JSON 파싱이 실패하면 plain text로 처리
+      // Fall back to plain-text parsing when JSON parsing fails.
       try {
         const hex = metadataHex.slice(2);
         const plainText = Buffer.from(hex, "hex").toString("utf8").replace(/\0/g, "");

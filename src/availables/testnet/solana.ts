@@ -123,7 +123,7 @@ export default class Solana extends TargetAbstract {
   //     help: 'Validators count',
   // });
 
-  // Onboarding priority 조회 최적화 상태 관리
+  // Track onboarding-priority fetch eligibility to reduce repeated failed lookups.
   private readonly onboardingFailedValidators: Set<string> = new Set();
   private readonly onboardingAllowedValidators: Set<string> = new Set();
   private onboardingSelectionLocked: boolean = false;
@@ -237,8 +237,8 @@ export default class Solana extends TargetAbstract {
     this.onboardingPriorityGauge.reset();
     const identityAccounts = this.toUniqueList(identities);
 
-    // 첫 실행 전: 실패한 주소 제외, 성공/실패를 판별해 집합에 기록
-    // 첫 실행 이후(locked): 최초 성공한 주소만 계속 조회
+    // Before the first pass, keep track of success and failure per identity.
+    // After the first pass, only continue polling identities that succeeded once.
     const targets: string[] = this.onboardingSelectionLocked
       ? identityAccounts.filter((v) => this.onboardingAllowedValidators.has(v))
       : identityAccounts.filter((v) => !this.onboardingFailedValidators.has(v));
@@ -272,7 +272,7 @@ export default class Solana extends TargetAbstract {
       }),
     );
 
-    // 첫 패스 이후엔 성공한 주소만 계속 확인하도록 고정
+    // Lock the selection after the first pass so only successful identities keep being checked.
     if (!this.onboardingSelectionLocked) {
       this.onboardingSelectionLocked = true;
     }
