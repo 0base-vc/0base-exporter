@@ -56,6 +56,8 @@ Common variables:
 | `EXISTING_METRICS_URL` | Existing Prometheus endpoints to merge into the output.    |
 | `ENABLE_PROM_PERF`     | Opt-in instrumentation for internal metric timing.         |
 
+The Solana mainnet collector uses the hosted 0Base validator indexer for current-epoch slot, fee, and MEV metrics. Slot and fee metrics are emitted for both `partial` and `exact` statuses as running lower bounds, while MEV metrics remain `exact` only.
+
 See the full reference:
 
 - [Configuration](./docs/en/configuration.md)

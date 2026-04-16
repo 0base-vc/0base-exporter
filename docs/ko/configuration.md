@@ -26,3 +26,9 @@
 | ------------ | --------- | -------------- |
 | Cosmos / EVM | `ADDRESS` | `VALIDATOR`    |
 | Solana       | `VOTE`    | `IDENTITY`     |
+
+여러 값은 쉼표로 구분합니다.
+
+## Solana 메인넷 current epoch 메트릭
+
+`solana` collector는 current epoch의 slot, fee, MEV 데이터를 `https://solana-validator-indexer.0base.dev`에서 읽습니다. slot과 fee 메트릭은 `partial`, `exact` 상태를 모두 running lower bound로 노출하고, MEV 메트릭은 `exact`일 때만 노출합니다.

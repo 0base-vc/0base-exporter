@@ -61,6 +61,139 @@ export async function getSolanaAmount(params: {
   });
 }
 
+export async function getSolanaCurrentEpochLabel(params: {
+  rpcUrl: string;
+  postWithCache: PostWithCacheFn;
+  cacheDurationMs?: number;
+  timeoutMs?: number;
+}): Promise<string> {
+  const epoch = await params.postWithCache(
+    params.rpcUrl,
+    { method: "getEpochInfo", params: [{ commitment: "processed" }] },
+    (response) => response.data?.result?.epoch,
+    params.cacheDurationMs ?? 60000,
+    params.timeoutMs ?? 10000,
+  );
+
+  const epochNumber = Number(epoch);
+  return Number.isFinite(epochNumber) ? String(epochNumber) : "";
+}
+
+export function createSolanaEpochLabelResolver(params: {
+  rpcUrl: string;
+  postWithCache: PostWithCacheFn;
+  cacheDurationMs?: number;
+  timeoutMs?: number;
+}): () => Promise<string> {
+  let pending: Promise<string> | null = null;
+
+  return async () => {
+    if (!pending) {
+      pending = getSolanaCurrentEpochLabel(params);
+    }
+
+    return pending;
+  };
+}
+
+export async function updateSolanaBlockProduction(params: {
+  validators: string;
+  validatorToIdentityMap: Record<string, string>;
+  rpcUrl: string;
+  slotsAssignedGauge: GaugeWithSingleSet;
+  slotsProducedGauge: GaugeWithSingleSet;
+  slotsSkippedGauge: GaugeWithSingleSet;
+  postWithCache: PostWithCacheFn;
+  cacheDurationMs?: number;
+  timeoutMs?: number;
+}): Promise<void> {
+  params.slotsAssignedGauge.reset();
+  params.slotsProducedGauge.reset();
+  params.slotsSkippedGauge.reset();
+
+  const voteAccounts = toUniqueCsv(params.validators);
+  if (voteAccounts.length === 0) {
+    return;
+  }
+
+  const resolveEpochLabel = createSolanaEpochLabelResolver({
+    rpcUrl: params.rpcUrl,
+    postWithCache: params.postWithCache,
+    cacheDurationMs: params.cacheDurationMs,
+    timeoutMs: params.timeoutMs,
+  });
+
+  const byIdentity = await params.postWithCache(
+    params.rpcUrl,
+    { method: "getBlockProduction", params: [{ commitment: "finalized" }] },
+    (response) => response.data?.result?.value?.byIdentity,
+    params.cacheDurationMs ?? 60000,
+    params.timeoutMs ?? 10000,
+  );
+
+  const epochLabel = await resolveEpochLabel();
+  if (!epochLabel) {
+    return;
+  }
+
+  const productionMap =
+    byIdentity && typeof byIdentity === "object" ? (byIdentity as Record<string, unknown>) : {};
+
+  for (const vote of voteAccounts) {
+    const identity = params.validatorToIdentityMap[vote];
+    if (!identity) {
+      continue;
+    }
+
+    const counts = Array.isArray(productionMap[identity]) ? productionMap[identity] : [];
+    const totalSlots = Number(counts[0] ?? 0);
+    const producedSlots = Number(counts[1] ?? 0);
+    const skippedSlots =
+      Number.isFinite(totalSlots) && Number.isFinite(producedSlots)
+        ? Math.max(totalSlots - producedSlots, 0)
+        : 0;
+
+    params.slotsAssignedGauge
+      .labels(vote, epochLabel)
+      .set(Number.isFinite(totalSlots) ? totalSlots : 0);
+    params.slotsProducedGauge
+      .labels(vote, epochLabel)
+      .set(Number.isFinite(producedSlots) ? producedSlots : 0);
+    params.slotsSkippedGauge.labels(vote, epochLabel).set(skippedSlots);
+  }
+}
+
+export function emitZeroSolanaVxIncomeMetrics(params: {
+  vote: string;
+  epochLabel: string;
+  blockFeesTotalGauge: GaugeWithSingleSet;
+  mevFeesTotalGauge: GaugeWithSingleSet;
+  blockTipsMedianGauge: GaugeWithSingleSet;
+}): void {
+  if (!params.epochLabel) {
+    return;
+  }
+
+  params.blockFeesTotalGauge.labels(params.vote, params.epochLabel).set(0);
+  params.mevFeesTotalGauge.labels(params.vote, params.epochLabel).set(0);
+  params.blockTipsMedianGauge.labels(params.vote, params.epochLabel).set(0);
+}
+
+export function emitZeroSolanaVxMedianAverages(params: {
+  epochLabel: string;
+  epochMedianBaseFeesAvgGauge: GaugeWithSingleSet;
+  epochMedianPriorityFeesAvgGauge: GaugeWithSingleSet;
+  epochMedianMevTipsAvgGauge: GaugeWithSingleSet;
+}): void {
+  if (!params.epochLabel) {
+    return;
+  }
+
+  params.epochMedianBaseFeesAvgGauge.labels(params.epochLabel).set(0);
+  params.epochMedianPriorityFeesAvgGauge.labels(params.epochLabel).set(0);
+  params.epochMedianMevTipsAvgGauge.labels(params.epochLabel).set(0);
+}
+
 export async function updateSolanaBalances(params: {
   addresses: string;
   rpcUrl: string;

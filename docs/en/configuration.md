@@ -28,3 +28,7 @@ If both are set, `CHAIN` wins.
 | Solana       | `VOTE`        | `IDENTITY`      |
 
 Multiple values are comma-separated.
+
+## Solana mainnet current-epoch metrics
+
+The `solana` collector reads current-epoch slot, fee, and MEV data from `https://solana-validator-indexer.0base.dev`. Slot and fee metrics are emitted for both `partial` and `exact` statuses as running lower bounds. MEV metrics are emitted only when the indexer marks them as `exact`.
