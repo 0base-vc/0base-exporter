@@ -146,46 +146,46 @@ describe("Solana vx.tools fallbacks", () => {
     collector.postWithCache = jest.fn(
       async (url: string, data: unknown, selector: Selector): Promise<unknown> => {
         if (
-          url !== "https://solana-validator-indexer.0base.dev/v1/validators/current-epoch/batch"
+          url === "https://solana-validator-indexer.0base.dev/v1/validators/current-epoch/batch"
         ) {
-          throw new Error(`Unexpected URL: ${url}`);
+          expect(data).toEqual({ votes: ["vote-1", "vote-2"] });
+
+          return selector({
+            data: {
+              epoch: 956,
+              results: [
+                {
+                  vote: "vote-1",
+                  identity: "identity-1",
+                  epoch: 956,
+                  slotsStatus: "exact",
+                  slotsAssigned: 12,
+                  slotsProduced: 10,
+                  slotsSkipped: 2,
+                  feesStatus: "exact",
+                  blockFeesTotalSol: "0.75",
+                  mevStatus: "exact",
+                  mevRewardsSol: "0.5",
+                },
+                {
+                  vote: "vote-2",
+                  identity: "identity-2",
+                  epoch: 956,
+                  slotsStatus: "partial",
+                  slotsAssigned: 6,
+                  slotsProduced: 5,
+                  slotsSkipped: 1,
+                  feesStatus: "partial",
+                  blockFeesTotalSol: "0.125",
+                  mevStatus: "best_effort",
+                  mevRewardsSol: "0.1",
+                },
+              ],
+            },
+          });
         }
 
-        expect(data).toEqual({ votes: ["vote-1", "vote-2"] });
-
-        return selector({
-          data: {
-            epoch: 956,
-            results: [
-              {
-                vote: "vote-1",
-                identity: "identity-1",
-                epoch: 956,
-                slotsStatus: "exact",
-                slotsAssigned: 12,
-                slotsProduced: 10,
-                slotsSkipped: 2,
-                feesStatus: "exact",
-                blockFeesTotalSol: "0.75",
-                mevStatus: "exact",
-                mevRewardsSol: "0.5",
-              },
-              {
-                vote: "vote-2",
-                identity: "identity-2",
-                epoch: 956,
-                slotsStatus: "partial",
-                slotsAssigned: 6,
-                slotsProduced: 5,
-                slotsSkipped: 1,
-                feesStatus: "partial",
-                blockFeesTotalSol: "0.125",
-                mevStatus: "best_effort",
-                mevRewardsSol: "0.1",
-              },
-            ],
-          },
-        });
+        throw new Error(`Unexpected URL: ${url}`);
       },
     );
 
