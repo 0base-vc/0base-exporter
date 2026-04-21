@@ -235,27 +235,40 @@ export async function updateSolanaVoteAccounts(params: {
   params.lastVoteGauge.reset();
 
   const voteAccounts = toUniqueCsv(params.validators);
+  const allValidators = await params.postWithCache(
+    params.rpcUrl,
+    { method: "getVoteAccounts" },
+    (response) => {
+      const current = Array.isArray(response.data?.result?.current)
+        ? response.data.result.current
+        : [];
+      const delinquent = Array.isArray(response.data?.result?.delinquent)
+        ? response.data.result.delinquent
+        : [];
 
-  await params.postWithCache(params.rpcUrl, { method: "getVoteAccounts" }, (response) => {
-    const allValidators = [
-      ...response.data.result.current.map((item: any) => ({ ...item, status: "current" })),
-      ...response.data.result.delinquent.map((item: any) => ({ ...item, status: "delinquent" })),
-    ];
+      return [
+        ...current.map((item: any) => ({ ...item, status: "current" as const })),
+        ...delinquent.map((item: any) => ({ ...item, status: "delinquent" as const })),
+      ];
+    },
+  );
 
-    for (const vote of voteAccounts) {
-      const validator = allValidators.find((item: any) => item.votePubkey === vote);
-      if (!validator) continue;
+  const validators = Array.isArray(allValidators) ? allValidators : [];
+  for (const vote of voteAccounts) {
+    const validator = validators.find(
+      (item: any) => item && typeof item === "object" && item.votePubkey === vote,
+    );
+    if (!validator) continue;
 
-      params.activatedStakeGauge.labels(vote).set(validator.activatedStake / LAMPORTS_PER_SOL);
-      params.activeGauge.labels(vote).set(validator.status === "current" ? 1 : 0);
-      params.commissionGauge.labels(vote).set(validator.commission);
-      params.lastVoteGauge.labels(vote).set(validator.lastVote);
+    params.activatedStakeGauge.labels(vote).set(validator.activatedStake / LAMPORTS_PER_SOL);
+    params.activeGauge.labels(vote).set(validator.status === "current" ? 1 : 0);
+    params.commissionGauge.labels(vote).set(validator.commission);
+    params.lastVoteGauge.labels(vote).set(validator.lastVote);
 
-      if (validator.nodePubkey && params.onNodePubkey) {
-        params.onNodePubkey(vote, validator.nodePubkey);
-      }
+    if (validator.nodePubkey && params.onNodePubkey) {
+      params.onNodePubkey(vote, validator.nodePubkey);
     }
-  });
+  }
 }
 
 export async function updateSolanaClusterRequiredVersions(params: {
