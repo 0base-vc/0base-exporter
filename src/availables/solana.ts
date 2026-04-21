@@ -404,7 +404,7 @@ export default class Solana extends TargetAbstract {
       activeGauge: this.activeGauge,
       commissionGauge: this.commissionGauge,
       lastVoteGauge: this.lastVoteGauge,
-      postWithCache: this.postWithCache.bind(this),
+      post: this.post.bind(this),
       onNodePubkey: (vote, nodePubkey) => {
         this.validatorToIdentityMap[vote] = nodePubkey;
       },

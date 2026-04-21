@@ -2,15 +2,9 @@ import { Gauge, Registry, register } from "prom-client";
 import { updateSolanaVoteAccounts } from "../../src/availables/shared/solana-common";
 
 type Selector = (response: { data: unknown }) => unknown;
-type PostWithCacheFn = (
-  url: string,
-  data: unknown,
-  selector: Selector,
-  cacheDurationMs?: number,
-  timeoutMs?: number,
-) => Promise<unknown>;
+type PostFn = (url: string, data: unknown, selector: Selector) => Promise<unknown>;
 
-type CachedVoteAccountsMock = PostWithCacheFn & { calls: number };
+type VoteAccountsPostMock = PostFn & { calls: number };
 
 function createGauge(name: string): Gauge<string> {
   return new Gauge({
@@ -29,13 +23,11 @@ describe("updateSolanaVoteAccounts", () => {
     register.clear();
   });
 
-  function createCachedVoteAccountsMock(): CachedVoteAccountsMock {
-    let cached: unknown;
-
+  function createVoteAccountsPostMock(): VoteAccountsPostMock {
     const fn = (async (_url: string, _data: unknown, selector: Selector): Promise<unknown> => {
       fn.calls += 1;
       if (fn.calls === 1) {
-        cached = selector({
+        return selector({
           data: {
             result: {
               current: [
@@ -53,14 +45,29 @@ describe("updateSolanaVoteAccounts", () => {
         });
       }
 
-      return cached;
-    }) as CachedVoteAccountsMock;
+      return selector({
+        data: {
+          result: {
+            current: [],
+            delinquent: [
+              {
+                votePubkey: "vote-1",
+                activatedStake: 123_000_000_000,
+                commission: 7,
+                lastVote: 43,
+                nodePubkey: "identity-1",
+              },
+            ],
+          },
+        },
+      });
+    }) as VoteAccountsPostMock;
 
     fn.calls = 0;
     return fn;
   }
 
-  it("re-emits cached vote-account metrics on repeated scrapes", async () => {
+  it("refreshes vote-account liveness metrics on repeated scrapes", async () => {
     const registry = new Registry();
     const activatedStakeGauge = createGauge("test_solana_validator_activated_stake");
     const activeGauge = createGauge("test_solana_validator_active");
@@ -71,7 +78,7 @@ describe("updateSolanaVoteAccounts", () => {
     registry.registerMetric(commissionGauge);
     registry.registerMetric(lastVoteGauge);
 
-    const postWithCache = createCachedVoteAccountsMock();
+    const post = createVoteAccountsPostMock();
 
     const invoke = async () => {
       await updateSolanaVoteAccounts({
@@ -81,7 +88,7 @@ describe("updateSolanaVoteAccounts", () => {
         activeGauge,
         commissionGauge,
         lastVoteGauge,
-        postWithCache,
+        post,
       });
       return registry.metrics();
     };
@@ -89,14 +96,14 @@ describe("updateSolanaVoteAccounts", () => {
     const firstMetrics = await invoke();
     const secondMetrics = await invoke();
 
-    expect(postWithCache.calls).toBe(2);
+    expect(post.calls).toBe(2);
     expect(firstMetrics).toContain('test_solana_validator_activated_stake{vote="vote-1"} 123');
     expect(firstMetrics).toContain('test_solana_validator_active{vote="vote-1"} 1');
     expect(firstMetrics).toContain('test_solana_validator_commission{vote="vote-1"} 7');
     expect(firstMetrics).toContain('test_solana_validator_last_vote{vote="vote-1"} 42');
     expect(secondMetrics).toContain('test_solana_validator_activated_stake{vote="vote-1"} 123');
-    expect(secondMetrics).toContain('test_solana_validator_active{vote="vote-1"} 1');
+    expect(secondMetrics).toContain('test_solana_validator_active{vote="vote-1"} 0');
     expect(secondMetrics).toContain('test_solana_validator_commission{vote="vote-1"} 7');
-    expect(secondMetrics).toContain('test_solana_validator_last_vote{vote="vote-1"} 42');
+    expect(secondMetrics).toContain('test_solana_validator_last_vote{vote="vote-1"} 43');
   });
 });

@@ -226,7 +226,7 @@ export async function updateSolanaVoteAccounts(params: {
   activeGauge: GaugeWithSingleSet;
   commissionGauge: GaugeWithSingleSet;
   lastVoteGauge: GaugeWithSingleSet;
-  postWithCache: PostWithCacheFn;
+  post: PostFn;
   onNodePubkey?: (vote: string, nodePubkey: string) => void;
 }): Promise<void> {
   params.activatedStakeGauge.reset();
@@ -235,7 +235,7 @@ export async function updateSolanaVoteAccounts(params: {
   params.lastVoteGauge.reset();
 
   const voteAccounts = toUniqueCsv(params.validators);
-  const allValidators = await params.postWithCache(
+  const allValidators = await params.post(
     params.rpcUrl,
     { method: "getVoteAccounts" },
     (response) => {
