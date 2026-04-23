@@ -42,13 +42,13 @@ describe("Solana indexer integration", () => {
                   vote: "vote-1",
                   identity: "identity-1",
                   epoch: 959,
-                  slotsStatus: "partial",
+                  slotsStatus: "live",
                   slotsAssigned: 16,
                   slotsProduced: 12,
                   slotsSkipped: 0,
-                  feesStatus: "partial",
+                  feesStatus: "live",
                   blockFeesTotalSol: "0.5",
-                  mevStatus: "unavailable",
+                  mevStatus: "no_data",
                   mevRewardsSol: null,
                 },
               ],
@@ -67,6 +67,14 @@ describe("Solana indexer integration", () => {
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-1",epoch="959"} 12');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="959"} 0');
     expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="959"} 0.5');
+    expect(metrics).toContain('solana_slots_status{vote="vote-1",epoch="959",status="live"} 1');
+    expect(metrics).toContain(
+      'solana_block_fees_status{vote="vote-1",epoch="959",status="live"} 1',
+    );
+    expect(metrics).toContain(
+      'solana_mev_fees_status{vote="vote-1",epoch="959",status="no_data"} 1',
+    );
+    expect(metrics).not.toContain('solana_mev_fees_total_sol{vote="vote-1",epoch="959"}');
     expect(collector.postWithCache).toHaveBeenCalledTimes(1);
   });
 });

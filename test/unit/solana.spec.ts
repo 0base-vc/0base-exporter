@@ -133,7 +133,7 @@ describe("Solana vx.tools fallbacks", () => {
     expect(metrics).not.toContain("solana_epoch_top50_validator_mev_tips_avg_sol{");
   });
 
-  it("emits partial and exact slot and fee metrics from the indexer while keeping mev exact-only", async () => {
+  it("emits numeric indexer metrics independently from status and exposes status gauges", async () => {
     const collector = new Solana(
       "",
       "https://rpc.example",
@@ -158,26 +158,26 @@ describe("Solana vx.tools fallbacks", () => {
                   vote: "vote-1",
                   identity: "identity-1",
                   epoch: 956,
-                  slotsStatus: "exact",
+                  slotsStatus: "final",
                   slotsAssigned: 12,
                   slotsProduced: 10,
                   slotsSkipped: 2,
-                  feesStatus: "exact",
+                  feesStatus: "final",
                   blockFeesTotalSol: "0.75",
-                  mevStatus: "exact",
+                  mevStatus: "final",
                   mevRewardsSol: "0.5",
                 },
                 {
                   vote: "vote-2",
                   identity: "identity-2",
                   epoch: 956,
-                  slotsStatus: "partial",
+                  slotsStatus: "live",
                   slotsAssigned: 6,
                   slotsProduced: 5,
                   slotsSkipped: 1,
-                  feesStatus: "partial",
+                  feesStatus: "live",
                   blockFeesTotalSol: "0.125",
-                  mevStatus: "best_effort",
+                  mevStatus: "approximate",
                   mevRewardsSol: "0.1",
                 },
               ],
@@ -197,11 +197,23 @@ describe("Solana vx.tools fallbacks", () => {
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="956"} 2');
     expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="956"} 0.75');
     expect(metrics).toContain('solana_mev_fees_total_sol{vote="vote-1",epoch="956"} 0.5');
+    expect(metrics).toContain('solana_slots_status{vote="vote-1",epoch="956",status="final"} 1');
+    expect(metrics).toContain(
+      'solana_block_fees_status{vote="vote-1",epoch="956",status="final"} 1',
+    );
+    expect(metrics).toContain('solana_mev_fees_status{vote="vote-1",epoch="956",status="final"} 1');
     expect(metrics).toContain('solana_slots_assigned_total{vote="vote-2",epoch="956"} 6');
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-2",epoch="956"} 5');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-2",epoch="956"} 1');
     expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-2",epoch="956"} 0.125');
-    expect(metrics).not.toContain('solana_mev_fees_total_sol{vote="vote-2",epoch="956"}');
+    expect(metrics).toContain('solana_mev_fees_total_sol{vote="vote-2",epoch="956"} 0.1');
+    expect(metrics).toContain('solana_slots_status{vote="vote-2",epoch="956",status="live"} 1');
+    expect(metrics).toContain(
+      'solana_block_fees_status{vote="vote-2",epoch="956",status="live"} 1',
+    );
+    expect(metrics).toContain(
+      'solana_mev_fees_status{vote="vote-2",epoch="956",status="approximate"} 1',
+    );
     expect(metrics).not.toContain("solana_block_tips_median_sol{");
     expect(metrics).not.toContain("solana_epoch_median_base_fees_avg_sol{");
   });

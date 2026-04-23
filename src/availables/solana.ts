@@ -16,19 +16,20 @@ import {
 const LAMPORTS_PER_SOL = 1e9;
 const SOLANA_INDEXER_BASE_URL = "https://solana-validator-indexer.0base.dev";
 
-type SolanaMetricStatus = "exact" | "partial" | "best_effort" | "unavailable" | "not_backfilled";
+type SolanaSlotsOrFeesStatus = "final" | "live" | "no_data" | "not_tracked";
+type SolanaMevStatus = "final" | "approximate" | "no_data";
 
 type SolanaIndexerValidatorRecord = {
   vote?: string;
   identity?: string;
   epoch?: number | string;
-  slotsStatus?: SolanaMetricStatus;
+  slotsStatus?: SolanaSlotsOrFeesStatus;
   slotsAssigned?: number | null;
   slotsProduced?: number | null;
   slotsSkipped?: number | null;
-  feesStatus?: SolanaMetricStatus;
+  feesStatus?: SolanaSlotsOrFeesStatus;
   blockFeesTotalSol?: string | number | null;
-  mevStatus?: SolanaMetricStatus;
+  mevStatus?: SolanaMevStatus;
   mevRewardsSol?: string | number | null;
 };
 
@@ -38,8 +39,13 @@ type SolanaIndexerBatchResponse = {
   missing?: string[];
 };
 
-function shouldEmitRunningEpochMetric(status: SolanaMetricStatus | undefined): boolean {
-  return status === "exact" || status === "partial";
+function toFiniteMetricValue(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export default class Solana extends TargetAbstract {
@@ -147,6 +153,24 @@ export default class Solana extends TargetAbstract {
     name: `${this.metricPrefix}_mev_fees_total_sol`,
     help: "Total MEV-related fees collected",
     labelNames: ["vote", "epoch"],
+  });
+
+  private readonly slotsStatusGauge = new Gauge({
+    name: `${this.metricPrefix}_slots_status`,
+    help: "Indexer completeness status for Solana slot metrics; value is 1 for the active status",
+    labelNames: ["vote", "epoch", "status"],
+  });
+
+  private readonly blockFeesStatusGauge = new Gauge({
+    name: `${this.metricPrefix}_block_fees_status`,
+    help: "Indexer completeness status for Solana block fee metrics; value is 1 for the active status",
+    labelNames: ["vote", "epoch", "status"],
+  });
+
+  private readonly mevFeesStatusGauge = new Gauge({
+    name: `${this.metricPrefix}_mev_fees_status`,
+    help: "Indexer completeness status for Solana MEV fee metrics; value is 1 for the active status",
+    labelNames: ["vote", "epoch", "status"],
   });
 
   private readonly blockTipsMedianGauge = new Gauge({
@@ -298,6 +322,9 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.slotsSkippedGauge);
     this.registry.registerMetric(this.blockFeesTotalGauge);
     this.registry.registerMetric(this.mevFeesTotalGauge);
+    this.registry.registerMetric(this.slotsStatusGauge);
+    this.registry.registerMetric(this.blockFeesStatusGauge);
+    this.registry.registerMetric(this.mevFeesStatusGauge);
     this.registry.registerMetric(this.blockTipsMedianGauge);
     this.registry.registerMetric(this.clusterRequiredVersionGauge);
     this.registry.registerMetric(this.validatorReleaseVersionGauge);
@@ -433,6 +460,9 @@ export default class Solana extends TargetAbstract {
     this.slotsSkippedGauge.reset();
     this.blockFeesTotalGauge.reset();
     this.mevFeesTotalGauge.reset();
+    this.slotsStatusGauge.reset();
+    this.blockFeesStatusGauge.reset();
+    this.mevFeesStatusGauge.reset();
     this.blockTipsMedianGauge.reset();
     this.epochMedianBaseFeesAvgGauge.reset();
     this.epochMedianPriorityFeesAvgGauge.reset();
@@ -473,34 +503,40 @@ export default class Solana extends TargetAbstract {
           this.validatorToIdentityMap[vote] = record.identity.trim();
         }
 
-        if (shouldEmitRunningEpochMetric(record.slotsStatus)) {
-          const slotsAssigned = Number(record.slotsAssigned);
-          const slotsProduced = Number(record.slotsProduced);
-          const slotsSkipped = Number(record.slotsSkipped);
-
-          if (Number.isFinite(slotsAssigned)) {
-            this.slotsAssignedGauge.labels(vote, epochLabel).set(slotsAssigned);
-          }
-          if (Number.isFinite(slotsProduced)) {
-            this.slotsProducedGauge.labels(vote, epochLabel).set(slotsProduced);
-          }
-          if (Number.isFinite(slotsSkipped)) {
-            this.slotsSkippedGauge.labels(vote, epochLabel).set(slotsSkipped);
-          }
+        if (record.slotsStatus) {
+          this.slotsStatusGauge.labels(vote, epochLabel, record.slotsStatus).set(1);
         }
 
-        if (shouldEmitRunningEpochMetric(record.feesStatus)) {
-          const blockFeesTotalSol = Number(record.blockFeesTotalSol);
-          if (Number.isFinite(blockFeesTotalSol)) {
-            this.blockFeesTotalGauge.labels(vote, epochLabel).set(blockFeesTotalSol);
-          }
+        const slotsAssigned = toFiniteMetricValue(record.slotsAssigned);
+        const slotsProduced = toFiniteMetricValue(record.slotsProduced);
+        const slotsSkipped = toFiniteMetricValue(record.slotsSkipped);
+
+        if (slotsAssigned !== null) {
+          this.slotsAssignedGauge.labels(vote, epochLabel).set(slotsAssigned);
+        }
+        if (slotsProduced !== null) {
+          this.slotsProducedGauge.labels(vote, epochLabel).set(slotsProduced);
+        }
+        if (slotsSkipped !== null) {
+          this.slotsSkippedGauge.labels(vote, epochLabel).set(slotsSkipped);
         }
 
-        if (record.mevStatus === "exact") {
-          const mevRewardsSol = Number(record.mevRewardsSol);
-          if (Number.isFinite(mevRewardsSol)) {
-            this.mevFeesTotalGauge.labels(vote, epochLabel).set(mevRewardsSol);
-          }
+        if (record.feesStatus) {
+          this.blockFeesStatusGauge.labels(vote, epochLabel, record.feesStatus).set(1);
+        }
+
+        const blockFeesTotalSol = toFiniteMetricValue(record.blockFeesTotalSol);
+        if (blockFeesTotalSol !== null) {
+          this.blockFeesTotalGauge.labels(vote, epochLabel).set(blockFeesTotalSol);
+        }
+
+        if (record.mevStatus) {
+          this.mevFeesStatusGauge.labels(vote, epochLabel, record.mevStatus).set(1);
+        }
+
+        const mevRewardsSol = toFiniteMetricValue(record.mevRewardsSol);
+        if (mevRewardsSol !== null) {
+          this.mevFeesTotalGauge.labels(vote, epochLabel).set(mevRewardsSol);
         }
       }
     } catch (error) {
