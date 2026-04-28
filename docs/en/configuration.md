@@ -31,4 +31,4 @@ Multiple values are comma-separated.
 
 ## Solana mainnet current-epoch metrics
 
-The `solana` collector reads current-epoch slot, fee, and MEV data from `https://solana-validator-indexer.0base.dev`. Slot and fee metrics are emitted for both `partial` and `exact` statuses as running lower bounds. MEV metrics are emitted only when the indexer marks them as `exact`.
+The `solana` collector reads current-epoch slot, fee, and MEV data from `https://whoearns.live`. Numeric metrics are emitted whenever the indexer returns a finite value. Completeness is exposed separately through `solana_slots_status`, `solana_block_fees_status`, and `solana_mev_fees_status`.

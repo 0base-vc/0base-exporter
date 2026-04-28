@@ -31,4 +31,4 @@
 
 ## Solana 메인넷 current epoch 메트릭
 
-`solana` collector는 current epoch의 slot, fee, MEV 데이터를 `https://solana-validator-indexer.0base.dev`에서 읽습니다. slot과 fee 메트릭은 `partial`, `exact` 상태를 모두 running lower bound로 노출하고, MEV 메트릭은 `exact`일 때만 노출합니다.
+`solana` collector는 current epoch의 slot, fee, MEV 데이터를 `https://whoearns.live`에서 읽습니다. indexer가 유효한 숫자를 반환하면 numeric metric을 노출하고, 완성도 상태는 `solana_slots_status`, `solana_block_fees_status`, `solana_mev_fees_status`로 별도 노출합니다.

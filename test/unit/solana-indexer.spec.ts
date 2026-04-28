@@ -31,9 +31,7 @@ describe("Solana indexer integration", () => {
 
     collector.postWithCache = jest.fn(
       async (url: string, _data: unknown, selector: Selector): Promise<unknown> => {
-        if (
-          url === "https://solana-validator-indexer.0base.dev/v1/validators/current-epoch/batch"
-        ) {
+        if (url === "https://whoearns.live/v1/validators/current-epoch/batch") {
           return selector({
             data: {
               epoch: 959,

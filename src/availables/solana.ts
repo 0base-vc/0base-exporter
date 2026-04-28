@@ -14,7 +14,7 @@ import {
 // Uses TargetAbstract caching helpers instead of axios directly.
 
 const LAMPORTS_PER_SOL = 1e9;
-const SOLANA_INDEXER_BASE_URL = "https://solana-validator-indexer.0base.dev";
+const SOLANA_INDEXER_BASE_URL = "https://whoearns.live";
 
 type SolanaSlotsOrFeesStatus = "final" | "live" | "no_data" | "not_tracked";
 type SolanaMevStatus = "final" | "approximate" | "no_data";

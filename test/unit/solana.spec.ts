@@ -145,9 +145,7 @@ describe("Solana vx.tools fallbacks", () => {
 
     collector.postWithCache = jest.fn(
       async (url: string, data: unknown, selector: Selector): Promise<unknown> => {
-        if (
-          url === "https://solana-validator-indexer.0base.dev/v1/validators/current-epoch/batch"
-        ) {
+        if (url === "https://whoearns.live/v1/validators/current-epoch/batch") {
           expect(data).toEqual({ votes: ["vote-1", "vote-2"] });
 
           return selector({
