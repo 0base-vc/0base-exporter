@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - run: npm ci
+      - run: npm run ci:verify
+      - run: npm pack
+      - run: shasum -a 256 ./*.tgz > SHA256SUMS.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-assets
+          path: |
+            ./*.tgz
+            SHA256SUMS.txt
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./*.tgz
+            SHA256SUMS.txt
+          generate_release_notes: true

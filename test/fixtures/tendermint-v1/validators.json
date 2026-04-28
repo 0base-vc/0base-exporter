@@ -1,0 +1,16 @@
+{
+  "validators": [
+    {
+      "operator_address": "cosmosvaloper1peer1",
+      "tokens": "9000000"
+    },
+    {
+      "operator_address": "cosmosvaloper1validator",
+      "tokens": "7500000"
+    },
+    {
+      "operator_address": "cosmosvaloper1peer2",
+      "tokens": "5000000"
+    }
+  ]
+}

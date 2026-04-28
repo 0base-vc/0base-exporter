@@ -1,67 +1,90 @@
-![Title](0base-exporter.png "Title")
-
 # 0Base Exporter
 
-Extra metrics for Blockchain.
+Prometheus exporter for validator and wallet metrics across Cosmos/Tendermint, Solana, and EVM-oriented networks.
 
+0Base Exporter exposes a stable `GET /metrics` endpoint and keeps legacy environment-variable workflows intact while adding a typed runtime config layer, test coverage, linting, Git hooks, and CI suitable for public open source development.
 
-## Metrics
+## Quickstart
 
-### Tendermint
-- ~~**tendermint_address_balance** - Total balance of address~~
-- **tendermint_address_available** - Available balance of address
-- **tendermint_address_delegated** - Delegated balance of address
-- **tendermint_address_unbonding**  - Unbonding balance of address 
-- **tendermint_address_rewards** - Rewards of address
-- **tendermint_address_commission** - Commission balance of address
-- **tendermint_validator_rank** - Your rank of validators
-- **tendermint_validator_power_rivals** - Voting power of Rivals
-- **tendermint_staking_parameters_max_validator_count** - Limitation of validators count
-- **tendermint_gov_proposals_count** - Gov proposals count
+```bash
+npm ci
+npm run build
 
+CHAIN=tendermint \
+API_URL=http://localhost:1317 \
+ADDRESS=cosmos1youraddress \
+VALIDATOR=cosmosvaloper1yourvalidator \
+npm start
+```
 
-### Solana
-- **Mainnet**:
-  - **solana_address_balance** - Total balance of address
-  - **solana_address_available** - Available balance of address
-  - **solana_validator_activated_stake** - Your activated stake
-  - **solana_validator_active** - Your validator active
-  - **solana_validator_commission** - Your validator commission
-  - **solana_validator_bonds** - Your validator bonds
-  - **solana_validator_last_vote** - Your validator last vote
-  - **solana_delegation_sol** - Delegations to validator by source (labels: `validator`, `source`)
-  - **solana_pending_activation_sol** - Pending activation stake by source (labels: `validator`, `source`)
-  - **solana_pending_deactivation_sol** - Pending deactivation stake by source (labels: `validator`, `source`)
-  - **solana_marinade_min_effective_bid_sol** - Minimum effective bid required to receive delegation from Marinade (labels: `validator`)
-  - **solana_marinade_my_bid_sol** - Current bid value our validator has set in Marinade (labels: `validator`)
-  - **solana_slots_assigned_total** - Total number of leader slots assigned in the current epoch (labels: `validator`, `epoch`)
-  - **solana_slots_produced_total** - Number of leader slots successfully produced in the current epoch (labels: `validator`, `epoch`)
-  - **solana_slots_skipped_total** - Number of assigned but not produced slots in the current epoch (labels: `validator`, `epoch`)
-  - **solana_block_fees_total_sol** - Total transaction fees from blocks we produced (labels: `validator`, `epoch`)
-  - **solana_mev_fees_total_sol** - Total MEV-related fees collected (labels: `validator`, `epoch`)
-  - **solana_block_fees_median_sol** - Median transaction fees per produced block (labels: `validator`, `epoch`)
-  - **solana_block_tips_median_sol** - Median block tips per produced block (labels: `validator`, `epoch`)
-- **Testnet**:
-  - **solana_address_balance** - Total balance of address
-  - **solana_address_available** - Available balance of address
-  - **solana_validator_activated_stake** - Your activated stake
-  - **solana_validator_active** - Your validator active
-  - **solana_validator_commission** - Your validator commission
-  - **solana_validator_bonds** - Your validator bonds
-  - **solana_validator_last_vote** - Your validator last vote
-  - **solana_onboarding_priority** - Validator onboarding priority number
+Then scrape:
 
-## ENV
+```bash
+curl http://localhost:27770/metrics
+```
 
-| Variable Name                    | Description                                       | Example                                               |
-|----------------------------------|---------------------------------------------------|-------------------------------------------------------|
-| `PORT`                           | Exporter listening Port                           | `27770`                                               |
-| `BLOCKCHAIN`                     | Blockchain to be used in `./availables` directory | `./availables/tendermint.ts`                          |
-| `EXISTING_METRICS_URL(Optional)` | The existing metrics URL                          | `http://localhost:26660,http://localhost:26661`       |
-| `API_URL`                        | Blockchain API URL                                | `http://localhost:1317`                               |
-| `RPC_URL`                        | Blockchain RPC URL                                | `http://localhost:26657`                              |
-| `ADDRESS`                        | Your addresses                                    | `akash1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4jxqcnl`        |
-| `VALIDATOR`                      | Your validator address                            | `akashvaloper1n3mhyp9fvcmuu8l0q8qvjy07x0rql8q4cyw7r4` |
-| `VOTE`                           | Solana vote accounts (comma-separated)            | `5BAi9YGCipHq4ZcXuen5vagRQqRTVTRszXNqBZC6uBPZ`        |
-| `IDENTITY`                       | Solana identity accounts (comma-separated)        | `zeroT6PTAEjipvZuACTh1mbGCqTHgA6i1ped9DcuidX`         |
-| `DECIMAL_PLACES(Optional)`       | Decimal Places                                    | `6 or 18`                                             |
+Sample env files are available in [examples/env](./examples/env).
+
+## Supported Chain Selection
+
+Use the new `CHAIN` variable when possible:
+
+| Family              | Recommended `CHAIN` values                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee` |
+| Solana              | `solana`, `solana-testnet`                                                                             |
+| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet` |
+
+Legacy `BLOCKCHAIN=./availables/...` values are still supported and mapped internally to `CHAIN`.
+
+## Configuration
+
+Common variables:
+
+| Variable               | Description                                                |
+| ---------------------- | ---------------------------------------------------------- |
+| `PORT`                 | HTTP listen port. Defaults to `27770`.                     |
+| `CHAIN`                | Preferred collector id.                                    |
+| `BLOCKCHAIN`           | Legacy module-path selector kept for compatibility.        |
+| `API_URL`              | REST API for Cosmos-style collectors.                      |
+| `RPC_URL`              | RPC endpoint for Cosmos or Solana collectors.              |
+| `EVM_API_URL`          | JSON-RPC endpoint for EVM-oriented collectors.             |
+| `ADDRESS`              | Wallet / delegator address list for non-Solana collectors. |
+| `VALIDATOR`            | Validator address list for non-Solana collectors.          |
+| `VOTE`                 | Solana vote account list.                                  |
+| `IDENTITY`             | Solana identity account list.                              |
+| `EXISTING_METRICS_URL` | Existing Prometheus endpoints to merge into the output.    |
+| `ENABLE_PROM_PERF`     | Opt-in instrumentation for internal metric timing.         |
+
+The Solana mainnet collector uses the hosted 0Base validator indexer for current-epoch slot, fee, and MEV metrics. Slot and fee metrics are emitted for both `partial` and `exact` statuses as running lower bounds, while MEV metrics remain `exact` only.
+
+See the full reference:
+
+- [Configuration](./docs/en/configuration.md)
+- [Supported chains](./docs/en/supported-chains.md)
+- [Examples](./docs/en/examples.md)
+- [Architecture](./docs/en/architecture.md)
+- [Troubleshooting](./docs/en/troubleshooting.md)
+- [Release policy](./docs/en/release-policy.md)
+- [Changelog](./CHANGELOG.md)
+- [Korean README](./README.ko.md)
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+Pre-commit formatting and linting run through Husky + `lint-staged`. CI runs on Node `20.x` and `22.x`.
+
+## Project Image
+
+![0Base Exporter logo](./0base-exporter.png)
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

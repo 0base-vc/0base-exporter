@@ -1,8 +1,10 @@
-package-lock.json
 .env
 .env.development
 /dist
 /node_modules
+/coverage
+*.tsbuildinfo
+.husky/_/
 
 .DS_Store
 
@@ -32,6 +34,7 @@ coverage/
 test-report.xml
 coverage.json
 jest.json
+.eslintcache
 
 ignore/
 ignore/*.sh
