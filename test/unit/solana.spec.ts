@@ -156,27 +156,45 @@ describe("Solana vx.tools fallbacks", () => {
                   vote: "vote-1",
                   identity: "identity-1",
                   epoch: 956,
-                  slotsStatus: "final",
+                  isCurrentEpoch: false,
+                  isFinal: true,
+                  hasSlots: true,
+                  hasIncome: true,
                   slotsAssigned: 12,
                   slotsProduced: 10,
                   slotsSkipped: 2,
-                  feesStatus: "final",
+                  blockBaseFeesTotalSol: "0.2",
+                  blockPriorityFeesTotalSol: "0.55",
                   blockFeesTotalSol: "0.75",
-                  mevStatus: "final",
-                  mevRewardsSol: "0.5",
+                  blockTipsTotalSol: "0.5",
+                  totalIncomeSol: "1.25",
+                  medianBlockFeeSol: "0.075",
+                  medianBlockBaseFeeSol: "0.02",
+                  medianBlockPriorityFeeSol: "0.055",
+                  medianBlockTipSol: "0.05",
+                  medianBlockTotalSol: "0.125",
                 },
                 {
                   vote: "vote-2",
                   identity: "identity-2",
                   epoch: 956,
-                  slotsStatus: "live",
+                  isCurrentEpoch: true,
+                  isFinal: false,
+                  hasSlots: true,
+                  hasIncome: true,
                   slotsAssigned: 6,
                   slotsProduced: 5,
                   slotsSkipped: 1,
-                  feesStatus: "live",
+                  blockBaseFeesTotalSol: "0.025",
+                  blockPriorityFeesTotalSol: "0.1",
                   blockFeesTotalSol: "0.125",
-                  mevStatus: "approximate",
-                  mevRewardsSol: "0.1",
+                  blockTipsTotalSol: "0.1",
+                  totalIncomeSol: "0.225",
+                  medianBlockFeeSol: "0.025",
+                  medianBlockBaseFeeSol: "0.005",
+                  medianBlockPriorityFeeSol: "0.02",
+                  medianBlockTipSol: "0.01",
+                  medianBlockTotalSol: "0.035",
                 },
               ],
             },
@@ -193,26 +211,38 @@ describe("Solana vx.tools fallbacks", () => {
     expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="956"} 12');
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-1",epoch="956"} 10');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="956"} 2');
-    expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="956"} 0.75');
-    expect(metrics).toContain('solana_mev_fees_total_sol{vote="vote-1",epoch="956"} 0.5');
-    expect(metrics).toContain('solana_slots_status{vote="vote-1",epoch="956",status="final"} 1');
+    expect(metrics).toContain('solana_block_base_fees_total_sol{vote="vote-1",epoch="956"} 0.2');
     expect(metrics).toContain(
-      'solana_block_fees_status{vote="vote-1",epoch="956",status="final"} 1',
+      'solana_block_priority_fees_total_sol{vote="vote-1",epoch="956"} 0.55',
     );
-    expect(metrics).toContain('solana_mev_fees_status{vote="vote-1",epoch="956",status="final"} 1');
+    expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="956"} 0.75');
+    expect(metrics).toContain('solana_block_tips_total_sol{vote="vote-1",epoch="956"} 0.5');
+    expect(metrics).toContain('solana_total_income_sol{vote="vote-1",epoch="956"} 1.25');
+    expect(metrics).toContain('solana_mev_fees_total_sol{vote="vote-1",epoch="956"} 0.5');
+    expect(metrics).toContain('solana_validator_epoch_current{vote="vote-1",epoch="956"} 0');
+    expect(metrics).toContain('solana_validator_epoch_final{vote="vote-1",epoch="956"} 1');
+    expect(metrics).toContain('solana_slots_available{vote="vote-1",epoch="956"} 1');
+    expect(metrics).toContain('solana_income_available{vote="vote-1",epoch="956"} 1');
+    expect(metrics).toContain('solana_block_fees_median_sol{vote="vote-1",epoch="956"} 0.075');
+    expect(metrics).toContain('solana_block_base_fees_median_sol{vote="vote-1",epoch="956"} 0.02');
+    expect(metrics).toContain(
+      'solana_block_priority_fees_median_sol{vote="vote-1",epoch="956"} 0.055',
+    );
+    expect(metrics).toContain('solana_block_tips_median_sol{vote="vote-1",epoch="956"} 0.05');
+    expect(metrics).toContain('solana_block_total_median_sol{vote="vote-1",epoch="956"} 0.125');
     expect(metrics).toContain('solana_slots_assigned_total{vote="vote-2",epoch="956"} 6');
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-2",epoch="956"} 5');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-2",epoch="956"} 1');
+    expect(metrics).toContain('solana_block_base_fees_total_sol{vote="vote-2",epoch="956"} 0.025');
+    expect(metrics).toContain(
+      'solana_block_priority_fees_total_sol{vote="vote-2",epoch="956"} 0.1',
+    );
     expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-2",epoch="956"} 0.125');
+    expect(metrics).toContain('solana_block_tips_total_sol{vote="vote-2",epoch="956"} 0.1');
+    expect(metrics).toContain('solana_total_income_sol{vote="vote-2",epoch="956"} 0.225');
     expect(metrics).toContain('solana_mev_fees_total_sol{vote="vote-2",epoch="956"} 0.1');
-    expect(metrics).toContain('solana_slots_status{vote="vote-2",epoch="956",status="live"} 1');
-    expect(metrics).toContain(
-      'solana_block_fees_status{vote="vote-2",epoch="956",status="live"} 1',
-    );
-    expect(metrics).toContain(
-      'solana_mev_fees_status{vote="vote-2",epoch="956",status="approximate"} 1',
-    );
-    expect(metrics).not.toContain("solana_block_tips_median_sol{");
+    expect(metrics).toContain('solana_validator_epoch_current{vote="vote-2",epoch="956"} 1');
+    expect(metrics).toContain('solana_validator_epoch_final{vote="vote-2",epoch="956"} 0');
     expect(metrics).not.toContain("solana_epoch_median_base_fees_avg_sol{");
   });
 });

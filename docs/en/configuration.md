@@ -31,4 +31,6 @@ Multiple values are comma-separated.
 
 ## Solana mainnet current-epoch metrics
 
-The `solana` collector reads current-epoch slot, fee, and MEV data from `https://whoearns.live`. Numeric metrics are emitted whenever the indexer returns a finite value. Completeness is exposed separately through `solana_slots_status`, `solana_block_fees_status`, and `solana_mev_fees_status`.
+The `solana` collector reads current-epoch slot, fee, and tip income data from `https://whoearns.live`. Numeric metrics are emitted whenever the indexer returns a finite value. Completeness is exposed through boolean gauges such as `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, and `solana_validator_epoch_final`.
+
+Income is derived from Solana RPC block data: base fees, priority fees, and on-chain Jito tips. `solana_mev_fees_total_sol` is kept as a compatibility alias for `solana_block_tips_total_sol`; it no longer represents Jito Kobe payout data.

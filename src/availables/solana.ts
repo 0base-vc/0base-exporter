@@ -16,21 +16,27 @@ import {
 const LAMPORTS_PER_SOL = 1e9;
 const SOLANA_INDEXER_BASE_URL = "https://whoearns.live";
 
-type SolanaSlotsOrFeesStatus = "final" | "live" | "no_data" | "not_tracked";
-type SolanaMevStatus = "final" | "approximate" | "no_data";
-
 type SolanaIndexerValidatorRecord = {
   vote?: string;
   identity?: string;
   epoch?: number | string;
-  slotsStatus?: SolanaSlotsOrFeesStatus;
+  isCurrentEpoch?: boolean;
+  isFinal?: boolean;
+  hasSlots?: boolean;
+  hasIncome?: boolean;
   slotsAssigned?: number | null;
   slotsProduced?: number | null;
   slotsSkipped?: number | null;
-  feesStatus?: SolanaSlotsOrFeesStatus;
+  blockBaseFeesTotalSol?: string | number | null;
+  blockPriorityFeesTotalSol?: string | number | null;
   blockFeesTotalSol?: string | number | null;
-  mevStatus?: SolanaMevStatus;
-  mevRewardsSol?: string | number | null;
+  blockTipsTotalSol?: string | number | null;
+  totalIncomeSol?: string | number | null;
+  medianBlockFeeSol?: string | number | null;
+  medianBlockBaseFeeSol?: string | number | null;
+  medianBlockPriorityFeeSol?: string | number | null;
+  medianBlockTipSol?: string | number | null;
+  medianBlockTotalSol?: string | number | null;
 };
 
 type SolanaIndexerBatchResponse = {
@@ -46,6 +52,14 @@ function toFiniteMetricValue(value: string | number | null | undefined): number 
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toBooleanMetricValue(value: boolean | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  return value ? 1 : 0;
 }
 
 export default class Solana extends TargetAbstract {
@@ -149,33 +163,87 @@ export default class Solana extends TargetAbstract {
     labelNames: ["vote", "epoch"],
   });
 
-  private readonly mevFeesTotalGauge = new Gauge({
-    name: `${this.metricPrefix}_mev_fees_total_sol`,
-    help: "Total MEV-related fees collected",
+  private readonly blockBaseFeesTotalGauge = new Gauge({
+    name: `${this.metricPrefix}_block_base_fees_total_sol`,
+    help: "Total base fees from blocks we produced",
     labelNames: ["vote", "epoch"],
   });
 
-  private readonly slotsStatusGauge = new Gauge({
-    name: `${this.metricPrefix}_slots_status`,
-    help: "Indexer completeness status for Solana slot metrics; value is 1 for the active status",
-    labelNames: ["vote", "epoch", "status"],
+  private readonly blockPriorityFeesTotalGauge = new Gauge({
+    name: `${this.metricPrefix}_block_priority_fees_total_sol`,
+    help: "Total priority fees from blocks we produced",
+    labelNames: ["vote", "epoch"],
   });
 
-  private readonly blockFeesStatusGauge = new Gauge({
-    name: `${this.metricPrefix}_block_fees_status`,
-    help: "Indexer completeness status for Solana block fee metrics; value is 1 for the active status",
-    labelNames: ["vote", "epoch", "status"],
+  private readonly blockTipsTotalGauge = new Gauge({
+    name: `${this.metricPrefix}_block_tips_total_sol`,
+    help: "Total on-chain Jito tips observed in blocks we produced",
+    labelNames: ["vote", "epoch"],
   });
 
-  private readonly mevFeesStatusGauge = new Gauge({
-    name: `${this.metricPrefix}_mev_fees_status`,
-    help: "Indexer completeness status for Solana MEV fee metrics; value is 1 for the active status",
-    labelNames: ["vote", "epoch", "status"],
+  private readonly totalIncomeGauge = new Gauge({
+    name: `${this.metricPrefix}_total_income_sol`,
+    help: "Total block fees plus on-chain Jito tips from blocks we produced",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly mevFeesTotalGauge = new Gauge({
+    name: `${this.metricPrefix}_mev_fees_total_sol`,
+    help: "Compatibility alias for total on-chain Jito tips observed in blocks we produced",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly validatorEpochCurrentGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_epoch_current`,
+    help: "Whether the validator epoch row is the current epoch; 1 means true, 0 means false",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly validatorEpochFinalGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_epoch_final`,
+    help: "Whether the validator epoch row is final; 1 means true, 0 means false",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly slotsAvailableGauge = new Gauge({
+    name: `${this.metricPrefix}_slots_available`,
+    help: "Whether slot production data is available for the validator epoch row",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly incomeAvailableGauge = new Gauge({
+    name: `${this.metricPrefix}_income_available`,
+    help: "Whether fee and tip income data is available for the validator epoch row",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly blockFeesMedianGauge = new Gauge({
+    name: `${this.metricPrefix}_block_fees_median_sol`,
+    help: "Median block fees per produced block",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly blockBaseFeesMedianGauge = new Gauge({
+    name: `${this.metricPrefix}_block_base_fees_median_sol`,
+    help: "Median base fees per produced block",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly blockPriorityFeesMedianGauge = new Gauge({
+    name: `${this.metricPrefix}_block_priority_fees_median_sol`,
+    help: "Median priority fees per produced block",
+    labelNames: ["vote", "epoch"],
   });
 
   private readonly blockTipsMedianGauge = new Gauge({
     name: `${this.metricPrefix}_block_tips_median_sol`,
     help: "Median block tips per produced block",
+    labelNames: ["vote", "epoch"],
+  });
+
+  private readonly blockTotalMedianGauge = new Gauge({
+    name: `${this.metricPrefix}_block_total_median_sol`,
+    help: "Median block fees plus on-chain Jito tips per produced block",
     labelNames: ["vote", "epoch"],
   });
 
@@ -321,11 +389,20 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.slotsProducedGauge);
     this.registry.registerMetric(this.slotsSkippedGauge);
     this.registry.registerMetric(this.blockFeesTotalGauge);
+    this.registry.registerMetric(this.blockBaseFeesTotalGauge);
+    this.registry.registerMetric(this.blockPriorityFeesTotalGauge);
+    this.registry.registerMetric(this.blockTipsTotalGauge);
+    this.registry.registerMetric(this.totalIncomeGauge);
     this.registry.registerMetric(this.mevFeesTotalGauge);
-    this.registry.registerMetric(this.slotsStatusGauge);
-    this.registry.registerMetric(this.blockFeesStatusGauge);
-    this.registry.registerMetric(this.mevFeesStatusGauge);
+    this.registry.registerMetric(this.validatorEpochCurrentGauge);
+    this.registry.registerMetric(this.validatorEpochFinalGauge);
+    this.registry.registerMetric(this.slotsAvailableGauge);
+    this.registry.registerMetric(this.incomeAvailableGauge);
+    this.registry.registerMetric(this.blockFeesMedianGauge);
+    this.registry.registerMetric(this.blockBaseFeesMedianGauge);
+    this.registry.registerMetric(this.blockPriorityFeesMedianGauge);
     this.registry.registerMetric(this.blockTipsMedianGauge);
+    this.registry.registerMetric(this.blockTotalMedianGauge);
     this.registry.registerMetric(this.clusterRequiredVersionGauge);
     this.registry.registerMetric(this.validatorReleaseVersionGauge);
     this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
@@ -459,11 +536,20 @@ export default class Solana extends TargetAbstract {
     this.slotsProducedGauge.reset();
     this.slotsSkippedGauge.reset();
     this.blockFeesTotalGauge.reset();
+    this.blockBaseFeesTotalGauge.reset();
+    this.blockPriorityFeesTotalGauge.reset();
+    this.blockTipsTotalGauge.reset();
+    this.totalIncomeGauge.reset();
     this.mevFeesTotalGauge.reset();
-    this.slotsStatusGauge.reset();
-    this.blockFeesStatusGauge.reset();
-    this.mevFeesStatusGauge.reset();
+    this.validatorEpochCurrentGauge.reset();
+    this.validatorEpochFinalGauge.reset();
+    this.slotsAvailableGauge.reset();
+    this.incomeAvailableGauge.reset();
+    this.blockFeesMedianGauge.reset();
+    this.blockBaseFeesMedianGauge.reset();
+    this.blockPriorityFeesMedianGauge.reset();
     this.blockTipsMedianGauge.reset();
+    this.blockTotalMedianGauge.reset();
     this.epochMedianBaseFeesAvgGauge.reset();
     this.epochMedianPriorityFeesAvgGauge.reset();
     this.epochMedianMevTipsAvgGauge.reset();
@@ -503,8 +589,22 @@ export default class Solana extends TargetAbstract {
           this.validatorToIdentityMap[vote] = record.identity.trim();
         }
 
-        if (record.slotsStatus) {
-          this.slotsStatusGauge.labels(vote, epochLabel, record.slotsStatus).set(1);
+        const isCurrentEpoch = toBooleanMetricValue(record.isCurrentEpoch);
+        const isFinal = toBooleanMetricValue(record.isFinal);
+        const hasSlots = toBooleanMetricValue(record.hasSlots);
+        const hasIncome = toBooleanMetricValue(record.hasIncome);
+
+        if (isCurrentEpoch !== null) {
+          this.validatorEpochCurrentGauge.labels(vote, epochLabel).set(isCurrentEpoch);
+        }
+        if (isFinal !== null) {
+          this.validatorEpochFinalGauge.labels(vote, epochLabel).set(isFinal);
+        }
+        if (hasSlots !== null) {
+          this.slotsAvailableGauge.labels(vote, epochLabel).set(hasSlots);
+        }
+        if (hasIncome !== null) {
+          this.incomeAvailableGauge.labels(vote, epochLabel).set(hasIncome);
         }
 
         const slotsAssigned = toFiniteMetricValue(record.slotsAssigned);
@@ -521,22 +621,48 @@ export default class Solana extends TargetAbstract {
           this.slotsSkippedGauge.labels(vote, epochLabel).set(slotsSkipped);
         }
 
-        if (record.feesStatus) {
-          this.blockFeesStatusGauge.labels(vote, epochLabel, record.feesStatus).set(1);
-        }
-
+        const blockBaseFeesTotalSol = toFiniteMetricValue(record.blockBaseFeesTotalSol);
+        const blockPriorityFeesTotalSol = toFiniteMetricValue(record.blockPriorityFeesTotalSol);
         const blockFeesTotalSol = toFiniteMetricValue(record.blockFeesTotalSol);
+        const blockTipsTotalSol = toFiniteMetricValue(record.blockTipsTotalSol);
+        const totalIncomeSol = toFiniteMetricValue(record.totalIncomeSol);
+        const medianBlockFeeSol = toFiniteMetricValue(record.medianBlockFeeSol);
+        const medianBlockBaseFeeSol = toFiniteMetricValue(record.medianBlockBaseFeeSol);
+        const medianBlockPriorityFeeSol = toFiniteMetricValue(record.medianBlockPriorityFeeSol);
+        const medianBlockTipSol = toFiniteMetricValue(record.medianBlockTipSol);
+        const medianBlockTotalSol = toFiniteMetricValue(record.medianBlockTotalSol);
+
+        if (blockBaseFeesTotalSol !== null) {
+          this.blockBaseFeesTotalGauge.labels(vote, epochLabel).set(blockBaseFeesTotalSol);
+        }
+        if (blockPriorityFeesTotalSol !== null) {
+          this.blockPriorityFeesTotalGauge.labels(vote, epochLabel).set(blockPriorityFeesTotalSol);
+        }
         if (blockFeesTotalSol !== null) {
           this.blockFeesTotalGauge.labels(vote, epochLabel).set(blockFeesTotalSol);
         }
-
-        if (record.mevStatus) {
-          this.mevFeesStatusGauge.labels(vote, epochLabel, record.mevStatus).set(1);
+        if (blockTipsTotalSol !== null) {
+          this.blockTipsTotalGauge.labels(vote, epochLabel).set(blockTipsTotalSol);
+          this.mevFeesTotalGauge.labels(vote, epochLabel).set(blockTipsTotalSol);
+        }
+        if (totalIncomeSol !== null) {
+          this.totalIncomeGauge.labels(vote, epochLabel).set(totalIncomeSol);
         }
 
-        const mevRewardsSol = toFiniteMetricValue(record.mevRewardsSol);
-        if (mevRewardsSol !== null) {
-          this.mevFeesTotalGauge.labels(vote, epochLabel).set(mevRewardsSol);
+        if (medianBlockFeeSol !== null) {
+          this.blockFeesMedianGauge.labels(vote, epochLabel).set(medianBlockFeeSol);
+        }
+        if (medianBlockBaseFeeSol !== null) {
+          this.blockBaseFeesMedianGauge.labels(vote, epochLabel).set(medianBlockBaseFeeSol);
+        }
+        if (medianBlockPriorityFeeSol !== null) {
+          this.blockPriorityFeesMedianGauge.labels(vote, epochLabel).set(medianBlockPriorityFeeSol);
+        }
+        if (medianBlockTipSol !== null) {
+          this.blockTipsMedianGauge.labels(vote, epochLabel).set(medianBlockTipSol);
+        }
+        if (medianBlockTotalSol !== null) {
+          this.blockTotalMedianGauge.labels(vote, epochLabel).set(medianBlockTotalSol);
         }
       }
     } catch (error) {
