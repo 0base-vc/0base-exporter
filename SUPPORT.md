@@ -7,7 +7,7 @@
 - Bugs and regressions: open a bug report issue.
 - New chain support: open a chain support request.
 - Documentation gaps: open a docs issue.
-- Usage questions that do not include secrets: open a question issue or start a GitHub Discussion when Discussions are enabled.
+- Usage questions that do not include secrets: open a safe public question issue.
 - Security-sensitive reports: follow [SECURITY.md](./SECURITY.md).
 
 ## What To Include

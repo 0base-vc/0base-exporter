@@ -34,4 +34,4 @@ Read [Metrics Compatibility Policy](./docs/en/metrics-policy.md) before adding, 
 - Tests updated or added
 - Docs updated in English and Korean when user-facing behavior changed
 - Legacy compatibility considered for `BLOCKCHAIN`, env vars, and metric output
-- Copilot review comments resolved or intentionally answered
+- Automated review comments resolved or intentionally answered

@@ -6,6 +6,3 @@ contact_links:
   - name: Support policy
     url: https://github.com/0base-vc/0base-exporter/blob/main/SUPPORT.md
     about: Read support boundaries and what information to include.
-  - name: GitHub Discussions
-    url: https://github.com/0base-vc/0base-exporter/discussions
-    about: Use Discussions for design and operational questions when enabled.

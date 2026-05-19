@@ -53,6 +53,7 @@ Update these files when behavior changes:
 - [examples](./examples.md)
 - [metrics compatibility policy](./metrics-policy.md), when metric contracts change
 - [Korean README](../../README.ko.md), when user-facing setup changes
+- Korean user docs under `docs/ko/`, especially configuration, supported chains, examples, and metrics policy when those contracts change
 
 ## Pull Request Expectations
 

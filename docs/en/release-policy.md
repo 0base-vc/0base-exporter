@@ -3,7 +3,7 @@
 ## Branching
 
 - Main development happens on topic branches off `main`.
-- Large refactors should use a dedicated integration branch, such as `codex/oss-foundation-refactor`.
+- Large refactors should use a dedicated topic branch, such as `refactor/runtime-config` or `integration/collector-registry`.
 
 ## Versioning
 

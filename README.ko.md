@@ -89,7 +89,6 @@ curl http://localhost:27770/metrics
 
 - 기여 전 [CONTRIBUTING.md](./CONTRIBUTING.md)를 확인하세요.
 - 버그, 기능 제안, 체인 지원 요청, 문서 이슈, 공개 가능한 질문은 GitHub Issues를 사용하세요.
-- 설계 논의와 운영 논의는 repository에서 GitHub Discussions가 활성화된 뒤 Discussions를 사용하세요.
 - 지원 범위는 [SUPPORT.md](./SUPPORT.md)를 참고하세요.
 - 보안 취약점은 공개 issue가 아니라 [SECURITY.md](./SECURITY.md)에 따라 신고하세요.
 

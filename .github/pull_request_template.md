@@ -24,7 +24,7 @@
 - [ ] Legacy env compatibility considered
 - [ ] `CHAIN` / `BLOCKCHAIN` behavior preserved or migration note added
 - [ ] English and Korean docs updated if needed
-- [ ] Copilot comments resolved or intentionally answered
+- [ ] Automated review comments resolved or intentionally answered
 - [ ] Release note or changelog entry added if user-facing behavior changed
 
 ## Risk / rollout

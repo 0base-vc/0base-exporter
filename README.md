@@ -96,7 +96,6 @@ Contributions are welcome when they preserve the exporter contracts that product
 
 - Start with [CONTRIBUTING.md](./CONTRIBUTING.md).
 - Use GitHub Issues for bugs, feature requests, chain support requests, docs issues, and safe public questions.
-- Use GitHub Discussions for design questions and operational discussion once enabled on the repository.
 - See [SUPPORT.md](./SUPPORT.md) for support boundaries.
 - Report vulnerabilities through [SECURITY.md](./SECURITY.md), not public issues.
 
