@@ -1,0 +1,30 @@
+name: Safe public question
+description: Ask a usage question that does not include secrets or private vulnerability details
+title: "[question] "
+labels:
+  - question
+  - "status: needs-info"
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to understand or operate?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Include `CHAIN`, Node version, and relevant env names. Redact secrets.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public safety
+      options:
+        - label: I removed secrets, private RPC credentials, validator keys, and bearer tokens.
+          required: true
+        - label: This is not a private vulnerability report. Security reports follow SECURITY.md.
+          required: true

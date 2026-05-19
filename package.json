@@ -52,7 +52,7 @@
     "lint:abi": "ts-node scripts/lint-abi-json.ts",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "docs:lint": "markdownlint-cli2 \"README*.md\" \"CHANGELOG.md\" \"CONTRIBUTING.md\" \"SECURITY.md\" \"CODE_OF_CONDUCT.md\" \"docs/**/*.md\" \".github/pull_request_template.md\"",
+    "docs:lint": "markdownlint-cli2 \"README*.md\" \"CHANGELOG.md\" \"CONTRIBUTING.md\" \"SECURITY.md\" \"CODE_OF_CONDUCT.md\" \"GOVERNANCE.md\" \"MAINTAINERS.md\" \"SUPPORT.md\" \"docs/**/*.md\" \".github/pull_request_template.md\"",
     "ci:verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:lint && npm test && npm audit --omit=dev && npm run build && npm pack --dry-run",
     "prepare": "husky"
   },

@@ -1,0 +1,47 @@
+name: Chain support request
+description: Request support for a new chain, testnet, or collector profile
+title: "[chain] "
+labels:
+  - "type: feature"
+  - "status: needs-info"
+body:
+  - type: input
+    id: chain
+    attributes:
+      label: Chain name
+      placeholder: "Example: foo-testnet"
+    validations:
+      required: true
+  - type: dropdown
+    id: family
+    attributes:
+      label: Chain family
+      options:
+        - Cosmos / Tendermint
+        - Solana
+        - EVM
+        - Hybrid
+        - Other / unsure
+    validations:
+      required: true
+  - type: textarea
+    id: endpoints
+    attributes:
+      label: Public endpoint docs
+      description: Link RPC, REST, explorer, or validator API docs. Do not include private credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Needed metrics
+      description: Which validator or wallet metrics should the collector expose?
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Compatibility notes
+      description: Mention similar existing collectors or required env variables if known.
+    validations:
+      required: false

@@ -1,0 +1,28 @@
+name: Documentation issue
+description: Report missing, stale, or confusing documentation
+title: "[docs] "
+labels:
+  - "type: docs"
+  - "area: docs"
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Page or section
+      description: Link the page or name the section that needs work.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing, stale, confusing, or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Suggested fix
+      description: What should the docs say instead?
+    validations:
+      required: false

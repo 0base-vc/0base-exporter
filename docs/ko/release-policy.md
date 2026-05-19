@@ -25,6 +25,8 @@
 
 태그 릴리스에서는 GitHub release workflow가 함께 실행되어 저장소 검증, 패키지 빌드, npm tarball 생성, checksum 업로드까지 수행합니다.
 
+버전 태그를 push하기 전에는 영문 canonical 문서인 [release checklist](../en/release-checklist.md)를 확인합니다.
+
 ## 호환성 정책
 
 - `GET /metrics`는 안정 인터페이스로 취급합니다.

@@ -25,6 +25,8 @@ Every pull request is expected to pass:
 
 Tagged releases also run the GitHub release workflow, which verifies the repository, builds the package, creates an npm tarball, and uploads checksum metadata.
 
+Use the [release checklist](./release-checklist.md) before pushing a version tag.
+
 ## Compatibility
 
 - `GET /metrics` is treated as stable.
