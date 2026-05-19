@@ -3,7 +3,7 @@
 ## 브랜치 전략
 
 - 일반 개발은 `main`에서 파생된 topic branch에서 진행합니다.
-- 큰 리팩터링은 `codex/oss-foundation-refactor` 같은 전용 브랜치를 사용합니다.
+- 큰 리팩터링은 `refactor/runtime-config` 또는 `integration/collector-registry` 같은 전용 topic branch를 사용합니다.
 
 ## 버전 정책
 

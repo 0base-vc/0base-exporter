@@ -9,8 +9,8 @@ Recommended settings:
 - description: `Prometheus exporter for validator and wallet metrics across Cosmos, Solana, and EVM networks`;
 - topics: `prometheus`, `exporter`, `blockchain`, `validator`, `cosmos`, `solana`, `evm`, `observability`;
 - Issues: enabled;
-- Discussions: enabled;
-- Projects: enabled;
+- Discussions: disabled;
+- Projects: disabled;
 - Wiki: disabled;
 - delete branch on merge: enabled;
 - merge commits and squash merges: enabled;
@@ -39,17 +39,11 @@ Use labels with predictable prefixes:
 
 Keep the default GitHub labels only when they remain useful for contributors.
 
-## Discussions And Projects
+## Issue Tracking
 
-Use Discussions for design, operational questions, and ideas that are not yet actionable issues.
+Use issues as the source of truth for planned work. Every actionable bug, feature, chain support request, docs task, dependency update, and CI task should live as an issue or pull request with the repository label taxonomy.
 
-Use one project board named `0Base Exporter Roadmap` with these fields:
-
-- `Status`: Backlog, Ready, In progress, In review, Done;
-- `Priority`: P0, P1, P2, P3;
-- `Area`: Cosmos, Solana, EVM, Runtime, CI, Docs.
-
-Issues should stay small enough to be closed by one focused pull request.
+Keep issues small enough to be closed by one focused pull request. Use `priority:` labels instead of a separate roadmap board.
 
 ## Action Pinning
 
