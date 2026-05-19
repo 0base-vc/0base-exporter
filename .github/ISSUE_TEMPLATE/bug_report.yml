@@ -1,0 +1,27 @@
+name: Bug report
+description: Report an exporter bug or regression
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include `CHAIN`, Node version, and relevant env configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Steps, logs, or sample metric output
+    validations:
+      required: true

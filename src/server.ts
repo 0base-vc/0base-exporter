@@ -1,44 +1,78 @@
-import * as express from 'express';
-import {Express} from 'express';
-import * as http from "http";
-import * as morgan from 'morgan';
-import TargetAbstract from "./target.abstract";
+import express from "express";
+import morgan from "morgan";
+import type { Logger } from "./core/logger";
+import type { Express, NextFunction, Request, Response } from "express";
+import type * as http from "http";
+import type TargetAbstract from "./target.abstract";
 
 export default class Server {
-    private readonly app: Express = express();
-    private server: http.Server = undefined;
+  private readonly app: Express;
+  private server?: http.Server;
 
-    public async setup(): Promise<void> {
-        this.app.use(morgan('combined'));
-        this.app.use('/metrics', await this.getMetricLoader());
+  public constructor(
+    private readonly deps: {
+      collector: TargetAbstract;
+      logger: Logger;
+    },
+  ) {
+    this.app = express();
+  }
+
+  public async setup(): Promise<void> {
+    this.app.use(morgan("combined"));
+    this.app.get("/healthz", (_request: Request, response: Response) => {
+      response.status(200).json({ ok: true });
+    });
+    this.app.get("/metrics", this.deps.collector.metrics());
+    this.app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
+      this.deps.logger.error("Request failed", {
+        error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+      });
+      response.status(500).type("text/plain").send("metrics collection failed");
+    });
+  }
+
+  public async start(port: number | string): Promise<{ server: http.Server; port: string }> {
+    await this.setup();
+    await this.deps.collector.start();
+
+    return new Promise((resolve, reject) => {
+      const server = this.app.listen(port);
+      this.server = server;
+
+      const onError = (error: Error) => {
+        server.off("listening", onListening);
+        this.server = undefined;
+        reject(error);
+      };
+      const onListening = () => {
+        server.off("error", onError);
+        const address = server.address();
+        const actualPort =
+          typeof address === "object" && address !== null ? String(address.port) : String(port);
+        resolve({ server, port: actualPort });
+      };
+
+      server.once("error", onError);
+      server.once("listening", onListening);
+    });
+  }
+
+  public async close(): Promise<void> {
+    await this.deps.collector.stop();
+    if (!this.server) {
+      return;
     }
 
-    // TargetAbstract 인스턴스를 싱글턴으로 관리
-    private static singletonInstance: TargetAbstract = null;
-
-    private getMetricLoader(): Promise<express.RequestHandler> {
-        if (!Server.singletonInstance) {
-            console.log('BLOCKCHAIN', process.env.BLOCKCHAIN || './availables/tendermint.ts');
-            const Cls = require(process.env.BLOCKCHAIN || './availables/tendermint.ts').default;
-            const addressesArg = (process.env.VOTE ? [process.env.VOTE] : [process.env.ADDRESS]).filter(Boolean).join(',');
-            const validatorArg = (process.env.IDENTITY ? [process.env.IDENTITY] : [process.env.VALIDATOR]).filter(Boolean).join(',');
-            Server.singletonInstance = new Cls(
-                process.env.EXISTING_METRICS_URL,
-                process.env.API_URL,
-                process.env.RPC_URL || 'http://localhost:26657',
-                addressesArg,
-                validatorArg
-            );
+    await new Promise<void>((resolve, reject) => {
+      this.server?.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
         }
-        return Server.singletonInstance.metrics();
-    }
 
-    public async start(): Promise<{ server: http.Server, port: string }> {
-        return this.setup().then(() => {
-            const port = process.env.PORT || '27770';
-            this.server = this.app.listen(port);
-            return {server: this.server, port: port};
-        });
-    }
-
+        resolve();
+      });
+    });
+  }
 }

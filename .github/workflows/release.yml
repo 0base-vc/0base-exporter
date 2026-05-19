@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - run: npm ci
+      - run: npm run ci:verify
+      - run: npm pack
+      - run: shasum -a 256 ./*.tgz > SHA256SUMS.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: release-assets
+          path: |
+            ./*.tgz
+            SHA256SUMS.txt
+
+  release:
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: write
+    steps:
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          files: |
+            ./*.tgz
+            SHA256SUMS.txt
+          generate_release_notes: true

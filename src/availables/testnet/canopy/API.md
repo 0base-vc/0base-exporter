@@ -3,6 +3,7 @@
 <hr/>
 
 ## RPC Routes Reference
+
 - /v1/
 - /v1/tx
 - /v1/query/height
@@ -124,7 +125,7 @@ $ curl -H "Content-Type: application/json" -X GET --data '{}' localhost:50002/v1
 - **signature**: `Signature` - the authorization (public key and signature) of the transaction
 - **time**: `uint64` - the creation time of the transaction for replay protection (unix micro)
 - **createdHeight**: `uint64` - the height the transaction was created `+/- 4320` accepted
-- **fee**: `uint64`  the network fee for sending the transaction (minimum is parameterized)
+- **fee**: `uint64` the network fee for sending the transaction (minimum is parameterized)
 - **memo**: `string` - an embedded message in the transaction (optional)
 - **networkID**: `uint64` - the unique identifier of the network (`1` for mainnet, `2` for testnet, ...)
 - **chainID**: `uint64` - the unique identifier of the committee (`1` for canopy, `2` for canary, ...)
@@ -187,6 +188,7 @@ $ curl -H "Content-Type: application/json" -X POST --data '{}' localhost:50002/v
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **address**: `hex string` - the 20 byte identifier of the account
 
@@ -220,11 +222,13 @@ $ curl -X POST localhost:50002/v1/query/account \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **perPage**: `int` - the number of elements per page (the default is 10 and max is 5,000)
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -279,6 +283,7 @@ $ curl -X POST localhost:50002/v1/query/accounts \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **id**: `uint64` - the unique identifier
 
@@ -312,11 +317,13 @@ $ curl -X POST localhost:50002/v1/query/pool \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **perPage**: `int` - the number of elements per page (the default is 10 and max is 5,000)
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -424,8 +431,8 @@ $ curl -X POST localhost:50002/v1/query/validator \
 - **delegate**: `int` only validators are set as delegates (optional: `0=Off`, `1=MustBe`, `2=Exclude`)
 - **committee**: `uint64` - validators are staked for this chain id (optional: `0=Any`)
 
-
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -509,6 +516,7 @@ $ curl -X POST localhost:50002/v1/query/validators \
 - **id**: `uint64` – the unique identifier of the committee
 
 **Response**:
+
 - **validatorSet** `array` - the list of result objects
   - **publicKey**: `hex string` - the unique public identifier of the validator that is used to validate digital signatures
   - **votingPower**: `uint64` - the locked balance of funds the address has in micro denomination
@@ -551,6 +559,7 @@ $ curl -X POST localhost:50002/v1/query/validator-set \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -619,6 +628,7 @@ $ curl -X POST localhost:50002/v1/query/committee \
 - **id**: `uint64` – the unique identifier of the committee
 
 **Response**:
+
 - **chainID**: `uint64` - the unique identifier of the committee
 - **lastRootHeightUpdated**: `uint64` - the most recent root-chain height the committee reported in their certificate results transaction
 - **lastChainHeightUpdated**: `uint64` - the most recent chain height the committee reported in their certificate results transaction
@@ -671,6 +681,7 @@ $ curl -X POST localhost:50002/v1/query/committee-data \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **list**: `array` - a list of result objects
   - **chainID**: `uint64` - the unique identifier of the committee
   - **lastRootHeightUpdated**: `uint64` - the most recent root-chain height the committee reported in their certificate results transaction
@@ -768,6 +779,7 @@ $ curl -X POST localhost:50002/v1/query/retired-committees \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - `array` - a list of non-signer data
   - **address**: 20 byte identifier of non-signer
   - **counter**: increments when a validator doesn't sign a block and resets every `non-sign-window`
@@ -800,6 +812,7 @@ $ curl -X POST localhost:50002/v1/query/non-signers \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **consensus**: `object` - the governance parameters listed under the consensus params space
   - **blockSize**: `uint64` - the maximum block size in bytes
   - **protocolVersion**: `string` - the protocol version and height when the version updated separated by delimiter: `/` (2/100 is version=2 height=100)
@@ -819,7 +832,7 @@ $ curl -X POST localhost:50002/v1/query/non-signers \
   - **maxSlashPerCommittee**: `uint64` - the maximum slash per block a committee may penalize a validator - if exceeded the validator is auto-ejected from the committee and the slash is limited
   - **delegateRewardPercentage**: `uint64` - the percent of the block reward a pseudo-randomly chosen delegate validator, nested-validator, and nested-delegate receives
   - **buyDeadlineBlocks**: `uint64` - the deadline in blocks before a 'locked' sell order is released on the root-chain - (applies only to the 'buyer-side' of token swaps)
-  - **lockOrderFeeMultiplier**: `uint64` - the multiplier to a `sendFee` required to `lock` a sell order on the root-chain  - (applies only to the 'buyer-side' of token swaps)
+  - **lockOrderFeeMultiplier**: `uint64` - the multiplier to a `sendFee` required to `lock` a sell order on the root-chain - (applies only to the 'buyer-side' of token swaps)
 - **fee**: `object` - the governance parameters listed under the fee params space
   - **sendFee**: `uint64` - the minimum fee in micro denomination needed to execute a `send` transaction
   - **stakeFee**: `uint64` - the minimum fee in micro denomination needed to execute a `stake` transaction
@@ -903,6 +916,7 @@ $ curl -X POST localhost:50002/v1/query/params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **sendFee**: `uint64` - the minimum fee in micro denomination needed to execute a `send` transaction
 - **stakeFee**: `uint64` - the minimum fee in micro denomination needed to execute a `stake` transaction
 - **editStakeFee**: `uint64` - the minimum fee in micro denomination needed to execute a `editStake` transaction
@@ -955,6 +969,7 @@ $ curl -X POST localhost:50002/v1/query/fee-params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **blockSize**: `uint64` - the maximum block size in bytes
 - **protocolVersion**: `string` - the protocol version and height when the version updated separated by delimiter: `/` (2/100 is version=2 height=100)
 - **rootChainID**: `uint64` - the committee id of the root chain (may be self chain id)
@@ -988,6 +1003,7 @@ $ curl -X POST localhost:50002/v1/query/con-params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **unstakingBlocks**: `uint64` - the number of blocks a validator is 'unstaking' before it is unstaked and the bonded funds are returned
 - **maxPauseBlocks**: `uint64` - the number of blocks a non-delegate validator may be consecutively paused for before automatically it begins 'unstaking'
 - **doubleSignSlashPercentage**: `uint64` - the percent of stake that is burned for a validator when a double sign is proved with evidence
@@ -1002,7 +1018,7 @@ $ curl -X POST localhost:50002/v1/query/con-params \
 - **maxSlashPerCommittee**: `uint64` - the maximum slash per block a committee may penalize a validator - if exceeded the validator is auto-ejected from the committee and the slash is limited
 - **delegateRewardPercentage**: `uint64` - the percent of the block reward a pseudo-randomly chosen delegate validator, nested-validator, and nested-delegate receives
 - **buyDeadlineBlocks**: `uint64` - the deadline in blocks before a 'locked' sell order is released on the root-chain - (applies only to the 'buyer-side' of token swaps)
-- **lockOrderFeeMultiplier**: `uint64` - the multiplier to a `sendFee` required to `lock` a sell order on the root-chain  - (applies only to the 'buyer-side' of token swaps)
+- **lockOrderFeeMultiplier**: `uint64` - the multiplier to a `sendFee` required to `lock` a sell order on the root-chain - (applies only to the 'buyer-side' of token swaps)
 
 **Example**:
 
@@ -1046,6 +1062,7 @@ $ curl -X POST localhost:50002/v1/query/val-params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **daoRewardPercentage**: `uint64` - the percent of the block reward that is awarded to the DAO treasury pool
 
 **Example**:
@@ -1075,6 +1092,7 @@ $ curl -X POST localhost:50002/v1/query/gov-params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **mintPerBlock**: `uint64` - the amount minted per block in micro denominiation
 - **mintPerCommittee**: `uint64` - the amount of mint distributed to each committee reward pool
 - **daoCut**: `uint64` - the amount of mint distributed to the DAO treasury pool
@@ -1112,6 +1130,7 @@ $ curl -X POST localhost:50002/v1/query/eco-params \
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **pools**: `array` - see `Pools` response
 - **accounts**: `array` - see `Accounts` response
 - **nonSigners**: `object` - see `Non-Signers` response
@@ -1159,10 +1178,12 @@ $ curl -X GET "localhost:50002/v1/query/state?height=1000"
 - **start-height**: `uint64` – the start height to act as the 'base' (optional: will auto-use `height-1`)
 
 **Response**:
+
 - **state**: `object` - see `State` but with diff highlights (ex. `"amount": 25257333001 <- 25206666335`)
 
 **Example**:
 VIEW IN BROWSER: `http://localhost:50002/v1/query/state-diff?height=1000&startHeight=998`
+
 ```
 {
   "pools": [
@@ -1202,6 +1223,7 @@ VIEW IN BROWSER: `http://localhost:50002/v1/query/state-diff?height=1000&startHe
 - **start-height**: `uint64` – the start height to act as the 'base' (optional: will auto-use `height-1`)
 
 **Response**:
+
 - **state**: `object` - see `State` but with diff highlights (ex. `"amount": 18239045002 => 18202565004`)
 
 ```
@@ -1235,7 +1257,6 @@ $ curl -X POST localhost:50002/v1/query/state-diff \
 }
 ```
 
-
 ## Quorum Certificate By Height
 
 **Route:** `/v1/query/cert-by-height`
@@ -1249,6 +1270,7 @@ $ curl -X POST localhost:50002/v1/query/state-diff \
 - **height**: `uint64` – the block height to act as the end to calculate the state deltas (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **header**: `object` - the view of the certificate
   - **height**: `uint64` - the block height of the certificate
   - **committeeHeight**: `uint64` - the block height of the root-chain that corresponds to the committee that signed this block
@@ -1260,7 +1282,7 @@ $ curl -X POST localhost:50002/v1/query/state-diff \
 - **blockHash**: `hex string` - the SHA256 hash of the block protobuf bytes
 - **resultsHash**: `hex string` - the SHA256 hash of the proposal results structure (see below)
 - **results**: `object` - the quorum certificate results summary
-  - **rewardRecipients**: `object` -  the recipients who are rewarded based on the quorum certificate, specifically who the committee agreed to reward from the committee treasury
+  - **rewardRecipients**: `object` - the recipients who are rewarded based on the quorum certificate, specifically who the committee agreed to reward from the committee treasury
     - **paymentPercents**: `array` - the percentage of rewards allocated to each recipient
       - **address**: `hex string` - the 20 byte unique identifier of the reward recipient
       - **percent**: `uint64` - the dilutable share of the committee treasury pool
@@ -1277,7 +1299,7 @@ $ curl -X POST localhost:50002/v1/query/state-diff \
         - **buyerSendAddress**: `hex string` - the 'counter asset' address where the tokens will be sent from
         - **buyerChainDeadline**: `uint64` - the 'counter asset' chain height at which the buyer must send the 'counter asset' by or the 'intent to buy' will be voided
       - **resetOrders**: `uint64 array` - a list of orders where no funds were sent before the deadline
-      - **closeOrders**: `uint64 array` -  list of orders where funds were sent, signaling the committee to transfer escrowed tokens to the buyer's receive address
+      - **closeOrders**: `uint64 array` - list of orders where funds were sent, signaling the committee to transfer escrowed tokens to the buyer's receive address
     - **checkpoint**: `object` - contains information from the 3rd party chain in order for Canopy to provide Checkpoint-as-a-Service
       - **height**: `uint64` - the height of the third party chain
       - **blockHash**: `hex string` - the cryptographic hash of the third party chain block for the height
@@ -1286,6 +1308,7 @@ $ curl -X POST localhost:50002/v1/query/state-diff \
 - **signature**: `object` - the BLS aggregate signature of the committee
   - **signature**: `hex string` - the bytes of the BLS signature
   - **bitmap**: `hex string` - bitmask of the BLS signature
+
 ```
 $ curl -X POST localhost:50002/v1/query/cert-by-height \
   -H "Content-Type: application/json" \
@@ -1353,6 +1376,7 @@ $ curl -X POST localhost:50002/v1/query/cert-by-height \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -1364,10 +1388,10 @@ $ curl -X POST localhost:50002/v1/query/cert-by-height \
     - **numTxs**: `uint64` - the number of transactions in the block
     - **totalTxs**: `uint64` - the total transactions in the blockchain
     - **totalVDFIterations**: `uint64` - the total number of verifiable random delay function iterations in the blockchain
-    - **lastBlockHash**:  `hex string` - the unique identifier of the previous block, chaining this block to the previous
-    - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing  the entire state of the blockchain at this height
-    - **transactionRoot**: `hex string` -  the merkle root of the 'transactions' included in this block
-    - **validatorRoot**: `hex string` -  the merkle root of the validators that signed the quorum certificate for this height
+    - **lastBlockHash**: `hex string` - the unique identifier of the previous block, chaining this block to the previous
+    - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing the entire state of the blockchain at this height
+    - **transactionRoot**: `hex string` - the merkle root of the 'transactions' included in this block
+    - **validatorRoot**: `hex string` - the merkle root of the validators that signed the quorum certificate for this height
     - **nextValidatorRoot**: `hex string` - the merkle root of the validators who are responsible for proposing and validating the next block
     - **proposerAddress**: `hex string` - is the short version of the public key of the Validator who proposed this block
     - **vdf**: `object` - the verifiable delay proof for this block. The VDF serves as a protection mechanism against historical forking attacks
@@ -1477,6 +1501,7 @@ $ curl -X POST localhost:50002/v1/query/blocks \
 - **height**: `uint64` – the block height to act as the end to calculate the state deltas (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **blockHeader**: `object` - the summary of the block
   - **height**: `uint64` - the number of blocks in the blockchain before a specific block, indicating its position in the chain and representing the blockchain's length
   - **hash**: `hex string` - a unique identifier for a block, generated by applying a cryptographic hash function to the block's contents, ensuring its integrity and connecting it to the previous block in the chain
@@ -1485,10 +1510,10 @@ $ curl -X POST localhost:50002/v1/query/blocks \
   - **numTxs**: `uint64` - the number of transactions in the block
   - **totalTxs**: `uint64` - the total transactions in the blockchain
   - **totalVDFIterations**: `uint64` - the total number of verifiable random delay function iterations in the blockchain
-  - **lastBlockHash**:  `hex string` - the unique identifier of the previous block, chaining this block to the previous
-  - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing  the entire state of the blockchain at this height
-  - **transactionRoot**: `hex string` -  the merkle root of the 'transactions' included in this block
-  - **validatorRoot**: `hex string` -  the merkle root of the validators that signed the quorum certificate for this height
+  - **lastBlockHash**: `hex string` - the unique identifier of the previous block, chaining this block to the previous
+  - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing the entire state of the blockchain at this height
+  - **transactionRoot**: `hex string` - the merkle root of the 'transactions' included in this block
+  - **validatorRoot**: `hex string` - the merkle root of the validators that signed the quorum certificate for this height
   - **nextValidatorRoot**: `hex string` - the merkle root of the validators who are responsible for proposing and validating the next block
   - **proposerAddress**: `hex string` - is the short version of the public key of the Validator who proposed this block
   - **vdf**: `object` - the verifiable delay proof for this block. The VDF serves as a protection mechanism against historical forking attacks
@@ -1611,6 +1636,7 @@ $ curl -X POST localhost:50002/v1/query/block-by-height \
 - **hash**: `hex string` – the 32 byte unique identifier of the block
 
 **Response**:
+
 - **blockHeader**: `object` - the summary of the block
   - **height**: `uint64` - the number of blocks in the blockchain before a specific block, indicating its position in the chain and representing the blockchain's length
   - **hash**: `hex string` - a unique identifier for a block, generated by applying a cryptographic hash function to the block's contents, ensuring its integrity and connecting it to the previous block in the chain
@@ -1619,10 +1645,10 @@ $ curl -X POST localhost:50002/v1/query/block-by-height \
   - **numTxs**: `uint64` - the number of transactions in the block
   - **totalTxs**: `uint64` - the total transactions in the blockchain
   - **totalVDFIterations**: `uint64` - the total number of verifiable random delay function iterations in the blockchain
-  - **lastBlockHash**:  `hex string` - the unique identifier of the previous block, chaining this block to the previous
-  - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing  the entire state of the blockchain at this height
-  - **transactionRoot**: `hex string` -  the merkle root of the 'transactions' included in this block
-  - **validatorRoot**: `hex string` -  the merkle root of the validators that signed the quorum certificate for this height
+  - **lastBlockHash**: `hex string` - the unique identifier of the previous block, chaining this block to the previous
+  - **stateRoot**: `hex string` - the merkle root of the 'state commit store' representing the entire state of the blockchain at this height
+  - **transactionRoot**: `hex string` - the merkle root of the 'transactions' included in this block
+  - **validatorRoot**: `hex string` - the merkle root of the validators that signed the quorum certificate for this height
   - **nextValidatorRoot**: `hex string` - the merkle root of the validators who are responsible for proposing and validating the next block
   - **proposerAddress**: `hex string` - is the short version of the public key of the Validator who proposed this block
   - **vdf**: `object` - the verifiable delay proof for this block. The VDF serves as a protection mechanism against historical forking attacks
@@ -1747,6 +1773,7 @@ $ curl -X POST localhost:50002/v1/query/block-by-hash \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -1772,7 +1799,6 @@ $ curl -X POST localhost:50002/v1/query/block-by-hash \
 - **count**: `int` - length of results
 - **totalPages**: `int` - number of pages
 - **totalCount**: `int` - total number of items that exist in all pages
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/txs-by-height \
@@ -1832,6 +1858,7 @@ $ curl -X POST localhost:50002/v1/query/txs-by-height \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -1857,7 +1884,6 @@ $ curl -X POST localhost:50002/v1/query/txs-by-height \
 - **count**: `int` - length of results
 - **totalPages**: `int` - number of pages
 - **totalCount**: `int` - total number of items that exist in all pages
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/txs-by-sender \
@@ -1917,6 +1943,7 @@ $ curl -X POST localhost:50002/v1/query/txs-by-sender \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -1942,7 +1969,6 @@ $ curl -X POST localhost:50002/v1/query/txs-by-sender \
 - **count**: `int` - length of results
 - **totalPages**: `int` - number of pages
 - **totalCount**: `int` - total number of items that exist in all pages
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/txs-by-rec \
@@ -1987,7 +2013,6 @@ $ curl -X POST localhost:50002/v1/query/txs-by-rec \
 }
 ```
 
-
 ## Transaction By Hash
 
 **Route:** `/v1/query/tx-by-hash`
@@ -2001,6 +2026,7 @@ $ curl -X POST localhost:50002/v1/query/txs-by-rec \
 - **hash**: `hex-string` – the 32 byte unique id of the transaction
 
 **Response**:
+
 - **sender**: `hex-string` - the address of the user sending the transaction
 - **recipient**: `hex-string` - the address of the user receiving the transaction
 - **messageType**: `string` - the name of the of the message like 'send' or 'stake'
@@ -2085,7 +2111,6 @@ $ curl -X POST localhost:50002/v1/query/txs-by-rec \
   - **chainId**: `uint64` - the identity of the committee the transaction is intended for
 - **txHash**: `hex-string` - the unique hash that identifies the transaction
 
-
 ```
 $ curl -X POST localhost:50002/v1/query/tx-by-hash \
   -H "Content-Type: application/json" \
@@ -2119,7 +2144,6 @@ $ curl -X POST localhost:50002/v1/query/tx-by-hash \
 }
 ```
 
-
 ## Order
 
 **Route:** `/v1/query/order`
@@ -2135,16 +2159,16 @@ $ curl -X POST localhost:50002/v1/query/tx-by-hash \
 - **orderId**: `hex-string` – the unique identifier of the order
 
 **Response**:
+
 - **id**: `hex-string` - the unique identifier of the order
 - **committee**: `uint64` - the id of the committee that is in-charge of escrow for the swap
 - **data**: `hex-string` - a generic data field which can allow a committee to execute specific functionality for the swap
-- **amountForSale**: `uint64` - amount of 'root-chain-asset' for sale  in smallest unit
+- **amountForSale**: `uint64` - amount of 'root-chain-asset' for sale in smallest unit
 - **requestedAmount**: `uint64` - amount of 'counter-asset' the seller of the 'root-chain-asset' receives
 - **sellerReceiveAddress**: `hex-string` - the external chain address to receive the 'counter-asset' in smallest unit
 - **buyerSendAddress**: `hex-string` - if reserved (locked): the address the buyer will be transferring the funds from
 - **buyerChainDeadline**: `hex-string` - the external chain height deadline to send the 'tokens' to SellerReceiveAddress
 - **sellersSendAddress**: `hex-string` - the signing address of seller who is selling the CNPY
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/order \
@@ -2182,6 +2206,7 @@ $ curl -X POST localhost:50002/v1/query/order \
 - **id**: `uint64` – the unique identifier of the committee (optional: use 0 to get all committees)
 
 **Response**:
+
 - **orders**: `object` - the swap order book from the 'root chain' for the 'nested chain'
   - **chainId**: `uint64` - the unique identifier of the committee
   - **orders**: `sell order array` - the actual list of sell orders
@@ -2194,7 +2219,6 @@ $ curl -X POST localhost:50002/v1/query/order \
     - **buyerSendAddress**: `hex-string` - if reserved (locked): the address the buyer will be transferring the funds from
     - **buyerChainDeadline**: `hex-string` - the external chain height deadline to send the 'tokens' to SellerReceiveAddress
     - **sellersSendAddress**: `hex-string` - the signing address of seller who is selling the CNPY
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/orders \
@@ -2236,6 +2260,7 @@ $ curl -X POST localhost:50002/v1/query/orders \
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -2261,7 +2286,6 @@ $ curl -X POST localhost:50002/v1/query/orders \
 - **count**: `int` - length of results
 - **totalPages**: `int` - number of pages
 - **totalCount**: `int` - total number of items that exist in all pages
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/pending \
@@ -2313,11 +2337,13 @@ $ curl -X POST localhost:50002/v1/query/pending \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address of the sender of the failed transactions
 - **perPage**: `int` - the number of elements per page (the default is 10 and max is 5,000)
 - **pageNumber**: `int` - the number of the page (the default is 1)
 
 **Response**:
+
 - **perPage**: `int` - the number of elements per page
 - **pageNumber**: `int` - the number of the page
 - **results**: `array` - the list of result objects
@@ -2348,7 +2374,6 @@ $ curl -X POST localhost:50002/v1/query/pending \
 - **count**: `int` - length of results
 - **totalPages**: `int` - number of pages
 - **totalCount**: `int` - total number of items that exist in all pages
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/failed-txs \
@@ -2395,7 +2420,6 @@ $ curl -X POST localhost:50002/v1/query/failed-txs \
 }
 ```
 
-
 ## Governance Proposals
 
 **Route:** `/v1/gov/proposals`
@@ -2407,10 +2431,10 @@ $ curl -X POST localhost:50002/v1/query/failed-txs \
 **Request**: None
 
 **Response**:
+
 - `map[proposalHashHex] -> object`
   - **proposal**: `object` - the governance proposal structure in the form of a Transaction with a payload that is `oneOf`: `MessageChangeParameter` or `MessageDAOTransfer` see (see tx-by-hash)
   - **approve**: `bool` - is the local Validator voting yes or no on the proposal
-
 
 ```
 $ curl -X GET localhost:50002/v1/gov/proposals
@@ -2454,6 +2478,7 @@ $ curl -X GET localhost:50002/v1/gov/proposals
 **Request**: None
 
 **Response**:
+
 - `map[proposalHashHex] -> object`
   - **proposalHash**: `hex-string` - the SHA256 hash of the proposal that is voted on
   - **proposalURL**: `url-string` - the URL of the proposal information
@@ -2472,7 +2497,6 @@ $ curl -X GET localhost:50002/v1/gov/proposals
     - **rejectPercent**: `uint64` - the percent of voters in this category who disapprove
     - **votedPercent**: `uint64` - the percent of voters in this category who voted
   - **approve**: `bool` - is the local Validator voting yes or no on the proposal
-
 
 ```
 $ curl -X GET localhost:50002/v1/gov/poll
@@ -2512,10 +2536,12 @@ $ curl -X GET localhost:50002/v1/gov/poll
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **id**: `uint64` – the unique identifier of the committee
 
 **Response**:
+
 - **rootChainid**: `uint64` - the unique identifier of the chain responsible for the validator set
 - **height**: `uint64` - the height of the query
 - **validatorSet**: `object` - the consensus validators currently active according to the root-chain
@@ -2539,7 +2565,6 @@ $ curl -X GET localhost:50002/v1/gov/poll
     - **buyerSendAddress**: `hex-string` - if reserved (locked): the address the buyer will be transferring the funds from
     - **buyerChainDeadline**: `hex-string` - the external chain height deadline to send the 'tokens' to SellerReceiveAddress
     - **sellersSendAddress**: `hex-string` - the signing address of seller who is selling the CNPY
-
 
 ```
 $ curl -X POST localhost:50002/v1/query/root-chain-info \
@@ -2589,9 +2614,11 @@ $ curl -X POST localhost:50002/v1/query/root-chain-info \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - **addresses**: `hex-string array` - a list of addresses of the most recent previous proposers in fixed modulo order
 
 ```
@@ -2621,6 +2648,7 @@ $ curl -X POST localhost:50002/v1/query/last-proposers \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **address**: `hex-string` - the address of the potential double signer
 
@@ -2646,9 +2674,11 @@ $ curl -X POST localhost:50002/v1/query/valid-double-signer \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 
 **Response**:
+
 - `array` - list of all double signers as of the query height
   - **id**: `uint64` - the address identifier of the malicious actor
   - **heights**: `array`
@@ -2695,10 +2725,12 @@ $ curl -X POST localhost:50002/v1/query/minimum-evidence-height \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **id**: `uint64` - the unique identifier of the committee
 
 **Response**:
+
 - **winner**: `hex-string` - the 20 byte address of the selected actor
 - **cut**: `uint64` - the percent cut of the rewards before normalization
 
@@ -2725,6 +2757,7 @@ $ curl -X POST localhost:50002/v1/query/lottery \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **height**: `uint64` – the block height to read data from (optional: use 0 to read from the latest block)
 - **id**: `uint64` - the unique identifier of the committee / chain
 
@@ -2741,7 +2774,6 @@ $ curl -X POST localhost:50002/v1/query/checkpoint \
 > "cd9d3e487bce2918e306364fca286f473bd8cc92f150b3d97f9063b570a2b801"
 ```
 
-
 ## Subscribe Root Chain Info
 
 **Route:** `/v1/query/subscribe-rc-info`
@@ -2751,6 +2783,7 @@ $ curl -X POST localhost:50002/v1/query/checkpoint \
 **HTTP Method**: `WS`
 
 **Request**:
+
 - **chainId**: `uint64` - the unique identifier of the committee / chain
 
 **Response**: Periodic updates with Root-Chain-Info sent over the WebSocket
@@ -2803,14 +2836,14 @@ $ curl -X POST http://localhost:50002/v1/eth \
 **Request**: `None`
 
 **Response**:
+
 - **addressMap**: `object` - the map of addresses to keystore entry `[hex-address] -> keystoreEntry`
-  - **publicKey**: `hex-string` -  the public code that can cryptographically verify signatures from the private key
+  - **publicKey**: `hex-string` - the public code that can cryptographically verify signatures from the private key
   - **salt**: `hex-string` - random 16 bytes salt
   - **encrypted**: `hex-string` - the private key encrypted with AES-GCM
   - **keyAddress**: `hex-string` - the address of the key
   - **keyNickname**: `string` - the nickname of the key
 - **nicknameMap**: `object` the map of nicknames to address `[nickname] -> hex-address`
-
 
 ```
 $ curl -X GET http://localhost:50003/v1/admin/keystore \
@@ -2842,11 +2875,11 @@ $ curl -X GET http://localhost:50003/v1/admin/keystore \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **nickname**: `string` - the nickname associated with the key
 - **password**: `string` - the plaintext password used to encrypt the key
 
 **Response**: `hex-string` - the 20 byte address of the newly created key
-
 
 ```
 $ curl -X POST http://localhost:50003/v1/admin/keystore-new-key \
@@ -2855,7 +2888,6 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-new-key \
 
 > "7cd2a86894f4a23ea956dee1722c6776230bf552"
 ```
-
 
 ## Keystore Import
 
@@ -2866,20 +2898,20 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-new-key \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **nickname**: `string` - the nickname associated with the key
 - **address**: `hex-string` - the address associated with the encrypted key
-- **publicKey**: `hex-string` -  the public code that can cryptographically verify signatures from the private key
+- **publicKey**: `hex-string` - the public code that can cryptographically verify signatures from the private key
 - **salt**: `hex-string` - random 16 bytes salt
 - **encrypted**: `hex-string` - the private key encrypted with AES-GCM
 
 **Response**: `hex-string` - the 20 byte address of the newly imported key
 
-
 ```
 $ curl -X POST http://localhost:50003/v1/admin/keystore-import \
   -H "Content-Type: application/json" \
   -d '{
-    "nickname":"my_key_", 
+    "nickname":"my_key_",
     "addresss":"b0b4a45ca70104ecc943a49e4553f0e7e1135b01",
     "publicKey": "8cb57bdcc0f90c36aea48a6edab31996400af55f623f676a3c64c04b826454aea227f14d1b70c150d5fa9fe5f6790f60",
       "salt": "aff12414025b261cc56fbeaeb5dcf5f4",
@@ -2898,18 +2930,18 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-import \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **nickname**: `string` - the nickname associated with the key
 - **password**: `string` - the plain-text password to encrypt the private key with
-- **privateKey**: `hex-string` -  the secret code that is capable of producing digital signatures
+- **privateKey**: `hex-string` - the secret code that is capable of producing digital signatures
 
 **Response**: `hex-string` - the 20 byte address of the newly imported key
-
 
 ```
 $ curl -X POST http://localhost:50003/v1/admin/keystore-import-raw \
   -H "Content-Type: application/json" \
   -d '{
-    "nickname":"my_key_2", 
+    "nickname":"my_key_2",
     "password":"plain-text",
     "privateKey": "ee62bbab22a26e34e5489bdb3a751533c34084975fadac4b5b23e15dbd0cff70"
     }'
@@ -2926,11 +2958,11 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-import-raw \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **nickname**: `string` - the nickname associated with the key
 - **address**: `string` - the address associated with the key
 
 **Response**: `hex-string` - the 20 byte address of the newly imported key
-
 
 ```
 $ curl -X POST http://localhost:50003/v1/admin/keystore-delete \
@@ -2951,15 +2983,16 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-delete \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **nickname**: `string` - the nickname associated with the key
 - **address**: `hex-string` - address associated with the key
 - **password**: `hex-string` - the plain-text password to get the private key with
 
 **Response**:
+
 - **address**: `hex-string` - the 20 byte address of the newly imported key
 - **publicKey**: `hex-string` - a cryptographic code shared openly, used to verify digital signatures of its paired private key
-- **privateKey**: `hex-string` -  a secret cryptographic code that is used to produce digital signatures
-
+- **privateKey**: `hex-string` - a secret cryptographic code that is used to produce digital signatures
 
 ```
 $ curl -X POST http://localhost:50003/v1/admin/keystore-get \
@@ -2985,6 +3018,7 @@ $ curl -X POST http://localhost:50003/v1/admin/keystore-get \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the from address
 - **output**: `hex-string` - the recipient address
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
@@ -3035,6 +3069,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-send \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the operator address associated with the validator
 - **amount**: `uint64` - the amount of tokens to stake in smallest (micro) denomination
 - **pubKey**: `hex-string` - the operator public key (must be BLS if non-delegate)
@@ -3104,6 +3139,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-stake \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the operator address associated with the validator
 - **amount**: `uint64` - the amount of tokens to stake in smallest (micro) denomination - (cannot decrease amount, lower defaults to current stake amount)
 - **netAddress**: `url string` - the p2p url of the validator (n/a for delegate)
@@ -3169,6 +3205,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-edit-stake \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the operator address associated with the validator
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
 - **memo**: `string` - an arbitrary message encoded in the transaction
@@ -3207,7 +3244,6 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-pause \
 }
 ```
 
-
 ## Txn Unpause
 
 **Route:** `/v1/admin/tx-unpause`
@@ -3217,6 +3253,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-pause \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the operator address associated with the validator
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
 - **memo**: `string` - an arbitrary message encoded in the transaction
@@ -3264,6 +3301,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-unpause \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the operator address associated with the validator
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
 - **memo**: `string` - an arbitrary message encoded in the transaction
@@ -3311,6 +3349,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-unstake \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is sending the 'root-chain' funds
 - **receiveAddress**: `hex-string` - the address that is receiving the 'counter-asset' funds
 - **committees**: `string` - the id of the committee that is responsible for the 'counter asset'
@@ -3361,6 +3400,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-create-order \
   "chainID": 1
 }
 ```
+
 ## Txn Edit Order
 
 **Route:** `/v1/admin/tx-edit-order`
@@ -3370,6 +3410,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-create-order \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that originally created the sell order
 - **receiveAddress**: `hex-string` - the address that is receiving the 'counter-asset' funds
 - **committees**: `string` - the id of the committee that is responsible for the 'counter asset'
@@ -3422,6 +3463,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-edit-order \
   "chainID": 1
 }
 ```
+
 ## Txn Delete Order
 
 **Route:** `/v1/admin/tx-delete-order`
@@ -3431,6 +3473,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-edit-order \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that originally created the sell order
 - **committees**: `string` - the id of the committee that is responsible for the 'counter asset'
 - **orderId**: `hex-string` - the unique id of the sell-order
@@ -3479,6 +3522,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-delete-order \
 **Description**: generates/submits a lock (sell) order transaction.
 
 Notes:
+
 1. Can only go through if order is not yet 'locked' by a buyer.
 2. This transaction is executed on the nested-chain but is reported back to the root-chain by the committee
 3. This is only for nested chains trying to lock an order based on the root-chain
@@ -3488,6 +3532,7 @@ Notes:
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is sending the nested-chain 'counter-asset'
 - **receiveAddress**: `hex-string` - the address on the root-chain that is receiving the `sell order` funds
 - **orderId**: `hex-string` - the unique id of the sell-order on the root-chain
@@ -3506,7 +3551,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-lock-order \
     "submit":false,
     "password":"test"
     }'
-  
+
 > {
   "type": "send",
   "msg": {
@@ -3534,6 +3579,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-lock-order \
 **Description**: generates/submits a close (sell) order transaction.
 
 Notes:
+
 1. Can only go through if order is already 'locked' by this sender as the buyer.
 2. This transaction is executed on the nested-chain but is reported back to the root-chain by the committee
 3. This is only for nested chains trying to lock an order based on the root-chain
@@ -3543,6 +3589,7 @@ Notes:
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is sending the nested-chain 'counter-asset'
 - **orderId**: `hex-string` - the unique id of the sell-order on the root-chain
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
@@ -3560,7 +3607,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-close-order \
     "submit":false,
     "password":"test"
   }'
-  
+
 > {
   "type": "send",
   "msg": {
@@ -3590,6 +3637,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-close-order \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is sending the funds
 - **id**: `uint64` - the id of the pool being subsidized
 - **amount**: `hex-string` - the amount being sent in micro denominiation
@@ -3611,7 +3659,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-subsidy \
     "submit":false,
     "password":"test"
   }'
-  
+
 > {
   "type": "subsidy",
   "msg": {
@@ -3643,6 +3691,7 @@ Note: Embeds a 'start-poll' command in a standard self-send transaction - this i
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is initiating the poll
 - **pollJSON**: `json string` - the poll json object (proposal, endBlock, url)
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
@@ -3660,7 +3709,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-start-poll \
     "password":"test",
     "submit":false
     }'
-  
+
 > {
   "type": "send",
   "msg": {
@@ -3681,7 +3730,6 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-start-poll \
 }
 ```
 
-
 ## Txn Vote Poll
 
 **Route:** `/v1/admin/tx-vote-poll`
@@ -3693,6 +3741,7 @@ Note: Embeds a 'vote-poll' command in a standard self-send transaction - this is
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address that is initiating the poll
 - **pollJSON**: `json string` - the poll json object (proposal, endBlock, url)
 - **pollApprove**: `bool` - vote yes or not on the poll
@@ -3712,7 +3761,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-vote-poll \
     "password":"test",
     "submit":false
     }'
-  
+
 > {
   "type": "send",
   "msg": {
@@ -3732,7 +3781,6 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-vote-poll \
   "chainID": 1
 ```
 
-
 ## Txn DAO Transfer
 
 **Route:** `/v1/admin/tx-dao-transfer`
@@ -3742,11 +3790,12 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-vote-poll \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address where the funds will be received
 - **amount**: `uint64` - the amount requested from the DAO
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
 - **startHeight**: `uint64` - is the beginning height where the transaction must. be sent, this field locks in a block-range when it's converted to JSON, allowing Validators a deadline to vote, and creating a valid window when this transaction may be submitted
-- **endHeight**: `uint64` -  is the ending height counterpart to `startHeight`
+- **endHeight**: `uint64` - is the ending height counterpart to `startHeight`
 - **memo**: `string` - an arbitrary message encoded in the transaction
 - **submit**: `bool` - submit this transaction or not (returns the tx-hash if true)
 - **password**: `string` - the password associated to decrypt the private key to sign the transaction
@@ -3798,12 +3847,13 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-dao-transfer \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **address**: `hex-string` - the address where the funds will be received
 - **paramSpace**: `string` - the sub-space where the parameter exists (fee, val, cons, gov)
 - **paramKey**: `string` - the unique name of the parameter
 - **paramValue**: `uint64/string` - the updated value of the parameter
 - **startHeight**: `uint64` - is the beginning height where the transaction must. be sent, this field locks in a block-range when it's converted to JSON, allowing Validators a deadline to vote, and creating a valid window when this transaction may be submitted
-- **endHeight**: `uint64` -  is the ending height counterpart to `startHeight`
+- **endHeight**: `uint64` - is the ending height counterpart to `startHeight`
 - **fee**: `uint64` - the transaction fee in micro denomination (optional - minimum fee filled if 0)
 - **memo**: `string` - an arbitrary message encoded in the transaction
 - **submit**: `bool` - submit this transaction or not (returns the tx-hash if true)
@@ -3860,6 +3910,7 @@ $ curl -X POST http://localhost:50003/v1/admin/tx-change-param \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **approve**: `bool` - approve the proposal or not
 - **proposal**: `object` - the proposal transaction
 
@@ -3891,7 +3942,7 @@ $ curl -X POST http://localhost:50003/v1/gov/add-vote \
     "chainID": 1
   }
 }'
-  
+
 > {
   "approve": true,
   "proposal": {
@@ -3926,6 +3977,7 @@ $ curl -X POST http://localhost:50003/v1/gov/add-vote \
 **HTTP Method**: `POST`
 
 **Request**:
+
 - **proposal**: `object` - the proposal transaction
 
 **Response**: Echo back the request
@@ -3955,7 +4007,7 @@ $ curl -X POST http://localhost:50003/v1/gov/del-vote \
     "chainID": 1
   }
 }'
-  
+
 > {
   "approve": false,
   "proposal": {
@@ -3992,6 +4044,7 @@ $ curl -X POST http://localhost:50003/v1/gov/del-vote \
 **Request**: `none`
 
 **Response**:
+
 - **id**: `object` - the id of the this node as seen by peers
   - **publicKey**: `hex-string` - the peer-to-peer public key
   - **netAddress**: `hex-string` - the external net address as configured
@@ -4013,9 +4066,10 @@ $ curl -X POST http://localhost:50003/v1/gov/del-vote \
   - **isMustConnect**: `bool` - must this node connect to this peer?
   - **isTrusted**: `bool` - is this peer trusted by configuration?
   - **reputation**: `int` - what is the reputation of this peer according to our node?
+
 ```
 $ curl http://localhost:50003/v1/admin/peer-info
-  
+
 > {
   "id": {
     "publicKey": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
@@ -4048,7 +4102,6 @@ $ curl http://localhost:50003/v1/admin/peer-info
 }
 ```
 
-
 ## Peer Book
 
 **Route:** `/v1/admin/peer-book`
@@ -4060,6 +4113,7 @@ $ curl http://localhost:50003/v1/admin/peer-info
 **Request**: `none`
 
 **Response**: `array` - the list of peers in the book
+
 - **address**: `object` - the identifier of the peer
   - **publicKey**: `hex-string` - the peer-to-peer public key
   - **netAddress**: `hex-string` - the external net address as configured
@@ -4070,7 +4124,7 @@ $ curl http://localhost:50003/v1/admin/peer-info
 
 ```
 $ curl http://localhost:50003/v1/admin/peer-book
-  
+
 > [
   {
     "address": {
@@ -4109,14 +4163,14 @@ $ curl http://localhost:50003/v1/admin/peer-book
 - **proposer**: `hex-string` - the pubKey of the proposer
 - **proposals**: `object` - `map[round]` -> 'proposals' received from the Leader Validator(s)
 - **partialQcs**: `object` - double sign evidence
-- **pacemakerVotes**: `object` -  view messages from the current ValidatorSet allowing the node to synchronize to the highest +2/3 seen Round
+- **pacemakerVotes**: `object` - view messages from the current ValidatorSet allowing the node to synchronize to the highest +2/3 seen Round
 - **minimumPowerFor23Maj**: `uint64` - minimum amount of voting power needed to acheive a +2/3rds majority
 - **votes**: `object` - `map[round]` -> 'votes' received from Replica (non-leader) Validators
 - **status**: `string` - useful message about the current BFT status of the node
 
 ```
 $ curl http://localhost:50003/v1/admin/consensus-info
-  
+
 > {
   "isSyncing": false,
   "view": {
@@ -4214,7 +4268,7 @@ $ curl http://localhost:50003/v1/admin/consensus-info
 
 ```
 $ curl http://localhost:50003/v1/admin/resource-usage
-  
+
 > {
   "process": {
     "name": "___go_build_github_com_canopy_network_canopy_cmd_cli",
@@ -4259,8 +4313,8 @@ $ curl http://localhost:50003/v1/admin/resource-usage
 
 ```
 $ curl http://localhost:50003/v1/admin/log
-  
-> 
+
+>
 Jun 11 09:47:15.533 INFO: Self is the proposer
 Jun 11 09:47:15.532 INFO: (rH:155, H:155, R:0, P:PROPOSE)
 Jun 11 09:47:13.538 INFO: Voting SELF as the proposer
@@ -4275,9 +4329,10 @@ Jun 11 09:47:09.521 INFO: Reset BFT (NEW_HEIGHT)
 ## Golang Profiling Debug
 
 **Route:**
+
 - DebugBlockedRoutePath = "/debug/blocked"
-- DebugHeapRoutePath    = "/debug/heap"
-- DebugCPURoutePath     = "/debug/cpu"
+- DebugHeapRoutePath = "/debug/heap"
+- DebugCPURoutePath = "/debug/cpu"
 - DebugRoutineRoutePath = "/debug/routine"
 
 **Description**: returns an HTTP handler that serves the named profile. Available profiles can be found in [runtime/pprof.Profile]. See https://pkg.go.dev/net/http/pprof

@@ -1,0 +1,10 @@
+{
+  "rewards": {
+    "total": [
+      {
+        "denom": "uatom",
+        "amount": "120000"
+      }
+    ]
+  }
+}

@@ -1,42 +1,24 @@
 {
   "compilerOptions": {
+    "target": "es2020",
+    "lib": ["es2020"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/@types"
-    ],
+    "typeRoots": ["./node_modules/@types", "./src/@types"],
+    "types": ["node", "jest"],
     "baseUrl": "./",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "skipLibCheck": true,
-    "target": "es6",
-    "sourceMap": true,
-    "inlineSources": true,
-    "pretty": true,
-    "outDir": "./dist",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": false,
     "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "suppressImplicitAnyIndexErrors": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "pretty": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "incremental": true,
-    "resolveJsonModule": true
+    "noUnusedParameters": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "**/*.spec.ts",
-    "./dist",
-    "./bin",
-    "./ignore"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "ignore"]
 }
-

@@ -1,0 +1,14 @@
+{
+  "result": {
+    "validators": [
+      {
+        "address": "A1B2C3",
+        "voting_power": "111"
+      },
+      {
+        "address": "D4E5F6",
+        "voting_power": "222"
+      }
+    ]
+  }
+}
