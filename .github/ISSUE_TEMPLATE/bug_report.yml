@@ -2,7 +2,8 @@ name: Bug report
 description: Report an exporter bug or regression
 title: "[bug] "
 labels:
-  - bug
+  - "type: bug"
+  - "status: needs-info"
 body:
   - type: textarea
     id: summary
@@ -11,17 +12,55 @@ body:
       description: What happened?
     validations:
       required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Cosmos / Tendermint
+        - Solana
+        - EVM / hybrid
+        - Runtime / configuration
+        - CI / repository
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release version, commit SHA, or branch.
+      placeholder: "v1.0.0 or ae0ed09"
+    validations:
+      required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Include `CHAIN`, Node version, and relevant env configuration.
+      description: Include Node version, `CHAIN` or `BLOCKCHAIN`, and relevant env names. Redact secrets.
+      render: shell
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
       label: Reproduction
-      description: Steps, logs, or sample metric output
+      description: Steps, logs, upstream responses, or sample metric output.
     validations:
       required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed secrets, private RPC credentials, validator keys, and bearer tokens.
+          required: true
+        - label: This is not a private vulnerability report. Security reports follow SECURITY.md.
+          required: true

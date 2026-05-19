@@ -2,7 +2,8 @@ name: Feature request
 description: Propose a new collector capability or repository improvement
 title: "[feature] "
 labels:
-  - enhancement
+  - "type: feature"
+  - "status: needs-info"
 body:
   - type: textarea
     id: problem
@@ -18,3 +19,22 @@ body:
       description: Describe the change you want to see.
     validations:
       required: true
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      options:
+        - No expected metric or env compatibility impact
+        - Adds optional behavior only
+        - May change metric output
+        - May change required environment variables
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or alternate design?
+    validations:
+      required: false
