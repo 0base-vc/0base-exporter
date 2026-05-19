@@ -67,17 +67,17 @@
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
-    "@marinade.finance/ds-sam-sdk": "^0.0.46",
+    "@marinade.finance/ds-sam-sdk": "^0.0.50",
     "axios": "^1.16.1",
-    "express": "^4.22.1",
+    "express": "^5.2.1",
     "lodash": "^4.18.1",
     "morgan": "^1.10.1",
-    "prom-client": "^14.1.1",
+    "prom-client": "^15.1.3",
     "web3": "^4.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/express": "^4.17.25",
+    "@types/express": "^5.0.6",
     "@types/express-serve-static-core": "^4.19.7",
     "@types/iarna__toml": "^2.0.5",
     "@types/jest": "^30.0.0",
