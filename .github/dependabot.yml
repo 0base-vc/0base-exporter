@@ -11,6 +11,16 @@ updates:
     labels:
       - "type: dependencies"
       - "area: runtime"
+    ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "lint-staged"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     groups:
       npm-production:
         dependency-type: production
