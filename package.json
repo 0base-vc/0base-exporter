@@ -22,7 +22,7 @@
     "evm"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -39,11 +39,12 @@
   "scripts": {
     "clean": "rm -rf dist coverage tsconfig.build.tsbuildinfo",
     "copy:assets": "copyfiles -u 1 \"src/**/*.json\" dist",
-    "build": "npm run clean && tsc --project tsconfig.build.json && npm run copy:assets",
+    "build": "npm run clean && tsc --project tsconfig.build.json && npm run copy:assets && chmod +x dist/index.js",
     "typecheck": "tsc --noEmit",
     "dev": "nodemon --watch src --ext ts,json --exec ts-node src/index.ts",
     "release:pack": "npm run build && npm pack",
     "start": "node dist/index.js",
+    "start:build": "npm run build && node dist/index.js",
     "test": "jest --runInBand",
     "test:coverage": "jest --coverage --runInBand",
     "lint": "eslint . && npm run lint:abi",
@@ -52,7 +53,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "docs:lint": "markdownlint-cli2 \"README*.md\" \"CHANGELOG.md\" \"CONTRIBUTING.md\" \"SECURITY.md\" \"CODE_OF_CONDUCT.md\" \"docs/**/*.md\" \".github/pull_request_template.md\"",
-    "ci:verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:lint && npm test && npm run build && npm pack --dry-run",
+    "ci:verify": "npm run typecheck && npm run lint && npm run format:check && npm run docs:lint && npm test && npm audit --omit=dev && npm run build && npm pack --dry-run",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -67,7 +68,7 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "@marinade.finance/ds-sam-sdk": "^0.0.46",
-    "axios": "^1.7.2",
+    "axios": "^1.16.1",
     "express": "^4.22.1",
     "lodash": "^4.18.1",
     "morgan": "^1.10.1",
@@ -119,6 +120,11 @@
       "minimatch": {
         "brace-expansion": "1.1.13"
       }
+    },
+    "follow-redirects": "1.16.0",
+    "ws": "8.20.1",
+    "@typescript-eslint/typescript-estree": {
+      "brace-expansion": "5.0.6"
     }
   }
 }

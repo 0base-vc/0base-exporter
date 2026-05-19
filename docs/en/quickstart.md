@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 20.19+
 - npm 10+
 - Access to the target chain RPC or REST endpoints
 

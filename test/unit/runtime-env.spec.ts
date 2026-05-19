@@ -14,6 +14,7 @@ describe("runtime env helpers", () => {
 
   it("parses decimal places with fallback", () => {
     expect(getDecimalPlaces(6, { DECIMAL_PLACES: "18" })).toBe(18);
+    expect(getDecimalPlaces(6, { DECIMAL_PLACES: "0" })).toBe(6);
     expect(getDecimalPlaces(6, { DECIMAL_PLACES: "NaN" })).toBe(6);
   });
 

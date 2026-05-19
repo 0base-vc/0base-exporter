@@ -1,12 +1,17 @@
 import { enablePromClientGaugeTiming } from "../lib/prom-perf";
 import Server from "../server";
 import { loadRuntimeConfig } from "./config";
-import { createCollector, resolveChainProfile } from "./collector-registry";
+import {
+  createCollector,
+  CUSTOM_BLOCKCHAIN_CHAIN_ID,
+  resolveChainProfile,
+} from "./collector-registry";
 import { logger } from "./logger";
 
 export async function bootstrap() {
   const config = loadRuntimeConfig();
-  const profile = resolveChainProfile(config.chainId);
+  const profile =
+    config.chainId === CUSTOM_BLOCKCHAIN_CHAIN_ID ? undefined : resolveChainProfile(config.chainId);
 
   if (config.enablePromPerf) {
     enablePromClientGaugeTiming();
@@ -15,7 +20,7 @@ export async function bootstrap() {
   logger.info("Starting exporter", {
     chain: config.chainId,
     chainSource: config.chainSource,
-    family: profile.family,
+    family: profile?.family ?? "custom",
     promPerf: config.enablePromPerf,
   });
 

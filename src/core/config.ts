@@ -1,4 +1,8 @@
-import { findChainProfileByLegacyModulePath, resolveChainProfile } from "./collector-registry";
+import {
+  CUSTOM_BLOCKCHAIN_CHAIN_ID,
+  findChainProfileByLegacyModulePath,
+  resolveChainProfile,
+} from "./collector-registry";
 import type { ChainProfile, RuntimeConfig } from "./types";
 
 const DEFAULT_CHAIN_ID = "tendermint";
@@ -33,13 +37,29 @@ function resolveChainFromEnv(env: NodeJS.ProcessEnv): {
 
   if (env.BLOCKCHAIN?.trim()) {
     const rawChainInput = env.BLOCKCHAIN.trim();
-    const legacyProfile =
-      findChainProfileByLegacyModulePath(rawChainInput) ?? resolveChainProfile(rawChainInput);
-    return {
-      chainId: legacyProfile.id,
-      chainSource: "BLOCKCHAIN",
-      rawChainInput,
-    };
+    const legacyProfile = findChainProfileByLegacyModulePath(rawChainInput);
+    if (legacyProfile) {
+      return {
+        chainId: legacyProfile.id,
+        chainSource: "BLOCKCHAIN",
+        rawChainInput,
+      };
+    }
+
+    try {
+      const resolvedProfile = resolveChainProfile(rawChainInput);
+      return {
+        chainId: resolvedProfile.id,
+        chainSource: "BLOCKCHAIN",
+        rawChainInput,
+      };
+    } catch {
+      return {
+        chainId: CUSTOM_BLOCKCHAIN_CHAIN_ID,
+        chainSource: "BLOCKCHAIN",
+        rawChainInput,
+      };
+    }
   }
 
   return {
@@ -48,22 +68,12 @@ function resolveChainFromEnv(env: NodeJS.ProcessEnv): {
   };
 }
 
-function selectCollectorAddresses(profile: ChainProfile, env: NodeJS.ProcessEnv): string {
-  const candidate =
-    profile.family === "solana"
-      ? firstPopulated(env.VOTE, env.ADDRESS)
-      : firstPopulated(env.ADDRESS, env.VOTE);
-
-  return normalizeCsv(candidate);
+function selectCollectorAddresses(env: NodeJS.ProcessEnv): string {
+  return normalizeCsv(firstPopulated(env.VOTE, env.ADDRESS));
 }
 
-function selectCollectorValidator(profile: ChainProfile, env: NodeJS.ProcessEnv): string {
-  const candidate =
-    profile.family === "solana"
-      ? firstPopulated(env.IDENTITY, env.VALIDATOR)
-      : firstPopulated(env.VALIDATOR, env.IDENTITY);
-
-  return normalizeCsv(candidate);
+function selectCollectorValidator(env: NodeJS.ProcessEnv): string {
+  return normalizeCsv(firstPopulated(env.IDENTITY, env.VALIDATOR));
 }
 
 function parsePort(portValue?: string): number {
@@ -98,17 +108,20 @@ function validateRequiredValues(profile: ChainProfile, config: RuntimeConfig): v
 
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const chainResolution = resolveChainFromEnv(env);
-  const profile = resolveChainProfile(chainResolution.chainId);
-  const collectorAddresses = selectCollectorAddresses(profile, env);
-  const collectorValidator = selectCollectorValidator(profile, env);
+  const profile =
+    chainResolution.chainId === CUSTOM_BLOCKCHAIN_CHAIN_ID
+      ? undefined
+      : resolveChainProfile(chainResolution.chainId);
+  const collectorAddresses = selectCollectorAddresses(env);
+  const collectorValidator = selectCollectorValidator(env);
 
   const config: RuntimeConfig = {
     port: parsePort(env.PORT),
-    chainId: profile.id,
+    chainId: profile?.id ?? CUSTOM_BLOCKCHAIN_CHAIN_ID,
     chainSource: chainResolution.chainSource,
     rawChainInput: chainResolution.rawChainInput,
     apiUrl: env.API_URL?.trim() ?? "",
-    rpcUrl: env.RPC_URL?.trim() ?? (profile.family === "solana" ? "" : DEFAULT_RPC_URL),
+    rpcUrl: env.RPC_URL?.trim() ?? (profile?.family === "solana" ? "" : DEFAULT_RPC_URL),
     existingMetricsUrl: env.EXISTING_METRICS_URL?.trim() ?? "",
     collectorAddresses,
     collectorValidator,
@@ -116,7 +129,9 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     env,
   };
 
-  validateRequiredValues(profile, config);
+  if (profile) {
+    validateRequiredValues(profile, config);
+  }
 
   return config;
 }

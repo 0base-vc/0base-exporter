@@ -29,11 +29,11 @@ Sample env files are available in [examples/env](./examples/env).
 
 Use the new `CHAIN` variable when possible:
 
-| Family              | Recommended `CHAIN` values                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee` |
-| Solana              | `solana`, `solana-testnet`                                                                             |
-| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet` |
+| Family              | Recommended `CHAIN` values                                                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee`, `tendermint-tgrade`, `initia-testnet` |
+| Solana              | `solana`, `solana-testnet`                                                                                                                    |
+| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet`                                        |
 
 Legacy `BLOCKCHAIN=./availables/...` values are still supported and mapped internally to `CHAIN`.
 
@@ -79,7 +79,7 @@ npm test
 npm run build
 ```
 
-Pre-commit formatting and linting run through Husky + `lint-staged`. CI runs on Node `20.x` and `22.x`.
+Pre-commit formatting and linting run through Husky + `lint-staged`. CI runs on Node `20.19.0` and `22.x`.
 
 ## Project Image
 

@@ -3,9 +3,11 @@
 ## Collector selection
 
 - Preferred: `CHAIN=<collector-id>`
-- Legacy compatibility: `BLOCKCHAIN=./availables/<module>.ts`
+- Legacy compatibility: `BLOCKCHAIN=./availables/<module>.ts` or a Node-resolvable module specifier
 
 If both are set, `CHAIN` wins.
+
+Registered legacy `BLOCKCHAIN` paths are mapped to the matching `CHAIN` entry. Unknown legacy values are still loaded dynamically for backward compatibility, so custom collectors can keep using old module paths or package specifiers as long as they export a compatible collector class.
 
 ## Core variables
 
@@ -28,6 +30,8 @@ If both are set, `CHAIN` wins.
 | Solana       | `VOTE`        | `IDENTITY`      |
 
 Multiple values are comma-separated.
+
+For backward compatibility, the runtime still checks `VOTE` before `ADDRESS` and `IDENTITY` before `VALIDATOR`. Prefer the family-specific fields above for new deployments, and avoid setting both aliases unless you intentionally want the legacy value to win.
 
 ## Solana mainnet current-epoch metrics
 

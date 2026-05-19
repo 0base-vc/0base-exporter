@@ -76,6 +76,24 @@ function normalizeInteger(value: number | string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function initiaAmountValue(value: any): number | string {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first && typeof first === "object" ? (first.amount ?? 0) : (first ?? 0);
+  }
+
+  return value && typeof value === "object" ? (value.amount ?? 0) : (value ?? 0);
+}
+
+function initiaAmountDenom(value: any): string | undefined {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first && typeof first === "object" ? first.denom : undefined;
+  }
+
+  return value && typeof value === "object" ? value.denom : undefined;
+}
+
 export default abstract class CosmosCollectorBase extends TargetAbstract {
   protected readonly decimalPlaces = getDecimalPlaces(6);
   protected readonly metricPrefix = "tendermint";
@@ -419,6 +437,40 @@ const cosmosCommissionSelector: AmountSelector = (json: any) =>
   json.commission.commission == null || json.commission.commission.length === 0
     ? []
     : json.commission.commission;
+const initiaDelegationSelector: AmountSelector = (json: any) =>
+  json.delegation_responses.length === 0
+    ? []
+    : [
+        json.delegation_responses.reduce(
+          (state: any, item: any) => {
+            state.amount += normalizeInteger(initiaAmountValue(item.balance));
+            return state;
+          },
+          {
+            denom: initiaAmountDenom(json.delegation_responses[0].balance),
+            amount: 0,
+          },
+        ),
+      ];
+const initiaUnbondingSelector: AmountSelector = (json: any) =>
+  json.unbonding_responses.length === 0
+    ? []
+    : [
+        json.unbonding_responses.reduce(
+          (state: any, item: any) => {
+            state.amount += item.entries.reduce(
+              (sum: number, entry: any) => sum + normalizeInteger(initiaAmountValue(entry.balance)),
+              0,
+            );
+            return state;
+          },
+          {
+            amount: 0,
+          },
+        ),
+      ];
+const initiaRewardsSelector: AmountSelector = (json: any) =>
+  json.total == null || json.total.length === 0 ? [] : json.total;
 
 export const legacyTendermintProfile: CosmosCollectorProfile = {
   filterAddress: (address) => !address.startsWith("0x"),
@@ -534,6 +586,63 @@ export const terraV2Profile: CosmosCollectorProfile = {
   },
   proposals: {
     url: (apiUrl) => `${apiUrl}/cosmos/gov/v1beta1/proposals?proposal_status=2`,
+    selector: (json) => json.proposals.length,
+  },
+};
+
+export const tgradeProfile: CosmosCollectorProfile = {
+  ...cosmosV1beta1Profile,
+  filterAddress: () => true,
+  rank: {
+    url: (apiUrl) => `${apiUrl}/cosmos/staking/v1beta1/validators?pagination.limit=256`,
+    selector: (json) =>
+      json.validators.map((entry: any) => ({
+        operatorAddress: entry.operator_address,
+        tokens: normalizeInteger(entry.tokens),
+      })),
+  },
+  proposals: {
+    url: () => null,
+    selector: () => 0,
+    fallbackValue: 0,
+  },
+};
+
+export const initiaProfile: CosmosCollectorProfile = {
+  ...cosmosV1beta1Profile,
+  delegations: {
+    url: (apiUrl, address) => `${apiUrl}/initia/mstaking/v1/delegations/${address}`,
+    selector: initiaDelegationSelector,
+  },
+  unbondings: {
+    url: (apiUrl, address) =>
+      `${apiUrl}/initia/mstaking/v1/delegators/${address}/unbonding_delegations`,
+    selector: initiaUnbondingSelector,
+  },
+  rewards: {
+    url: (apiUrl, address) => `${apiUrl}/cosmos/distribution/v1beta1/delegators/${address}/rewards`,
+    selector: initiaRewardsSelector,
+  },
+  rank: {
+    url: (apiUrl) =>
+      `${apiUrl}/initia/mstaking/v1/validators?status=BOND_STATUS_BONDED&pagination.limit=256`,
+    selector: (json) =>
+      json.validators.map((entry: any) => {
+        const token = Array.isArray(entry.tokens)
+          ? entry.tokens.find((amount: any) => amount?.denom === "uinit")
+          : undefined;
+        return {
+          operatorAddress: entry.operator_address,
+          tokens: normalizeInteger(token?.amount ?? 0),
+        };
+      }),
+  },
+  maxValidators: {
+    url: (apiUrl) => `${apiUrl}/initia/mstaking/v1/params`,
+    selector: (json) => json.params.max_validators,
+  },
+  proposals: {
+    url: (apiUrl) => `${apiUrl}/cosmos/gov/v1/proposals?proposal_status=2`,
     selector: (json) => json.proposals.length,
   },
 };

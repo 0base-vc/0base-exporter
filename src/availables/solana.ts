@@ -264,6 +264,24 @@ export default class Solana extends TargetAbstract {
     labelNames: ["epoch"],
   });
 
+  private readonly epochTop50ValidatorBaseFeesAvgGauge = new Gauge({
+    name: `${this.metricPrefix}_epoch_top50_validator_base_fees_avg_sol`,
+    help: "Per-validator median base fees among top 50 validators by stake for the epoch",
+    labelNames: ["epoch", "rank", "validator", "name", "stake"],
+  });
+
+  private readonly epochTop50ValidatorPriorityFeesAvgGauge = new Gauge({
+    name: `${this.metricPrefix}_epoch_top50_validator_priority_fees_avg_sol`,
+    help: "Per-validator median priority fees among top 50 validators by stake for the epoch",
+    labelNames: ["epoch", "rank", "validator", "name", "stake"],
+  });
+
+  private readonly epochTop50ValidatorMevTipsAvgGauge = new Gauge({
+    name: `${this.metricPrefix}_epoch_top50_validator_mev_tips_avg_sol`,
+    help: "Per-validator median MEV tips among top 50 validators by stake for the epoch",
+    labelNames: ["epoch", "rank", "validator", "name", "stake"],
+  });
+
   private readonly clusterRequiredVersionGauge = new Gauge({
     name: `${this.metricPrefix}_cluster_required_versions`,
     help: "Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch",
@@ -408,6 +426,9 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.epochMedianBaseFeesAvgGauge);
     this.registry.registerMetric(this.epochMedianPriorityFeesAvgGauge);
     this.registry.registerMetric(this.epochMedianMevTipsAvgGauge);
+    this.registry.registerMetric(this.epochTop50ValidatorBaseFeesAvgGauge);
+    this.registry.registerMetric(this.epochTop50ValidatorPriorityFeesAvgGauge);
+    this.registry.registerMetric(this.epochTop50ValidatorMevTipsAvgGauge);
     this.registry.registerMetric(this.leaderSlotNextTsGauge);
     this.registry.registerMetric(this.leaderSlotRewardTsGauge);
     this.registry.registerMetric(this.epochEndTsGauge);
@@ -435,7 +456,8 @@ export default class Solana extends TargetAbstract {
         this.updateValidatorReleaseVersions(),
         this.updateLeaderWindowsAndEpochEnd(),
         this.updateMarinadeEffectiveBidEpoch(),
-        this.updateCurrentEpochMetricsFromIndexer(this.votes),
+        this.updateCurrentEpochMetrics(this.votes),
+        this.updateEpochMedianFeesAverages(),
       ]);
 
       customMetrics = await this.registry.metrics();
@@ -550,21 +572,29 @@ export default class Solana extends TargetAbstract {
     this.blockPriorityFeesMedianGauge.reset();
     this.blockTipsMedianGauge.reset();
     this.blockTotalMedianGauge.reset();
-    this.epochMedianBaseFeesAvgGauge.reset();
-    this.epochMedianPriorityFeesAvgGauge.reset();
-    this.epochMedianMevTipsAvgGauge.reset();
   }
 
   private getSolanaIndexerBatchUrl(): string {
     return `${SOLANA_INDEXER_BASE_URL}/v1/validators/current-epoch/batch`;
   }
 
-  public async updateCurrentEpochMetricsFromIndexer(validators: string): Promise<void> {
-    this.resetIndexerManagedGauges();
+  private async updateCurrentEpochMetrics(validators: string): Promise<void> {
+    const usedIndexer = await this.updateCurrentEpochMetricsFromIndexer(validators);
+    if (usedIndexer) {
+      return;
+    }
 
+    this.resetIndexerManagedGauges();
+    await Promise.all([
+      this.updateBlockProductionFromRpc(validators),
+      this.updateEpochIncomeFromVx(validators),
+    ]);
+  }
+
+  public async updateCurrentEpochMetricsFromIndexer(validators: string): Promise<boolean> {
     const voteAccounts = this.toUniqueList(validators);
     if (voteAccounts.length === 0) {
-      return;
+      return true;
     }
 
     try {
@@ -577,6 +607,16 @@ export default class Solana extends TargetAbstract {
       );
 
       const results = Array.isArray(response?.results) ? response.results : [];
+      if (results.length === 0) {
+        return false;
+      }
+
+      if (!this.hasCompleteIndexerCoverage(voteAccounts, results)) {
+        return false;
+      }
+
+      this.resetIndexerManagedGauges();
+
       for (const record of results) {
         const vote = record.vote?.trim() ?? "";
         const epochLabel =
@@ -665,12 +705,52 @@ export default class Solana extends TargetAbstract {
           this.blockTotalMedianGauge.labels(vote, epochLabel).set(medianBlockTotalSol);
         }
       }
+      return true;
     } catch (error) {
       console.error("updateCurrentEpochMetricsFromIndexer", error);
+      return false;
     }
   }
 
-  // Epoch-scoped fee gauges are updated only by updateEpochIncomeFromVx.
+  private hasCompleteIndexerCoverage(
+    voteAccounts: string[],
+    results: SolanaIndexerValidatorRecord[],
+  ): boolean {
+    const recordsByVote = new Map<string, SolanaIndexerValidatorRecord>();
+    for (const record of results) {
+      const vote = record.vote?.trim();
+      if (vote) {
+        recordsByVote.set(vote, record);
+      }
+    }
+
+    return voteAccounts.every((vote) => {
+      const record = recordsByVote.get(vote);
+      return record ? this.hasCompleteIndexerRecord(record) : false;
+    });
+  }
+
+  private hasCompleteIndexerRecord(record: SolanaIndexerValidatorRecord): boolean {
+    const vote = record.vote?.trim() ?? "";
+    const epochLabel =
+      record.epoch !== undefined && record.epoch !== null ? String(record.epoch) : "";
+    if (!vote || !epochLabel) {
+      return false;
+    }
+
+    if (record.hasSlots === false || record.hasIncome === false) {
+      return false;
+    }
+
+    return [
+      record.slotsAssigned,
+      record.slotsProduced,
+      record.slotsSkipped,
+      record.blockFeesTotalSol,
+      record.blockTipsTotalSol,
+      record.medianBlockTipSol,
+    ].every((value) => toFiniteMetricValue(value) !== null);
+  }
 
   private async updateClusterRequiredVersions(): Promise<void> {
     await updateSolanaClusterRequiredVersions({
@@ -985,6 +1065,7 @@ export default class Solana extends TargetAbstract {
   public async updateEpochIncomeFromVx(validators: string): Promise<void> {
     this.blockFeesTotalGauge.reset();
     this.mevFeesTotalGauge.reset();
+    this.blockFeesMedianGauge.reset();
     this.blockTipsMedianGauge.reset();
 
     const voteAccounts = this.toUniqueList(validators);
@@ -1016,6 +1097,7 @@ export default class Solana extends TargetAbstract {
               epochLabel: fallbackEpochLabel,
               blockFeesTotalGauge: this.blockFeesTotalGauge,
               mevFeesTotalGauge: this.mevFeesTotalGauge,
+              blockFeesMedianGauge: this.blockFeesMedianGauge,
               blockTipsMedianGauge: this.blockTipsMedianGauge,
             });
             return;
@@ -1030,14 +1112,18 @@ export default class Solana extends TargetAbstract {
           const priorityFeesTotal = Number(latest?.totalIncome?.priorityFees ?? 0);
           const mevTipsTotal = Number(latest?.totalIncome?.mevTips ?? 0);
 
+          const baseFeesMedian = Number(latest?.medianIncome?.baseFees ?? 0);
+          const priorityFeesMedian = Number(latest?.medianIncome?.priorityFees ?? 0);
           const mevTipsMedian = Number(latest?.medianIncome?.mevTips ?? 0);
 
           const totalFeesSol = (baseFeesTotal + priorityFeesTotal) / LAMPORTS_PER_SOL;
           const mevFeesSol = mevTipsTotal / LAMPORTS_PER_SOL;
+          const medianFeesSol = (baseFeesMedian + priorityFeesMedian) / LAMPORTS_PER_SOL;
           const medianTipsSol = mevTipsMedian / LAMPORTS_PER_SOL;
 
           this.blockFeesTotalGauge.labels(vote, epochLabel).set(totalFeesSol);
           this.mevFeesTotalGauge.labels(vote, epochLabel).set(mevFeesSol);
+          this.blockFeesMedianGauge.labels(vote, epochLabel).set(medianFeesSol);
           this.blockTipsMedianGauge.labels(vote, epochLabel).set(medianTipsSol);
         } catch (e) {
           const fallbackEpochLabel = await resolveFallbackEpochLabel();
@@ -1046,6 +1132,7 @@ export default class Solana extends TargetAbstract {
             epochLabel: fallbackEpochLabel,
             blockFeesTotalGauge: this.blockFeesTotalGauge,
             mevFeesTotalGauge: this.mevFeesTotalGauge,
+            blockFeesMedianGauge: this.blockFeesMedianGauge,
             blockTipsMedianGauge: this.blockTipsMedianGauge,
           });
           console.error("updateEpochIncomeFromVx", e);
@@ -1065,6 +1152,9 @@ export default class Solana extends TargetAbstract {
       this.epochMedianBaseFeesAvgGauge.reset();
       this.epochMedianPriorityFeesAvgGauge.reset();
       this.epochMedianMevTipsAvgGauge.reset();
+      this.epochTop50ValidatorBaseFeesAvgGauge.reset();
+      this.epochTop50ValidatorPriorityFeesAvgGauge.reset();
+      this.epochTop50ValidatorMevTipsAvgGauge.reset();
 
       const url = "https://api.vx.tools/epochs/leaderboard/income";
       const payload = {} as any;
@@ -1102,6 +1192,41 @@ export default class Solana extends TargetAbstract {
       const epochLabel =
         String(epochFromRoot ?? top[0]?.epoch ?? "") || (await resolveFallbackEpochLabel());
       if (!epochLabel) return;
+
+      for (let index = 0; index < top.length; index += 1) {
+        const item = top[index];
+        const confirmedSlots = Number(item?.confirmedSlots ?? 0);
+        if (!Number.isFinite(confirmedSlots) || confirmedSlots <= 0) {
+          continue;
+        }
+
+        const rank = String(index + 1);
+        const validator = String(item?.nodeAddress || "");
+        const name = String(item?.nodeName || "");
+        const stakeLabel = String(Number(item?.stake ?? 0));
+        const baseAvgSol =
+          Number(item?.totalIncome?.baseFees ?? 0) / confirmedSlots / LAMPORTS_PER_SOL;
+        const priorityAvgSol =
+          Number(item?.totalIncome?.priorityFees ?? 0) / confirmedSlots / LAMPORTS_PER_SOL;
+        const mevAvgSol =
+          Number(item?.totalIncome?.mevTips ?? 0) / confirmedSlots / LAMPORTS_PER_SOL;
+
+        if (Number.isFinite(baseAvgSol)) {
+          this.epochTop50ValidatorBaseFeesAvgGauge
+            .labels(epochLabel, rank, validator, name, stakeLabel)
+            .set(baseAvgSol);
+        }
+        if (Number.isFinite(priorityAvgSol)) {
+          this.epochTop50ValidatorPriorityFeesAvgGauge
+            .labels(epochLabel, rank, validator, name, stakeLabel)
+            .set(priorityAvgSol);
+        }
+        if (Number.isFinite(mevAvgSol)) {
+          this.epochTop50ValidatorMevTipsAvgGauge
+            .labels(epochLabel, rank, validator, name, stakeLabel)
+            .set(mevAvgSol);
+        }
+      }
 
       const totalBaseLamports = top.reduce(
         (acc, it) => acc + Number(it?.totalIncome?.baseFees ?? 0),

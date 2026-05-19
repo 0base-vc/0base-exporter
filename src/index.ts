@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { bootstrap } from "./core/bootstrap";
 import { logger } from "./core/logger";
 

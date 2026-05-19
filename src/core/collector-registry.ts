@@ -1,21 +1,35 @@
 import AtomOne from "../availables/atomone";
 import Berachain from "../availables/berachain";
+import { createRequire } from "module";
+import * as path from "path";
 import Mitosis from "../availables/mitosis";
 import Monad from "../availables/monad";
 import Solana from "../availables/solana";
 import Tendermint from "../availables/tendermint";
+import TendermintTgrade from "../availables/tendermint-tgrade";
 import TendermintUmee from "../availables/tendermint-umee";
 import TendermintV1 from "../availables/tendermint-v1";
 import TendermintV1beta1 from "../availables/tendermint-v1beta1";
 import TerraV2 from "../availables/terra-v2";
 import Terra from "../availables/terra";
 import CanopyTestnet from "../availables/testnet/canopy";
+import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
 import SolanaTestnet from "../availables/testnet/solana";
 import StoryTestnet from "../availables/testnet/story";
 import type TargetAbstract from "../target.abstract";
 import type { ChainProfile, CollectorContext } from "./types";
+
+export const CUSTOM_BLOCKCHAIN_CHAIN_ID = "__custom_blockchain__";
+
+type LegacyCollectorConstructor = new (
+  existMetrics: string,
+  apiUrl: string,
+  rpcUrl: string,
+  addresses: string,
+  validator: string,
+) => TargetAbstract;
 
 function normalizeChainToken(value: string): string {
   return value
@@ -66,6 +80,61 @@ function createSolanaFactory(
       config.collectorValidator,
       config.env.ADDRESS?.trim() ?? "",
     );
+}
+
+export function resolveLegacyCustomModulePath(modulePath: string): string {
+  const runtimeRequire = createRequire(__filename);
+  if (!path.isAbsolute(modulePath) && !modulePath.startsWith(".")) {
+    try {
+      return runtimeRequire.resolve(modulePath);
+    } catch {
+      // Fall through to the legacy relative-path resolution below.
+    }
+  }
+
+  const basePath = path.isAbsolute(modulePath)
+    ? modulePath
+    : path.resolve(__dirname, "..", modulePath);
+  const candidates = [basePath];
+
+  if (basePath.endsWith(".ts")) {
+    candidates.push(basePath.replace(/\.ts$/, ".js"));
+  } else if (!path.extname(basePath)) {
+    candidates.push(`${basePath}.js`, `${basePath}.ts`);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return runtimeRequire.resolve(candidate);
+    } catch {
+      // Try the next legacy path variant.
+    }
+  }
+
+  return runtimeRequire.resolve(basePath);
+}
+
+function createLegacyCustomCollector({ config }: CollectorContext): TargetAbstract {
+  if (!config.rawChainInput) {
+    throw new Error("Missing legacy BLOCKCHAIN module path");
+  }
+
+  const runtimeRequire = createRequire(__filename);
+  const modulePath = resolveLegacyCustomModulePath(config.rawChainInput);
+  const imported = runtimeRequire(modulePath) as
+    | { default?: LegacyCollectorConstructor }
+    | LegacyCollectorConstructor;
+  const Collector = (
+    "default" in imported && imported.default ? imported.default : imported
+  ) as LegacyCollectorConstructor;
+
+  return new Collector(
+    config.existingMetricsUrl,
+    config.apiUrl,
+    config.rpcUrl,
+    config.collectorAddresses,
+    config.collectorValidator,
+  );
 }
 
 export const CHAIN_PROFILES: ChainProfile[] = [
@@ -140,6 +209,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     factory: createFactory(TendermintUmee),
   },
   {
+    id: "tendermint-tgrade",
+    family: "cosmos",
+    description: "Tgrade collector",
+    aliases: ["tgrade"],
+    legacyModulePaths: ["./availables/tendermint-tgrade.ts"],
+    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
+    factory: createFactory(TendermintTgrade),
+  },
+  {
     id: "solana",
     family: "solana",
     description: "Solana mainnet collector",
@@ -175,8 +254,8 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     description: "Monad testnet collector",
     aliases: ["testnet/monad"],
     legacyModulePaths: ["./availables/testnet/monad.ts"],
-    requiredEnv: ["EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "API_URL", "RPC_URL"],
+    requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
     factory: createFactory(MonadTestnet),
   },
   {
@@ -205,7 +284,7 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     description: "Mitosis testnet collector",
     aliases: ["testnet/mitosis"],
     legacyModulePaths: ["./availables/testnet/mitosis.ts"],
-    requiredEnv: ["EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
     factory: createFactory(MitosisTestnet),
   },
@@ -215,9 +294,19 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     description: "Story testnet collector",
     aliases: ["testnet/story"],
     legacyModulePaths: ["./availables/testnet/story.ts"],
-    requiredEnv: ["EVM_API_URL", "COLLECTOR_ADDRESSES"],
+    requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
     factory: createFactory(StoryTestnet),
+  },
+  {
+    id: "initia-testnet",
+    family: "cosmos",
+    description: "Initia testnet collector",
+    aliases: ["testnet/initia", "initia"],
+    legacyModulePaths: ["./availables/testnet/initia.ts"],
+    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
+    factory: createFactory(InitiaTestnet),
   },
   {
     id: "canopy-testnet",
@@ -268,5 +357,9 @@ export function resolveChainProfile(input: string): ChainProfile {
 }
 
 export function createCollector(context: CollectorContext) {
+  if (context.config.chainId === CUSTOM_BLOCKCHAIN_CHAIN_ID) {
+    return createLegacyCustomCollector(context);
+  }
+
   return resolveChainProfile(context.config.chainId).factory(context);
 }

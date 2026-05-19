@@ -12,7 +12,7 @@ The new runtime config validates required inputs before binding the HTTP server.
 
 ## Legacy `BLOCKCHAIN` path does not work
 
-Use `CHAIN` instead. Legacy paths are normalized internally, but unsupported custom file paths are rejected.
+Use `CHAIN` for registered collectors when possible. For custom collectors, verify that the `BLOCKCHAIN` value is either a valid relative/absolute module path or a package specifier resolvable by Node from the installed exporter. The module must export a compatible collector constructor.
 
 ## Need to compare metric regressions
 

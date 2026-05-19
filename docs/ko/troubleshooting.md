@@ -12,7 +12,7 @@
 
 ## 레거시 `BLOCKCHAIN` 경로가 동작하지 않는 경우
 
-가능하면 `CHAIN`을 사용하세요. 레거시 경로는 normalization 후 registry에 있는 값만 허용됩니다.
+등록된 collector는 가능하면 `CHAIN`을 사용하세요. custom collector라면 `BLOCKCHAIN` 값이 유효한 상대/절대 module path이거나, 설치된 exporter 기준으로 Node가 해석할 수 있는 package specifier인지 확인하세요. 해당 module은 호환되는 collector constructor를 export해야 합니다.
 
 ## 메트릭 회귀를 비교하고 싶은 경우
 

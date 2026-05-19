@@ -2,7 +2,7 @@
 
 ## 요구 사항
 
-- Node.js 20+
+- Node.js 20.19+
 - npm 10+
 - 대상 체인의 RPC 또는 REST 접근 권한
 

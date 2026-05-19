@@ -168,6 +168,7 @@ export function emitZeroSolanaVxIncomeMetrics(params: {
   epochLabel: string;
   blockFeesTotalGauge: GaugeWithSingleSet;
   mevFeesTotalGauge: GaugeWithSingleSet;
+  blockFeesMedianGauge: GaugeWithSingleSet;
   blockTipsMedianGauge: GaugeWithSingleSet;
 }): void {
   if (!params.epochLabel) {
@@ -176,6 +177,7 @@ export function emitZeroSolanaVxIncomeMetrics(params: {
 
   params.blockFeesTotalGauge.labels(params.vote, params.epochLabel).set(0);
   params.mevFeesTotalGauge.labels(params.vote, params.epochLabel).set(0);
+  params.blockFeesMedianGauge.labels(params.vote, params.epochLabel).set(0);
   params.blockTipsMedianGauge.labels(params.vote, params.epochLabel).set(0);
 }
 

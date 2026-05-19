@@ -22,6 +22,7 @@ export default class Berachain extends Tendermint {
   private readonly BGTStakerContract;
   private readonly alchemyApiUrl = "https://berachain-mainnet.g.alchemy.com/v2/";
   private readonly alchemyApiKey = getAlchemyApiKey();
+  private readonly ALCHEMY_TIMEOUT_MS = 10000;
   private erc20Metadata: Map<string, ERC20TokenMetadata> = new Map();
 
   protected readonly boostedGauge = new Gauge({
@@ -81,7 +82,7 @@ export default class Berachain extends Tendermint {
       return;
     }
 
-    await this.scanERC20Tokens();
+    void this.scanERC20Tokens();
     this.tokenScanTimer = setInterval(
       () => {
         void this.scanERC20Tokens();
@@ -127,12 +128,16 @@ export default class Berachain extends Tendermint {
 
     try {
       for (const address of evmAddresses) {
-        const response = await axios.post(`${this.alchemyApiUrl}${this.alchemyApiKey}`, {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "alchemy_getTokenBalances",
-          params: [address, "erc20"],
-        });
+        const response = await axios.post(
+          `${this.alchemyApiUrl}${this.alchemyApiKey}`,
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "alchemy_getTokenBalances",
+            params: [address, "erc20"],
+          },
+          { timeout: this.ALCHEMY_TIMEOUT_MS },
+        );
 
         if (response.data && response.data.result && response.data.result.tokenBalances) {
           for (const token of response.data.result.tokenBalances) {
@@ -159,12 +164,16 @@ export default class Berachain extends Tendermint {
     }
 
     try {
-      const metadataResponse = await axios.post(`${this.alchemyApiUrl}${this.alchemyApiKey}`, {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "alchemy_getTokenMetadata",
-        params: [contractAddress],
-      });
+      const metadataResponse = await axios.post(
+        `${this.alchemyApiUrl}${this.alchemyApiKey}`,
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "alchemy_getTokenMetadata",
+          params: [contractAddress],
+        },
+        { timeout: this.ALCHEMY_TIMEOUT_MS },
+      );
 
       if (metadataResponse.data && metadataResponse.data.result) {
         const metadata = metadataResponse.data.result;

@@ -3,9 +3,11 @@
 ## Collector 선택
 
 - 권장 방식: `CHAIN=<collector-id>`
-- 레거시 호환: `BLOCKCHAIN=./availables/<module>.ts`
+- 레거시 호환: `BLOCKCHAIN=./availables/<module>.ts` 또는 Node가 해석할 수 있는 module specifier
 
 둘 다 있으면 `CHAIN`이 우선합니다.
+
+등록된 레거시 `BLOCKCHAIN` 경로는 대응하는 `CHAIN` 항목으로 매핑됩니다. 등록되지 않은 값도 하위 호환성을 위해 동적으로 로드하므로, custom collector는 기존 module path나 package specifier를 계속 사용할 수 있습니다. 단, 호환되는 collector class를 export해야 합니다.
 
 ## 핵심 변수
 
@@ -28,6 +30,8 @@
 | Solana       | `VOTE`    | `IDENTITY`     |
 
 여러 값은 쉼표로 구분합니다.
+
+하위 호환성을 위해 런타임은 여전히 `VOTE`를 `ADDRESS`보다, `IDENTITY`를 `VALIDATOR`보다 먼저 확인합니다. 새 배포에서는 위 표의 계열별 필드를 권장하며, 두 alias를 동시에 설정하면 레거시 값이 이긴다는 점을 명시적으로 의도해야 합니다.
 
 ## Solana 메인넷 current epoch 메트릭
 
