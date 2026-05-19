@@ -38,13 +38,14 @@ describe("Server smoke tests", () => {
   it("serves health and metrics endpoints and runs collector lifecycle hooks", async () => {
     const collector = new StaticCollector();
     const server = new Server({ collector, logger });
-    const { server: httpServer } = await server.start(0);
+    const { server: httpServer, port } = await server.start(0);
 
     await request(httpServer).get("/healthz").expect(200, { ok: true });
 
     const metricsResponse = await request(httpServer).get("/metrics").expect(200);
     expect(metricsResponse.text).toContain("static_metric 1");
     expect(collector.started).toBe(true);
+    expect(port).not.toBe("0");
 
     await server.close();
     expect(collector.stopped).toBe(true);
@@ -59,5 +60,14 @@ describe("Server smoke tests", () => {
     expect(response.text).toContain("metrics collection failed");
 
     await server.close();
+  });
+
+  it("rejects when the listen port is already in use", async () => {
+    const first = new Server({ collector: new StaticCollector(), logger });
+    const { port } = await first.start(0);
+    const second = new Server({ collector: new StaticCollector(), logger });
+
+    await expect(second.start(Number(port))).rejects.toMatchObject({ code: "EADDRINUSE" });
+    await first.close();
   });
 });

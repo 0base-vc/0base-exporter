@@ -36,10 +36,25 @@ export default class Server {
     await this.setup();
     await this.deps.collector.start();
 
-    return new Promise((resolve) => {
-      this.server = this.app.listen(port, () => {
-        resolve({ server: this.server as http.Server, port: String(port) });
-      });
+    return new Promise((resolve, reject) => {
+      const server = this.app.listen(port);
+      this.server = server;
+
+      const onError = (error: Error) => {
+        server.off("listening", onListening);
+        this.server = undefined;
+        reject(error);
+      };
+      const onListening = () => {
+        server.off("error", onError);
+        const address = server.address();
+        const actualPort =
+          typeof address === "object" && address !== null ? String(address.port) : String(port);
+        resolve({ server, port: actualPort });
+      };
+
+      server.once("error", onError);
+      server.once("listening", onListening);
     });
   }
 

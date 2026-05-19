@@ -128,9 +128,14 @@ export default abstract class TargetAbstract {
 
   protected async loadExistMetrics(): Promise<string> {
     if (this.existMetrics) {
+      const urls = this.existMetrics
+        .split(",")
+        .map((url) => url.trim())
+        .filter(Boolean);
+
       return (
         await Promise.all(
-          this.existMetrics.split(",").map(async (url: string) => {
+          urls.map(async (url: string) => {
             return this.get(url, (response) => {
               let currentResponse = response.data;
               currentResponse = currentResponse.replaceAll("cometbft", "tendermint");

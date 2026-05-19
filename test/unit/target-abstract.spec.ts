@@ -4,8 +4,8 @@ import TargetAbstract from "../../src/target.abstract";
 jest.mock("axios");
 
 class TestCollector extends TargetAbstract {
-  public constructor() {
-    super("", "https://api.example", "https://rpc.example", "a", "b");
+  public constructor(existingMetricsUrl = "") {
+    super(existingMetricsUrl, "https://api.example", "https://rpc.example", "a", "b");
   }
 
   public async makeMetrics(): Promise<string> {
@@ -18,6 +18,10 @@ class TestCollector extends TargetAbstract {
 
   public async fetchDirect(url: string): Promise<number | ""> {
     return this.get(url, (response) => response.data.value as number);
+  }
+
+  public async fetchExistingMetrics(): Promise<string> {
+    return this.loadExistMetrics();
   }
 }
 
@@ -55,5 +59,18 @@ describe("TargetAbstract transport helpers", () => {
 
     await expect(collector.fetchDirect("https://api.example/value")).resolves.toBe(42);
     await expect(collector.fetchDirect("https://api.example/value")).resolves.toBe(42);
+  });
+
+  it("trims and skips empty existing metric URLs", async () => {
+    collector = new TestCollector("https://a.example/metrics, https://b.example/metrics, ");
+    mockedAxios.get
+      .mockResolvedValueOnce({ data: "cometbft_metric 1\n" })
+      .mockResolvedValueOnce({ data: "other_metric 2\n" });
+
+    await expect(collector.fetchExistingMetrics()).resolves.toBe(
+      "tendermint_metric 1\n\nother_metric 2\n",
+    );
+    expect(mockedAxios.get).toHaveBeenNthCalledWith(1, "https://a.example/metrics", {});
+    expect(mockedAxios.get).toHaveBeenNthCalledWith(2, "https://b.example/metrics", {});
   });
 });
