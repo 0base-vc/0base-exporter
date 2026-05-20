@@ -32,7 +32,7 @@ When the maintainer team grows, add required approvals and CODEOWNERS review.
 
 Use labels with predictable prefixes:
 
-- `type: bug`, `type: feature`, `type: docs`, `type: security`, `type: refactor`, `type: dependencies`;
+- `type: bug`, `type: feature`, `type: docs`, `type: security`, `type: refactor`, `type: dependencies`, `type: support`;
 - `area: cosmos`, `area: solana`, `area: evm`, `area: runtime`, `area: ci`, `area: docs`;
 - `priority: p0`, `priority: p1`, `priority: p2`, `priority: p3`;
 - `status: needs-info`, `status: blocked`, `status: good-first-issue`, `status: help-wanted`.

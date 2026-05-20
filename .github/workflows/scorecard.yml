@@ -12,13 +12,35 @@ on:
 permissions:
   contents: read
   actions: read
-  security-events: write
-  id-token: write
 
 jobs:
-  scorecard:
-    name: scorecard
+  scorecard-pr:
+    name: scorecard-pr
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
+        with:
+          results_file: results.json
+          results_format: json
+          publish_results: false
+
+  scorecard-upload:
+    name: scorecard-upload
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
