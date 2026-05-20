@@ -261,7 +261,7 @@ export default class Berachain extends Tendermint {
       },
       query: `query GetValidatorAnalytics($pubKey: Bytes!, $timestamp: Timestamp!) {\n  incentiveDistributionByValidators(\n    interval: day\n    where: {validator_: {publicKey: $pubKey}, timestamp_gte: $timestamp}\n  ) {\n    token {\n      address\n      symbol\n      decimals\n      name\n    }\n    receivedTokenAmount\n    timestamp\n    id\n    __typename\n  }\n}`,
     };
-    let incentiveList: any[] = [];
+    let incentiveList: any[];
     try {
       const res = await axios.post(goldskyUrl, query, {
         headers: { "content-type": "application/json" },

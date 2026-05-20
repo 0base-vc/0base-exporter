@@ -2,7 +2,7 @@ name: Safe public question
 description: Ask a usage question that does not include secrets or private vulnerability details
 title: "[question] "
 labels:
-  - question
+  - "type: support"
   - "status: needs-info"
 body:
   - type: textarea
