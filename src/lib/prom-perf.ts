@@ -3,6 +3,7 @@ declare const require: any;
 const promClient: any = require("prom-client");
 type Gauge = any;
 type Registry = any;
+const PERF_METRIC_NAME = "metric_set_duration_ms";
 
 // Global map to track start times between reset and first set per gauge instance
 const gaugeStartTimes = new WeakMap<Gauge, number>();
@@ -34,13 +35,19 @@ export function enablePromClientGaugeTiming(): void {
       } catch {
         // Ignore registry back-reference failures.
       }
-      return origRegisterMetric.call(this, metric);
+      const result = origRegisterMetric.call(this, metric);
+      if ((metric as any).name !== PERF_METRIC_NAME) {
+        getOrCreatePerfGauge(this);
+      }
+      return result;
     } as any;
   }
 
   // Patch reset: mark start time
   promClient.Gauge.prototype.reset = function patchedReset(this: Gauge) {
-    gaugeStartTimes.set(this, Date.now());
+    if ((this as any).name !== PERF_METRIC_NAME) {
+      gaugeStartTimes.set(this, Date.now());
+    }
     if (typeof originalReset === "function") {
       return originalReset.call(this);
     }
@@ -57,6 +64,10 @@ export function enablePromClientGaugeTiming(): void {
     const selfGauge = this as Gauge;
     const setFn = labeled.set;
     labeled.set = function patchedSet(this: any, ...args: any[]) {
+      if (selfGauge["name"] === PERF_METRIC_NAME) {
+        return setFn.apply(this, args);
+      }
+
       const start = gaugeStartTimes.get(selfGauge);
       if (typeof start === "number") {
         const duration = Date.now() - start;
@@ -72,6 +83,10 @@ export function enablePromClientGaugeTiming(): void {
   // Also patch direct gauge.set(value) without labels
   if (originalSet) {
     promClient.Gauge.prototype.set = function patchedDirectSet(this: Gauge, ...args: any[]) {
+      if ((this as any)["name"] === PERF_METRIC_NAME) {
+        return (originalSet as any).apply(this, args);
+      }
+
       const start = gaugeStartTimes.get(this);
       if (typeof start === "number") {
         const duration = Date.now() - start;
@@ -90,12 +105,14 @@ function getOrCreatePerfGauge(registry: Registry): Gauge {
   let g = registryPerfGauge.get(registry);
   if (!g) {
     g = new promClient.Gauge({
-      name: `metric_set_duration_ms`,
+      name: PERF_METRIC_NAME,
       help: "Time from reset to next set() in milliseconds",
       labelNames: ["metric"],
+      registers: [],
     });
     registry.registerMetric(g);
     registryPerfGauge.set(registry, g);
+    g.labels(PERF_METRIC_NAME).set(0);
   }
   return g;
 }
