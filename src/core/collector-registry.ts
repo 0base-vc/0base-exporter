@@ -245,7 +245,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     aliases: [],
     legacyModulePaths: ["./availables/monad.ts"],
     requiredEnv: ["EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["MONAD_VALIDATOR_ID", "VALIDATOR_ID", "EXISTING_METRICS_URL", "DECIMAL_PLACES"],
+    optionalEnv: [
+      "MONAD_VALIDATOR_ID",
+      "VALIDATOR_ID",
+      "EXISTING_METRICS_URL",
+      "DECIMAL_PLACES",
+      "MONAD_BALANCE_CACHE_TTL_MS",
+      "MONAD_CONTRACT_CACHE_TTL_MS",
+      "MONAD_VALIDATOR_SET_CACHE_TTL_MS",
+      "MONAD_CACHE_BLOCK_ON_COLD_START",
+    ],
     factory: createFactory(Monad),
   },
   {

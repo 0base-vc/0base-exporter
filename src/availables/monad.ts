@@ -9,11 +9,44 @@ function toSafeNumber(value: bigint | string | number | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getDurationEnv(name: string, fallbackMs: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallbackMs;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallbackMs;
+}
+
+function getBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes"].includes(raw);
+}
+
+interface CacheState {
+  initialized: boolean;
+  refreshedAt: number;
+  inFlight?: Promise<void>;
+}
+
 export default class Monad extends TargetAbstract {
   public readonly web3: Web3;
   private readonly evmClient: EvmClient;
 
   private readonly metricPrefix = "monad";
+  private readonly cacheStates = new Map<string, CacheState>();
+  private readonly balanceCacheTtlMs = getDurationEnv("MONAD_BALANCE_CACHE_TTL_MS", 60000);
+  private readonly contractCacheTtlMs = getDurationEnv("MONAD_CONTRACT_CACHE_TTL_MS", 300000);
+  private readonly validatorSetCacheTtlMs = getDurationEnv(
+    "MONAD_VALIDATOR_SET_CACHE_TTL_MS",
+    1800000,
+  );
+  private readonly blockOnColdCache = getBooleanEnv("MONAD_CACHE_BLOCK_ON_COLD_START", false);
   protected readonly decimalPlaces = getDecimalPlaces(18);
   private readonly registry = new Registry();
   private readonly availableGauge = new Gauge({
@@ -483,21 +516,102 @@ export default class Monad extends TargetAbstract {
     let customMetrics = "";
     try {
       await Promise.all([
-        this.updateEvmAddressBalance(this.addresses),
-        this.updateValidatorRewards(this.validator),
-        this.updateAddressDelegations(this.addresses),
-        this.updateAddressUnbonding(this.addresses),
-        this.updateEpoch(),
-        this.updateDelegatorsCount(this.validator),
-        this.updateAddressDelegatorRewards(this.addresses),
-        this.updateValidatorSets(),
-        this.updateProposerValId(),
+        this.updateCached(
+          "address-balances",
+          this.balanceCacheTtlMs,
+          () => this.updateEvmAddressBalance(this.addresses),
+          this.blockOnColdCache,
+        ),
+        this.updateCached(
+          "contract-metrics",
+          this.contractCacheTtlMs,
+          () => this.updateContractMetrics(),
+          this.blockOnColdCache,
+        ),
+        this.updateCached(
+          "validator-set-metrics",
+          this.validatorSetCacheTtlMs,
+          () => this.updateValidatorSetMetrics(),
+          this.blockOnColdCache,
+        ),
       ]);
       customMetrics = await this.registry.metrics();
     } catch (e) {
       console.error("makeMetrics", e);
     }
     return customMetrics + "\n" + (await this.loadExistMetrics());
+  }
+
+  public async start(): Promise<void> {
+    this.warmCaches();
+  }
+
+  private warmCaches(): void {
+    void this.updateCached("address-balances", this.balanceCacheTtlMs, () =>
+      this.updateEvmAddressBalance(this.addresses),
+    );
+    void this.updateCached("contract-metrics", this.contractCacheTtlMs, () =>
+      this.updateContractMetrics(),
+    );
+    void this.updateCached("validator-set-metrics", this.validatorSetCacheTtlMs, () =>
+      this.updateValidatorSetMetrics(),
+    );
+  }
+
+  private async updateCached(
+    key: string,
+    ttlMs: number,
+    refresh: () => Promise<void>,
+    blockOnCold: boolean = false,
+  ): Promise<void> {
+    if (ttlMs === 0) {
+      await refresh();
+      return;
+    }
+
+    let state = this.cacheStates.get(key);
+    if (!state) {
+      state = { initialized: false, refreshedAt: 0 };
+      this.cacheStates.set(key, state);
+    }
+
+    const now = Date.now();
+    const isFresh = state.initialized && now - state.refreshedAt < ttlMs;
+    if (isFresh) {
+      return;
+    }
+
+    if (!state.inFlight) {
+      state.inFlight = refresh()
+        .then(() => {
+          state.initialized = true;
+          state.refreshedAt = Date.now();
+        })
+        .catch((error) => {
+          console.error(`Monad cache refresh failed for ${key}`, error);
+        })
+        .finally(() => {
+          state.inFlight = undefined;
+        });
+    }
+
+    if (!state.initialized && blockOnCold) {
+      await state.inFlight;
+    }
+  }
+
+  private async updateContractMetrics(): Promise<void> {
+    await this.updateEpoch();
+    await this.updateProposerValId();
+    await this.updateValidatorRewards(this.validator);
+    await this.updateAddressDelegatorRewards(this.addresses);
+    await this.updateAddressDelegations(this.addresses);
+    await this.updateAddressUnbonding(this.addresses);
+  }
+
+  private async updateValidatorSetMetrics(): Promise<void> {
+    await this.updateDelegatorsCount(this.validator);
+    await this.updateValidatorSets();
   }
 
   protected async updateEvmAddressBalance(addresses: string): Promise<void> {
