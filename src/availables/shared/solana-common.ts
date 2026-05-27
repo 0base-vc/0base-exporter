@@ -138,6 +138,30 @@ export async function updateSolanaBlockProduction(params: {
 
   const productionMap =
     byIdentity && typeof byIdentity === "object" ? (byIdentity as Record<string, unknown>) : {};
+  const scheduledSlotsByIdentity = new Map<string, number>();
+
+  await Promise.all(
+    voteAccounts.map(async (vote) => {
+      const identity = params.validatorToIdentityMap[vote];
+      if (!identity || scheduledSlotsByIdentity.has(identity)) {
+        return;
+      }
+
+      const schedule = await params.postWithCache(
+        params.rpcUrl,
+        { method: "getLeaderSchedule", params: [null, { identity }] },
+        (response) => response.data?.result,
+        params.cacheDurationMs ?? 60000,
+        params.timeoutMs ?? 10000,
+      );
+      const scheduleMap =
+        schedule && typeof schedule === "object" ? (schedule as Record<string, unknown>) : {};
+      const slots = Array.isArray(scheduleMap[identity]) ? scheduleMap[identity] : null;
+      if (slots) {
+        scheduledSlotsByIdentity.set(identity, slots.length);
+      }
+    }),
+  );
 
   for (const vote of voteAccounts) {
     const identity = params.validatorToIdentityMap[vote];
@@ -146,16 +170,21 @@ export async function updateSolanaBlockProduction(params: {
     }
 
     const counts = Array.isArray(productionMap[identity]) ? productionMap[identity] : [];
-    const totalSlots = Number(counts[0] ?? 0);
+    const elapsedLeaderSlots = Number(counts[0] ?? 0);
     const producedSlots = Number(counts[1] ?? 0);
+    const scheduledSlots = scheduledSlotsByIdentity.get(identity);
+    const assignedSlots =
+      typeof scheduledSlots === "number" && Number.isFinite(scheduledSlots)
+        ? scheduledSlots
+        : elapsedLeaderSlots;
     const skippedSlots =
-      Number.isFinite(totalSlots) && Number.isFinite(producedSlots)
-        ? Math.max(totalSlots - producedSlots, 0)
+      Number.isFinite(elapsedLeaderSlots) && Number.isFinite(producedSlots)
+        ? Math.max(elapsedLeaderSlots - producedSlots, 0)
         : 0;
 
     params.slotsAssignedGauge
       .labels(vote, epochLabel)
-      .set(Number.isFinite(totalSlots) ? totalSlots : 0);
+      .set(Number.isFinite(assignedSlots) ? assignedSlots : 0);
     params.slotsProducedGauge
       .labels(vote, epochLabel)
       .set(Number.isFinite(producedSlots) ? producedSlots : 0);

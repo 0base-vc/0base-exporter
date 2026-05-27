@@ -7,7 +7,7 @@ type TestCollector = {
   validatorToIdentityMap: Record<string, string>;
   registry: { metrics(): Promise<string> };
   postWithCache: PostWithCacheMock;
-  updateCurrentEpochMetricsFromIndexer(validators: string): Promise<void>;
+  updateCurrentEpochMetricsFromIndexer(validators: string): Promise<boolean>;
 };
 
 describe("Solana indexer integration", () => {
@@ -93,5 +93,65 @@ describe("Solana indexer integration", () => {
     expect(metrics).toContain('solana_block_tips_median_sol{vote="vote-1",epoch="959"} 0.02');
     expect(metrics).toContain('solana_block_total_median_sol{vote="vote-1",epoch="959"} 0.06');
     expect(collector.postWithCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps indexer slot totals when optional median values are unavailable", async () => {
+    const collector = new Solana(
+      "",
+      "https://rpc.example",
+      "https://rpc.example",
+      "vote-1",
+      "identity-1",
+      "",
+    ) as unknown as TestCollector;
+
+    collector.postWithCache = jest.fn(
+      async (url: string, _data: unknown, selector: Selector): Promise<unknown> => {
+        if (url === "https://whoearns.live/v1/validators/current-epoch/batch") {
+          return selector({
+            data: {
+              epoch: 978,
+              results: [
+                {
+                  vote: "vote-1",
+                  identity: "identity-1",
+                  epoch: 978,
+                  isCurrentEpoch: true,
+                  isFinal: false,
+                  hasSlots: true,
+                  hasIncome: true,
+                  slotsAssigned: 32,
+                  slotsProduced: 0,
+                  slotsSkipped: 0,
+                  blockBaseFeesTotalSol: "0",
+                  blockPriorityFeesTotalSol: "0",
+                  blockFeesTotalSol: "0",
+                  blockTipsTotalSol: "0",
+                  totalIncomeSol: "0",
+                  medianBlockFeeSol: null,
+                  medianBlockBaseFeeSol: null,
+                  medianBlockPriorityFeeSol: null,
+                  medianBlockTipSol: null,
+                  medianBlockTotalSol: null,
+                },
+              ],
+            },
+          });
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
+
+    const usedIndexer = await collector.updateCurrentEpochMetricsFromIndexer("vote-1");
+
+    const metrics = await collector.registry.metrics();
+    expect(usedIndexer).toBe(true);
+    expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="978"} 32');
+    expect(metrics).toContain('solana_slots_produced_total{vote="vote-1",epoch="978"} 0');
+    expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="978"} 0');
+    expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="978"} 0');
+    expect(metrics).toContain('solana_block_tips_total_sol{vote="vote-1",epoch="978"} 0');
+    expect(metrics).not.toContain("solana_block_tips_median_sol{");
   });
 });

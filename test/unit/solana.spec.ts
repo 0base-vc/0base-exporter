@@ -34,7 +34,7 @@ describe("Solana vx.tools fallbacks", () => {
     ) as unknown as TestCollector;
   }
 
-  it("derives slot metrics from getBlockProduction and zero-fills missing identities", async () => {
+  it("uses leader schedule for assigned slots and block production for produced slots", async () => {
     const collector = createCollector();
     collector.validatorToIdentityMap = {
       "vote-1": "identity-1",
@@ -61,6 +61,16 @@ describe("Solana vx.tools fallbacks", () => {
           });
         }
 
+        if (method === "getLeaderSchedule") {
+          const identity = (data as { params?: [unknown, { identity?: string }] }).params?.[1]
+            ?.identity;
+          const slotsByIdentity: Record<string, number[]> =
+            identity === "identity-1"
+              ? { "identity-1": Array.from({ length: 16 }, (_value, index) => index) }
+              : { "identity-2": [] };
+          return selector({ data: { result: slotsByIdentity } });
+        }
+
         if (method === "getEpochInfo") {
           return selector({ data: { result: { epoch: 956 } } });
         }
@@ -72,7 +82,7 @@ describe("Solana vx.tools fallbacks", () => {
     await collector.updateBlockProductionFromRpc("vote-1,vote-2");
 
     const metrics = await collector.registry.metrics();
-    expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="956"} 12');
+    expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="956"} 16');
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-1",epoch="956"} 10');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="956"} 2');
     expect(metrics).toContain('solana_slots_assigned_total{vote="vote-2",epoch="956"} 0');
@@ -403,6 +413,16 @@ describe("Solana vx.tools fallbacks", () => {
             });
           }
 
+          if (method === "getLeaderSchedule") {
+            return selector({
+              data: {
+                result: {
+                  "identity-1": Array.from({ length: 10 }, (_value, index) => index),
+                },
+              },
+            });
+          }
+
           if (method === "getEpochInfo") {
             return selector({ data: { result: { epoch: 957 } } });
           }
@@ -424,7 +444,7 @@ describe("Solana vx.tools fallbacks", () => {
     await collector.updateCurrentEpochMetrics("vote-1");
 
     const metrics = await collector.registry.metrics();
-    expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="957"} 8');
+    expect(metrics).toContain('solana_slots_assigned_total{vote="vote-1",epoch="957"} 10');
     expect(metrics).toContain('solana_slots_produced_total{vote="vote-1",epoch="957"} 6');
     expect(metrics).toContain('solana_slots_skipped_total{vote="vote-1",epoch="957"} 2');
     expect(metrics).toContain('solana_block_fees_total_sol{vote="vote-1",epoch="957"} 0');

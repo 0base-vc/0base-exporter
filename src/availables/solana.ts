@@ -611,7 +611,7 @@ export default class Solana extends TargetAbstract {
         return false;
       }
 
-      if (!this.hasCompleteIndexerCoverage(voteAccounts, results)) {
+      if (!this.hasUsableIndexerCoverage(voteAccounts, results)) {
         return false;
       }
 
@@ -712,7 +712,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  private hasCompleteIndexerCoverage(
+  private hasUsableIndexerCoverage(
     voteAccounts: string[],
     results: SolanaIndexerValidatorRecord[],
   ): boolean {
@@ -726,11 +726,11 @@ export default class Solana extends TargetAbstract {
 
     return voteAccounts.every((vote) => {
       const record = recordsByVote.get(vote);
-      return record ? this.hasCompleteIndexerRecord(record) : false;
+      return record ? this.hasUsableIndexerRecord(record) : false;
     });
   }
 
-  private hasCompleteIndexerRecord(record: SolanaIndexerValidatorRecord): boolean {
+  private hasUsableIndexerRecord(record: SolanaIndexerValidatorRecord): boolean {
     const vote = record.vote?.trim() ?? "";
     const epochLabel =
       record.epoch !== undefined && record.epoch !== null ? String(record.epoch) : "";
@@ -748,7 +748,6 @@ export default class Solana extends TargetAbstract {
       record.slotsSkipped,
       record.blockFeesTotalSol,
       record.blockTipsTotalSol,
-      record.medianBlockTipSol,
     ].every((value) => toFiniteMetricValue(value) !== null);
   }
 
