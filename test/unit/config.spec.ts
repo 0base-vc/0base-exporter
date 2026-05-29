@@ -48,9 +48,16 @@ describe("loadRuntimeConfig", () => {
       VOTE: "init1abc",
       IDENTITY: "initvaloper1def",
     });
+    const ritual = loadRuntimeConfig({
+      BLOCKCHAIN: "./availables/testnet/ritual.ts",
+      API_URL: "https://ritual-cl.example",
+      EVM_API_URL: "https://ritual-el.example",
+      ADDRESS: "0xabc",
+    });
 
     expect(tgrade.chainId).toBe("tendermint-tgrade");
     expect(initia.chainId).toBe("initia-testnet");
+    expect(ritual.chainId).toBe("ritual-testnet");
   });
 
   it("preserves legacy VOTE and IDENTITY precedence during CHAIN migration", () => {
@@ -126,7 +133,7 @@ describe("loadRuntimeConfig", () => {
   });
 
   it("fails fast when testnet hybrid collectors miss API_URL", () => {
-    for (const chain of ["monad-testnet", "mitosis-testnet", "story-testnet"]) {
+    for (const chain of ["monad-testnet", "mitosis-testnet", "story-testnet", "ritual-testnet"]) {
       expect(() =>
         loadRuntimeConfig({
           CHAIN: chain,
@@ -136,6 +143,19 @@ describe("loadRuntimeConfig", () => {
         }),
       ).toThrow(`Missing required configuration for chain "${chain}": API_URL`);
     }
+  });
+
+  it("allows Ritual testnet to select validators by address without VALIDATOR", () => {
+    const config = loadRuntimeConfig({
+      CHAIN: "ritual-testnet",
+      API_URL: "https://ritual-cl.example",
+      EVM_API_URL: "https://ritual-el.example",
+      ADDRESS: "0xFBF57F6b80578F4918684BAbB5dA70Fac504bdB3",
+    });
+
+    expect(config.chainId).toBe("ritual-testnet");
+    expect(config.collectorAddresses).toBe("0xFBF57F6b80578F4918684BAbB5dA70Fac504bdB3");
+    expect(config.collectorValidator).toBe("");
   });
 
   it("keeps the default RPC URL for non-solana chains", () => {

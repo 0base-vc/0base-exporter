@@ -48,3 +48,21 @@ VALIDATOR=0xvalidator \
 ALCHEMY_API_KEY=your-key \
 npm start
 ```
+
+## Ritual testnet 예제
+
+env 템플릿: [`examples/env/ritual-testnet.env`](../../examples/env/ritual-testnet.env)
+
+```bash
+CHAIN=ritual-testnet \
+API_URL=http://ritual-testnet:3030 \
+EVM_API_URL=http://ritual-testnet:8545 \
+ADDRESS=0xFBF57F6b80578F4918684BAbB5dA70Fac504bdB3 \
+VALIDATOR=0xd819a8df40351384466db487458d0b9091c697fd198b05a8729f892c251ae82f \
+EXISTING_METRICS_URL=http://ritual-testnet:9001/metrics,http://ritual-testnet:9090/metrics \
+npm start
+```
+
+`API_URL`은 Ritual CL JSON-RPC, `EVM_API_URL`은 EL JSON-RPC를 가리킵니다.
+`EXISTING_METRICS_URL`에 EL/CL Prometheus endpoint를 넣으면 exporter의
+`/metrics` 응답에 함께 병합됩니다.

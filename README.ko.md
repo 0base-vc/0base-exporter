@@ -50,7 +50,7 @@ curl http://localhost:27770/metrics
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee`, `tendermint-tgrade`, `initia-testnet` |
 | Solana              | `solana`, `solana-testnet`                                                                                                                    |
-| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet`                                        |
+| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `ritual-testnet`, `canopy-testnet`                      |
 
 기존 `BLOCKCHAIN=./availables/...` 값도 계속 지원됩니다.
 

@@ -22,6 +22,11 @@
 | `EXISTING_METRICS_URL` | 선택                | 합쳐서 노출할 Prometheus endpoint 목록           |
 | `ENABLE_PROM_PERF`     | 선택                | 내부 gauge timing 계측 활성화                    |
 
+`ritual-testnet`에서는 `API_URL`에 Ritual CL JSON-RPC endpoint를 넣고,
+`EVM_API_URL`에 Ritual EL JSON-RPC endpoint를 넣습니다.
+`EXISTING_METRICS_URL`에는 exporter `/metrics` 응답에 함께 합칠 EL/CL
+Prometheus endpoint를 넣습니다.
+
 ## 주소 의미
 
 | 계열         | 주소 필드 | validator 필드 |
