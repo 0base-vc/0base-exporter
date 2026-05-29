@@ -12,6 +12,11 @@ type TestCollector = {
   updateCurrentEpochMetricsFromIndexer(validators: string): Promise<boolean>;
   updateEpochIncomeFromVx(validators: string): Promise<void>;
   updateEpochMedianFeesAverages(): Promise<void>;
+  applyEffBidToVotes(
+    winningTotalPmpe: number,
+    baseInflPmpe: number,
+    baseMevPmpe: number,
+  ): Promise<void>;
 };
 
 describe("Solana vx.tools fallbacks", () => {
@@ -239,6 +244,28 @@ describe("Solana vx.tools fallbacks", () => {
     expect(metrics).toContain(
       'solana_epoch_top50_validator_mev_tips_avg_sol{epoch="956",rank="1",validator="validator-high",name="High",stake="100"} 0.5',
     );
+  });
+
+  it("emits Marinade effective bid using only the (5,0) commission case", async () => {
+    const collector = new Solana(
+      "",
+      "https://rpc.example",
+      "https://rpc.example",
+      "vote-1,vote-2",
+      "identity-1,identity-2",
+      "",
+    ) as unknown as TestCollector;
+
+    await collector.applyEffBidToVotes(100, 60, 20);
+
+    const metrics = await collector.registry.metrics();
+    expect(metrics).toContain(
+      'solana_marinade_min_effective_bid_sol{vote="vote-1",commission="5",mev_commission="0"} 23',
+    );
+    expect(metrics).toContain(
+      'solana_marinade_min_effective_bid_sol{vote="vote-2",commission="5",mev_commission="0"} 23',
+    );
+    expect(metrics).not.toContain('mev_commission="2"');
   });
 
   it("emits numeric indexer metrics independently from status and exposes status gauges", async () => {

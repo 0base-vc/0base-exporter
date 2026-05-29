@@ -340,11 +340,6 @@ export default class Solana extends TargetAbstract {
   } | null = null;
   private readonly SDK_CACHE_TTL_MS = 30 * 60 * 1000;
 
-  // Cached Marinade metadata such as advertised commission and MEV BPS.
-  private validatorsAdvCache: { ts: number; map: Record<string, number> } | null = null;
-  private mevBpsCache: { ts: number; map: Record<string, number> } | null = null;
-  private readonly META_TTL_MS = 10 * 60 * 1000;
-
   private toUniqueList(csv: string): string[] {
     return Array.from(
       new Set(
@@ -891,66 +886,6 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Build a vote-account map from commission_advertised values in the validators API.
-  private async loadValidatorsAdvertisedCommission(): Promise<Record<string, number>> {
-    try {
-      const now = Date.now();
-      if (this.validatorsAdvCache && now - this.validatorsAdvCache.ts < this.META_TTL_MS) {
-        return this.validatorsAdvCache.map;
-      }
-      const url = "https://validators-api.marinade.finance/validators?limit=9999&epochs=1";
-      const data = await this.getWithCache(
-        url,
-        (response: { data: any }) => response.data,
-        this.getRandomCacheDuration(60000, 15000),
-        25000,
-      );
-      const arr: any[] = Array.isArray(data?.validators) ? data.validators : [];
-      const map: Record<string, number> = {};
-      for (const it of arr) {
-        const vote = String(it?.vote_account || it?.vote || "");
-        if (!vote) continue;
-        const adv = Number(it?.commission_advertised);
-        if (Number.isFinite(adv)) map[vote] = adv;
-      }
-      this.validatorsAdvCache = { ts: now, map };
-      return map;
-    } catch (e) {
-      console.error("loadValidatorsAdvertisedCommission", e);
-      return {};
-    }
-  }
-
-  // Build a vote-account map from mev_commission_bps values in the MEV API.
-  private async loadMevCommissionBps(): Promise<Record<string, number>> {
-    try {
-      const now = Date.now();
-      if (this.mevBpsCache && now - this.mevBpsCache.ts < this.META_TTL_MS) {
-        return this.mevBpsCache.map;
-      }
-      const url = "https://validators-api.marinade.finance/mev";
-      const data = await this.getWithCache(
-        url,
-        (response: { data: any }) => response.data,
-        this.getRandomCacheDuration(60000, 15000),
-        25000,
-      );
-      // Only process the expected `{ validators: [{ vote_account, mev_commission_bps, ... }] }` shape.
-      const out: Record<string, number> = {};
-      const arr: any[] = Array.isArray((data as any)?.validators) ? (data as any).validators : [];
-      for (const it of arr) {
-        const vote = String(it?.vote_account || "");
-        const bps = Number(it?.mev_commission_bps);
-        if (vote && Number.isFinite(bps)) out[vote] = bps;
-      }
-      this.mevBpsCache = { ts: now, map: out };
-      return out;
-    } catch (e) {
-      console.error("loadMevCommissionBps", e);
-      return {};
-    }
-  }
-
   // Compute the global effective bid and expose it with commission and mev_commission labels.
   private async updateGlobalEffectiveBid(): Promise<void> {
     try {
@@ -1027,7 +962,7 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Precompute the (5,0) and (5,2) cases, then apply the appropriate one per vote account.
+  // Apply the (5,0) case to every configured vote account.
   private async applyEffBidToVotes(
     winningTotalPmpe: number,
     baseInflPmpe: number,
@@ -1038,25 +973,9 @@ export default class Solana extends TargetAbstract {
       0,
       Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0)),
     );
-    // (5,2): commission 5%, mev_commission 2%
-    const eff52 = Math.max(
-      0,
-      Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0.02)),
-    );
-
-    const [, mevCommissionBpsByVote] = await Promise.all([
-      this.loadValidatorsAdvertisedCommission(),
-      this.loadMevCommissionBps(),
-    ]);
 
     for (const vote of this.toUniqueList(this.votes)) {
-      const mevBps = Number(mevCommissionBpsByVote[vote]);
-      // Treat MEV commission below 100 bps (1%) as 0%, otherwise treat it as 2%.
-      const isMev0 = Number.isFinite(mevBps) && mevBps < 100;
-      const useEff = isMev0 ? eff50 : eff52;
-      const commLabel = "5";
-      const mevLabel = isMev0 ? "0" : "2";
-      this.marinadeMinEffectiveBidGauge.labels(vote, commLabel, mevLabel).set(useEff);
+      this.marinadeMinEffectiveBidGauge.labels(vote, "5", "0").set(eff50);
     }
   }
 
