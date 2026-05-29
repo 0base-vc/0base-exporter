@@ -78,10 +78,14 @@ function installRpcMock(collector: TestCollector): void {
 
 describe("Ritual testnet collector", () => {
   const previousEvmApiUrl = process.env.EVM_API_URL;
+  const previousCacheMs = process.env.RITUAL_CACHE_MS;
+  const previousRpcTimeoutMs = process.env.RITUAL_RPC_TIMEOUT_MS;
 
   beforeEach(() => {
     register.clear();
     process.env.EVM_API_URL = "http://ritual-testnet:8545";
+    delete process.env.RITUAL_CACHE_MS;
+    delete process.env.RITUAL_RPC_TIMEOUT_MS;
   });
 
   afterEach(() => {
@@ -90,6 +94,16 @@ describe("Ritual testnet collector", () => {
       delete process.env.EVM_API_URL;
     } else {
       process.env.EVM_API_URL = previousEvmApiUrl;
+    }
+    if (previousCacheMs == null) {
+      delete process.env.RITUAL_CACHE_MS;
+    } else {
+      process.env.RITUAL_CACHE_MS = previousCacheMs;
+    }
+    if (previousRpcTimeoutMs == null) {
+      delete process.env.RITUAL_RPC_TIMEOUT_MS;
+    } else {
+      process.env.RITUAL_RPC_TIMEOUT_MS = previousRpcTimeoutMs;
     }
   });
 
@@ -119,6 +133,12 @@ describe("Ritual testnet collector", () => {
       `ritual_validator_commission_available{node_pubkey="${NODE_PUBKEY}"} 0`,
     );
     expect(metrics).toContain("existing_metric 1");
+    expect(metrics).toContain(
+      "# HELP ritual_execution_layer_up Whether Ritual execution-layer JSON-RPC data is usable, including cached fallback data",
+    );
+    expect(metrics).toContain(
+      "# HELP ritual_consensus_layer_up Whether Ritual consensus-layer JSON-RPC data is usable, including cached fallback data",
+    );
   });
 
   it("can select the configured validator by node public key and emit commission when exposed", async () => {
@@ -139,6 +159,24 @@ describe("Ritual testnet collector", () => {
     );
     expect(metrics).toContain(
       'ritual_validator_commission_available{node_pubkey="0x00d21610e478bc59b0c1e70505874e191bf94ab73cb1f9246f963f9bc0a1b253"} 1',
+    );
+  });
+
+  it("falls back to default cache and timeout values when Ritual env values are invalid", async () => {
+    process.env.RITUAL_CACHE_MS = "-1";
+    process.env.RITUAL_RPC_TIMEOUT_MS = "1.5";
+    const collector = createCollector();
+    installRpcMock(collector);
+    jest.spyOn(collector.web3.eth, "getBalance").mockResolvedValue(0n);
+
+    await collector.makeMetrics();
+
+    expect(collector.postWithCache).toHaveBeenCalledWith(
+      "http://ritual-testnet:8545",
+      { method: "eth_chainId", params: [] },
+      expect.any(Function),
+      30000,
+      10000,
     );
   });
 });

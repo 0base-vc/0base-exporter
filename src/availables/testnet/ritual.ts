@@ -81,6 +81,16 @@ function parseNumeric(value: number | string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function parseIntegerEnv(name: string, fallback: number, minimum: number): number {
+  const raw = getOptionalEnv(name);
+  if (!/^\d+$/.test(raw)) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(parsed) && parsed >= minimum ? parsed : fallback;
+}
+
 function parseHexQuantity(value: string | undefined): number | undefined {
   if (!value) {
     return undefined;
@@ -120,9 +130,12 @@ export default class Ritual extends TargetAbstract {
     getOptionalEnv("RITUAL_CL_RPC_URL") ||
     this.apiUrl ||
     (getOptionalEnv("RPC_URL") ? this.rpcUrl : "");
-  private readonly rpcTimeoutMs =
-    parseNumeric(getOptionalEnv("RITUAL_RPC_TIMEOUT_MS")) ?? DEFAULT_RPC_TIMEOUT_MS;
-  private readonly cacheMs = parseNumeric(getOptionalEnv("RITUAL_CACHE_MS")) ?? DEFAULT_CACHE_MS;
+  private readonly rpcTimeoutMs = parseIntegerEnv(
+    "RITUAL_RPC_TIMEOUT_MS",
+    DEFAULT_RPC_TIMEOUT_MS,
+    1,
+  );
+  private readonly cacheMs = parseIntegerEnv("RITUAL_CACHE_MS", DEFAULT_CACHE_MS, 0);
 
   private readonly addressAvailableGauge = new Gauge({
     name: `${this.metricPrefix}_address_available`,
@@ -131,7 +144,7 @@ export default class Ritual extends TargetAbstract {
   });
   private readonly executionLayerUpGauge = new Gauge({
     name: `${this.metricPrefix}_execution_layer_up`,
-    help: "Whether the Ritual execution-layer JSON-RPC endpoint is reachable",
+    help: "Whether Ritual execution-layer JSON-RPC data is usable, including cached fallback data",
   });
   private readonly executionLayerChainIdGauge = new Gauge({
     name: `${this.metricPrefix}_execution_layer_chain_id`,
@@ -156,7 +169,7 @@ export default class Ritual extends TargetAbstract {
   });
   private readonly consensusLayerUpGauge = new Gauge({
     name: `${this.metricPrefix}_consensus_layer_up`,
-    help: "Whether the Ritual consensus-layer JSON-RPC endpoint is reachable",
+    help: "Whether Ritual consensus-layer JSON-RPC data is usable, including cached fallback data",
   });
   private readonly consensusLayerHealthGauge = new Gauge({
     name: `${this.metricPrefix}_consensus_layer_health`,
