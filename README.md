@@ -50,7 +50,7 @@ Use the new `CHAIN` variable when possible:
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee`, `tendermint-tgrade`, `initia-testnet` |
 | Solana              | `solana`, `solana-testnet`                                                                                                                    |
-| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `canopy-testnet`                                        |
+| EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `ritual-testnet`, `canopy-testnet`                      |
 
 Legacy `BLOCKCHAIN=./availables/...` values are still supported and mapped internally to `CHAIN`.
 

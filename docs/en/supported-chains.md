@@ -19,4 +19,5 @@
 | `mitosis`            | Hybrid | `./availables/mitosis.ts`            |
 | `mitosis-testnet`    | Hybrid | `./availables/testnet/mitosis.ts`    |
 | `story-testnet`      | EVM    | `./availables/testnet/story.ts`      |
+| `ritual-testnet`     | Hybrid | `./availables/testnet/ritual.ts`     |
 | `canopy-testnet`     | Hybrid | `./availables/testnet/canopy.ts`     |

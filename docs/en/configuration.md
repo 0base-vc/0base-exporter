@@ -22,6 +22,11 @@ Registered legacy `BLOCKCHAIN` paths are mapped to the matching `CHAIN` entry. U
 | `EXISTING_METRICS_URL` | Optional                    | Comma-separated Prometheus endpoints to merge.                  |
 | `ENABLE_PROM_PERF`     | Optional                    | Enables internal Prometheus gauge timing instrumentation.       |
 
+For `ritual-testnet`, set `API_URL` to the Ritual CL JSON-RPC endpoint and
+`EVM_API_URL` to the Ritual EL JSON-RPC endpoint. Use `EXISTING_METRICS_URL` for
+the node-native EL/CL Prometheus endpoints that should be merged into the
+exporter output.
+
 ## Address semantics
 
 | Family       | Address field | Validator field |

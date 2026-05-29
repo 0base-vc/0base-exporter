@@ -16,6 +16,7 @@ import CanopyTestnet from "../availables/testnet/canopy";
 import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
+import RitualTestnet from "../availables/testnet/ritual";
 import SolanaTestnet from "../availables/testnet/solana";
 import StoryTestnet from "../availables/testnet/story";
 import type TargetAbstract from "../target.abstract";
@@ -306,6 +307,24 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
     factory: createFactory(StoryTestnet),
+  },
+  {
+    id: "ritual-testnet",
+    family: "hybrid",
+    description: "Ritual testnet collector",
+    aliases: ["testnet/ritual", "ritual"],
+    legacyModulePaths: ["./availables/testnet/ritual.ts"],
+    requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES"],
+    optionalEnv: [
+      "VALIDATOR",
+      "RITUAL_CL_RPC_URL",
+      "RPC_URL",
+      "EXISTING_METRICS_URL",
+      "DECIMAL_PLACES",
+      "RITUAL_RPC_TIMEOUT_MS",
+      "RITUAL_CACHE_MS",
+    ],
+    factory: createFactory(RitualTestnet),
   },
   {
     id: "initia-testnet",

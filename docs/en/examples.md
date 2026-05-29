@@ -48,3 +48,21 @@ VALIDATOR=0xvalidator \
 ALCHEMY_API_KEY=your-key \
 npm start
 ```
+
+## Ritual testnet example
+
+Env template: [`examples/env/ritual-testnet.env`](../../examples/env/ritual-testnet.env)
+
+```bash
+CHAIN=ritual-testnet \
+API_URL=http://ritual-testnet:3030 \
+EVM_API_URL=http://ritual-testnet:8545 \
+ADDRESS=0xFBF57F6b80578F4918684BAbB5dA70Fac504bdB3 \
+VALIDATOR=0xd819a8df40351384466db487458d0b9091c697fd198b05a8729f892c251ae82f \
+EXISTING_METRICS_URL=http://ritual-testnet:9001/metrics,http://ritual-testnet:9090/metrics \
+npm start
+```
+
+`API_URL` points to Ritual CL JSON-RPC, `EVM_API_URL` points to EL JSON-RPC, and
+`EXISTING_METRICS_URL` merges the native EL/CL Prometheus endpoints into the same
+exporter `/metrics` response.
