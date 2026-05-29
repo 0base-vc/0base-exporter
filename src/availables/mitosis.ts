@@ -15,6 +15,14 @@ function parseScaled(value: string | number | undefined, decimals: number): numb
   return toDecimal(String(value ?? 0), decimals);
 }
 
+type MitosisValidator = {
+  addr?: string;
+  collateral?: string | number;
+  collateral_shares?: string | number;
+  extra_voting_power?: string | number;
+  voting_power?: string | number;
+};
+
 export default class Mitosis extends Tendermint {
   public readonly web3: Web3;
   private readonly evmClient: EvmClient;
@@ -109,30 +117,35 @@ export default class Mitosis extends Tendermint {
   }
 
   protected async updateRank(validator: string): Promise<void> {
-    const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
+    const validators = await this.loadValidators();
+    if (validators.length === 0) {
+      return;
+    }
 
-    return this.get(url, (response: { data: any }) => {
-      const sorted = _.sortBy(response.data.validators, (o: any) => {
-        return parseInteger(o.collateral_shares);
-      }).reverse();
+    const sorted = _.sortBy(validators, (o: MitosisValidator) => {
+      return parseInteger(o.collateral_shares);
+    }).reverse();
 
-      const rank =
-        _.findIndex(sorted, (o: any) => {
-          return o.addr.toLowerCase() === validator.toLowerCase();
-        }) + 1;
+    const rank =
+      _.findIndex(sorted, (o: MitosisValidator) => {
+        return o.addr?.toLowerCase() === validator.toLowerCase();
+      }) + 1;
 
-      const me = sorted[rank - 1];
-      const above = sorted[rank - 2] || { collateral_shares: me.collateral_shares };
-      const below = sorted[rank] || { collateral_shares: "0" };
+    if (rank <= 0) {
+      return;
+    }
 
-      this.rankGauge.labels(validator).set(rank);
-      this.rivalsPowerGauge
-        .labels("above")
-        .set(parseScaled(above.collateral_shares, this.decimalPlaces));
-      this.rivalsPowerGauge
-        .labels("below")
-        .set(parseScaled(below.collateral_shares, this.decimalPlaces));
-    });
+    const me = sorted[rank - 1];
+    const above = sorted[rank - 2] || { collateral_shares: me.collateral_shares };
+    const below = sorted[rank] || { collateral_shares: "0" };
+
+    this.rankGauge.labels(validator).set(rank);
+    this.rivalsPowerGauge
+      .labels("above")
+      .set(parseScaled(above.collateral_shares, this.decimalPlaces));
+    this.rivalsPowerGauge
+      .labels("below")
+      .set(parseScaled(below.collateral_shares, this.decimalPlaces));
   }
 
   protected async updateMaxValidator(): Promise<void> {
@@ -145,15 +158,10 @@ export default class Mitosis extends Tendermint {
   }
 
   protected async updateValidatorsPower(): Promise<void> {
-    const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators`;
-
-    return this.get(url, async (response: { data: any }) => {
-      const validators = response.data.validators;
-      for (const validator of validators) {
-        // Fetch all validator details in a single contract call.
-        await this.updateValidatorInfo(validator);
-      }
-    });
+    const validators = await this.loadValidatorsWithConfiguredFallback();
+    for (const validator of validators) {
+      await this.updateValidatorInfo(validator);
+    }
   }
 
   protected async updateEvmAddressBalance(addresses: string): Promise<void> {
@@ -178,6 +186,9 @@ export default class Mitosis extends Tendermint {
           }
           const balance: bigint = await tokenContract.methods.balanceOf(address).call();
           const amount = this.evmClient.scale(balance.toString(), this.gMitoDecimals);
+          this.erc20BalanceGauge
+            .labels(address, this.gMitoContractAddress, "gMITO", "gMITO")
+            .set(amount);
           this.availableGauge.labels(address, "gMITO").set(amount);
         } catch (e) {
           console.error("gMITO balance fetch error", e);
@@ -311,26 +322,64 @@ export default class Mitosis extends Tendermint {
     return this.validatorManagerContract;
   }
 
-  private async updateValidatorInfo(validator: any): Promise<void> {
+  private async loadValidators(): Promise<MitosisValidator[]> {
+    const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators?pagination.limit=1000`;
+    const validators = await this.get(url, (response: { data: any }) => {
+      return Array.isArray(response.data?.validators) ? response.data.validators : [];
+    });
+
+    return Array.isArray(validators) ? validators : [];
+  }
+
+  private async loadConfiguredValidator(): Promise<MitosisValidator | null> {
+    const validator = this.validator.trim();
+    if (!validator) {
+      return null;
+    }
+
+    const url = `${this.apiUrl}/mitosis/evmvalidator/v1/validators/${validator}`;
+    const result = await this.get(url, (response: { data: any }) => {
+      return response.data?.validator ?? null;
+    });
+
+    return result && typeof result === "object" ? (result as MitosisValidator) : null;
+  }
+
+  private async loadValidatorsWithConfiguredFallback(): Promise<MitosisValidator[]> {
+    const validators = await this.loadValidators();
+    if (validators.length > 0) {
+      return validators;
+    }
+
+    const configuredValidator = await this.loadConfiguredValidator();
+    return configuredValidator ? [configuredValidator] : [];
+  }
+
+  private async updateValidatorInfo(validator: MitosisValidator): Promise<void> {
+    const address = validator.addr;
+    if (!address) {
+      return;
+    }
+
     try {
       // Load validator details from the smart contract.
       const contract = this.getValidatorManagerContract();
-      const result = await contract.methods.validatorInfo(validator.addr).call();
+      const result = await contract.methods.validatorInfo(address).call();
 
       // Parse metadata and extract the moniker when possible.
       const metadata = this.parseMetadataToJson(result.metadata);
       const moniker = metadata?.name || "Unknown";
 
       // Update the base validator power gauges from API data, including the moniker label.
-      this.validatorsGauge.labels(validator.addr).set(parseInteger(validator.collateral_shares));
+      this.validatorsGauge.labels(address).set(parseInteger(validator.collateral_shares));
       this.validatorsCollateralGauge
-        .labels(validator.addr, moniker)
+        .labels(address, moniker)
         .set(parseInteger(validator.collateral));
       this.validatorsExtraVotingPowerGauge
-        .labels(validator.addr, moniker)
+        .labels(address, moniker)
         .set(parseInteger(validator.extra_voting_power));
       this.validatorsVotingPowerGauge
-        .labels(validator.addr, moniker)
+        .labels(address, moniker)
         .set(parseInteger(validator.voting_power));
 
       // Update commission-rate gauges from contract data.
@@ -342,32 +391,30 @@ export default class Mitosis extends Tendermint {
         result.pendingCommissionRateUpdateEpoch,
       );
 
-      this.validatorsCommissionRateGauge.labels(validator.addr, moniker).set(commissionRatePercent);
+      this.validatorsCommissionRateGauge.labels(address, moniker).set(commissionRatePercent);
       this.validatorsPendingCommissionRateGauge
-        .labels(validator.addr, moniker)
+        .labels(address, moniker)
         .set(pendingCommissionRatePercent);
       this.validatorsPendingCommissionRateUpdateEpochGauge
-        .labels(validator.addr, moniker)
+        .labels(address, moniker)
         .set(pendingCommissionRateUpdateEpoch);
     } catch (e) {
-      console.error(`Error fetching validator info for ${validator.addr}:`, e);
+      console.error(`Error fetching validator info for ${address}:`, e);
       // Fall back to default values when contract reads fail.
       const fallbackMoniker = "Unknown";
-      this.validatorsGauge.labels(validator.addr).set(parseInteger(validator.collateral_shares));
+      this.validatorsGauge.labels(address).set(parseInteger(validator.collateral_shares));
       this.validatorsCollateralGauge
-        .labels(validator.addr, fallbackMoniker)
+        .labels(address, fallbackMoniker)
         .set(parseInteger(validator.collateral));
       this.validatorsExtraVotingPowerGauge
-        .labels(validator.addr, fallbackMoniker)
+        .labels(address, fallbackMoniker)
         .set(parseInteger(validator.extra_voting_power));
       this.validatorsVotingPowerGauge
-        .labels(validator.addr, fallbackMoniker)
+        .labels(address, fallbackMoniker)
         .set(parseInteger(validator.voting_power));
-      this.validatorsCommissionRateGauge.labels(validator.addr, fallbackMoniker).set(0);
-      this.validatorsPendingCommissionRateGauge.labels(validator.addr, fallbackMoniker).set(0);
-      this.validatorsPendingCommissionRateUpdateEpochGauge
-        .labels(validator.addr, fallbackMoniker)
-        .set(0);
+      this.validatorsCommissionRateGauge.labels(address, fallbackMoniker).set(0);
+      this.validatorsPendingCommissionRateGauge.labels(address, fallbackMoniker).set(0);
+      this.validatorsPendingCommissionRateUpdateEpochGauge.labels(address, fallbackMoniker).set(0);
     }
   }
 
