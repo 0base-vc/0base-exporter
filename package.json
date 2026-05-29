@@ -103,7 +103,7 @@
     "typescript-eslint": "^8.59.4"
   },
   "overrides": {
-    "qs": "6.15.1",
+    "qs": "6.15.2",
     "smol-toml": "1.6.1",
     "diff": "4.0.4",
     "micromatch": {
