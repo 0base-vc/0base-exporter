@@ -12,6 +12,8 @@ describe("Tendermint legacy metrics contract", () => {
     nock(apiUrl)
       .get(`/bank/balances/${address}`)
       .reply(200, { result: [{ denom: "uatom", amount: "1230000" }] })
+      .get(`/auth/accounts/${address}`)
+      .reply(200, { result: { value: { sequence: "5472864" } } })
       .get(`/staking/delegators/${address}/delegations`)
       .reply(200, { result: [{ balance: { denom: "uatom", amount: "4560000" } }] })
       .get(`/staking/delegators/${address}/unbonding_delegations`)
@@ -52,6 +54,7 @@ describe("Tendermint legacy metrics contract", () => {
     expect(metrics).toContain(
       'tendermint_address_commission{address="cosmosvaloper1legacy",denom="uatom"} 0.34',
     );
+    expect(metrics).toContain('tendermint_address_sequence{address="cosmos1legacy"} 5472864');
     expect(metrics).toContain('tendermint_validator_rank{validator="cosmosvaloper1legacy"} 2');
     expect(metrics).toContain('tendermint_validator_power_rivals{rank="above"} 9');
     expect(metrics).toContain('tendermint_validator_power_rivals{rank="below"} 5');

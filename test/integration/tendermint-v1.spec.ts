@@ -21,6 +21,8 @@ describe("TendermintV1 metrics contract", () => {
     nock(apiUrl)
       .get(`/cosmos/bank/v1beta1/balances/${address}`)
       .reply(200, loadFixture("balances"))
+      .get(`/cosmos/auth/v1beta1/accounts/${address}`)
+      .reply(200, { account: { sequence: "5472864" } })
       .get(`/cosmos/staking/v1beta1/delegations/${address}`)
       .reply(200, loadFixture("delegations"))
       .get(`/cosmos/staking/v1beta1/delegators/${address}/unbonding_delegations`)
@@ -96,6 +98,10 @@ tendermint_gov_proposals_count 2
 # TYPE tendermint_validators_power gauge
 tendermint_validators_power{address="A1B2C3"} 111
 tendermint_validators_power{address="D4E5F6"} 222
+
+# HELP tendermint_address_sequence Account sequence of address
+# TYPE tendermint_address_sequence gauge
+tendermint_address_sequence{address="cosmos1address"} 5472864
 
 "
 `);

@@ -6,6 +6,7 @@ import { getDecimalPlaces } from "../../core/runtime-env";
 
 type AmountLike = { denom?: string; amount: number | string };
 type AmountSelector = (json: any) => AmountLike[];
+type AccountSequenceSelector = (json: any) => number | undefined;
 
 interface ValidatorsPowerItem {
   address: string;
@@ -20,6 +21,11 @@ interface RankItem {
 interface AmountRequestProfile {
   url: (apiUrl: string, address: string) => string;
   selector: AmountSelector;
+}
+
+interface AccountSequenceProfile {
+  url: (apiUrl: string, address: string) => string;
+  selector: AccountSequenceSelector;
 }
 
 interface CommissionRequestProfile {
@@ -47,6 +53,7 @@ interface ValidatorsPowerProfile {
 export interface CosmosCollectorProfile {
   filterAddress?: (address: string) => boolean;
   balances: AmountRequestProfile;
+  accountSequence?: AccountSequenceProfile;
   delegations: AmountRequestProfile;
   unbondings: AmountRequestProfile;
   rewards: AmountRequestProfile;
@@ -74,6 +81,41 @@ function normalizeAmount(amount: number | string, decimals: number = 0): number 
 function normalizeInteger(value: number | string): number {
   const parsed = Number(String(value));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseSequence(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = typeof value === "string" ? value.trim() : value;
+
+  if (normalized === "") {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function nestedAccountSequence(value: any, depth = 0): number | undefined {
+  if (value == null || typeof value !== "object" || depth > 5) {
+    return undefined;
+  }
+
+  const direct = parseSequence(value.sequence);
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  for (const key of ["base_account", "base_vesting_account", "account", "value"]) {
+    const nested = nestedAccountSequence(value[key], depth + 1);
+    if (nested !== undefined) {
+      return nested;
+    }
+  }
+
+  return undefined;
 }
 
 function initiaAmountValue(value: any): number | string {
@@ -151,6 +193,7 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
     help: "Gov voting period proposals count",
   });
 
+  private accountSequenceGauge?: Gauge;
   private readonly maybeValidatorsGauge?: Gauge;
 
   protected constructor(
@@ -193,6 +236,19 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
     return this.maybeValidatorsGauge;
   }
 
+  protected getOrCreateAccountSequenceGauge(): Gauge {
+    if (!this.accountSequenceGauge) {
+      this.accountSequenceGauge = new Gauge({
+        name: `${this.metricPrefix}_address_sequence`,
+        help: "Account sequence of address",
+        labelNames: ["address"],
+      });
+      this.registry.registerMetric(this.accountSequenceGauge);
+    }
+
+    return this.accountSequenceGauge;
+  }
+
   public async makeMetrics(): Promise<string> {
     let customMetrics = "";
 
@@ -225,6 +281,8 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
       .filter((address) =>
         this.profile.filterAddress ? this.profile.filterAddress(address) : true,
       );
+
+    this.accountSequenceGauge?.reset();
 
     for (const address of addressesToScan) {
       const available = await this.getAmount(
@@ -262,6 +320,8 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
       rewards.forEach((entry) => {
         this.rewardsGauge.labels(address, entry.denom).set(entry.amount);
       });
+
+      await this.updateAccountSequence(address);
     }
 
     const commissions = await this.getAmount(
@@ -285,6 +345,21 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
         amount: normalizeAmount(entry.amount, decimal),
       }));
     });
+  }
+
+  protected async updateAccountSequence(address: string): Promise<void> {
+    if (!this.profile.accountSequence) {
+      return;
+    }
+
+    const sequence = await this.get(
+      this.profile.accountSequence.url(this.apiUrl, address),
+      (response) => this.profile.accountSequence.selector(response.data),
+    );
+
+    if (typeof sequence === "number") {
+      this.getOrCreateAccountSequenceGauge().labels(address).set(sequence);
+    }
   }
 
   protected async updateRank(validator: string): Promise<void> {
@@ -437,6 +512,10 @@ const cosmosCommissionSelector: AmountSelector = (json: any) =>
   json.commission.commission == null || json.commission.commission.length === 0
     ? []
     : json.commission.commission;
+const accountSequenceSelector: AccountSequenceSelector = (json: any) =>
+  nestedAccountSequence(json.account) ??
+  nestedAccountSequence(json.result) ??
+  nestedAccountSequence(json);
 const initiaDelegationSelector: AmountSelector = (json: any) =>
   json.delegation_responses.length === 0
     ? []
@@ -478,6 +557,10 @@ export const legacyTendermintProfile: CosmosCollectorProfile = {
     url: (apiUrl, address) => `${apiUrl}/bank/balances/${address}`,
     selector: legacyBalanceSelector,
   },
+  accountSequence: {
+    url: (apiUrl, address) => `${apiUrl}/auth/accounts/${address}`,
+    selector: accountSequenceSelector,
+  },
   delegations: {
     url: (apiUrl, address) => `${apiUrl}/staking/delegators/${address}/delegations`,
     selector: legacyDelegationSelector,
@@ -517,6 +600,10 @@ export const cosmosV1beta1Profile: CosmosCollectorProfile = {
   balances: {
     url: (apiUrl, address) => `${apiUrl}/cosmos/bank/v1beta1/balances/${address}`,
     selector: cosmosBalanceSelector,
+  },
+  accountSequence: {
+    url: (apiUrl, address) => `${apiUrl}/cosmos/auth/v1beta1/accounts/${address}`,
+    selector: accountSequenceSelector,
   },
   delegations: {
     url: (apiUrl, address) => `${apiUrl}/cosmos/staking/v1beta1/delegations/${address}`,

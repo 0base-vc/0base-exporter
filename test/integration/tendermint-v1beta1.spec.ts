@@ -12,6 +12,8 @@ describe("Tendermint v1beta1 metrics contract", () => {
     nock(apiUrl)
       .get(`/cosmos/bank/v1beta1/balances/${address}`)
       .reply(200, { balances: [{ denom: "uatom", amount: "1230000" }] })
+      .get(`/cosmos/auth/v1beta1/accounts/${address}`)
+      .reply(200, { account: { sequence: "5472864" } })
       .get(`/cosmos/staking/v1beta1/delegations/${address}`)
       .reply(200, {
         delegation_responses: [{ balance: { denom: "uatom", amount: "4560000" } }],
@@ -56,6 +58,7 @@ describe("Tendermint v1beta1 metrics contract", () => {
     expect(metrics).toContain(
       'tendermint_address_commission{address="cosmosvaloper1beta",denom="uatom"} 0.34',
     );
+    expect(metrics).toContain('tendermint_address_sequence{address="cosmos1beta"} 5472864');
     expect(metrics).toContain('tendermint_validator_rank{validator="cosmosvaloper1beta"} 2');
     expect(metrics).toContain("tendermint_staking_parameters_max_validator_count 180");
     expect(metrics).toContain("tendermint_gov_proposals_count 2");
