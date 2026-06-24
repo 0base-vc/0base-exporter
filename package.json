@@ -68,10 +68,10 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "@marinade.finance/ds-sam-sdk": "^0.0.51",
-    "axios": "^1.16.1",
+    "axios": "^1.17.0",
     "express": "^5.2.1",
     "lodash": "^4.18.1",
-    "morgan": "^1.10.1",
+    "morgan": "^1.11.0",
     "prom-client": "^15.1.3",
     "web3": "^4.9.0"
   },
@@ -83,7 +83,7 @@
     "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.20",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.12.4",
+    "@types/node": "^24.13.2",
     "@types/supertest": "^7.2.0",
     "copyfiles": "^2.4.1",
     "eslint": "^9.39.1",
@@ -95,12 +95,12 @@
     "markdownlint-cli2": "^0.22.1",
     "nock": "^14.0.15",
     "nodemon": "^3.1.14",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "supertest": "^7.1.4",
-    "ts-jest": "^29.4.10",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.4"
+    "typescript-eslint": "^8.61.0"
   },
   "overrides": {
     "qs": "6.15.2",
@@ -121,7 +121,7 @@
       }
     },
     "follow-redirects": "1.16.0",
-    "ws": "8.20.1",
+    "ws": "8.21.0",
     "@typescript-eslint/typescript-estree": {
       "brace-expansion": "5.0.6"
     }
