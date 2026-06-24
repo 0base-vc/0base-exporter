@@ -48,6 +48,11 @@ describe("loadRuntimeConfig", () => {
       VOTE: "init1abc",
       IDENTITY: "initvaloper1def",
     });
+    const gnoland = loadRuntimeConfig({
+      BLOCKCHAIN: "./availables/testnet/gnoland.ts",
+      RPC_URL: "https://gnoland.example",
+      VALIDATOR: "g1validator",
+    });
     const ritual = loadRuntimeConfig({
       BLOCKCHAIN: "./availables/testnet/ritual.ts",
       API_URL: "https://ritual-cl.example",
@@ -57,6 +62,7 @@ describe("loadRuntimeConfig", () => {
 
     expect(tgrade.chainId).toBe("tendermint-tgrade");
     expect(initia.chainId).toBe("initia-testnet");
+    expect(gnoland.chainId).toBe("gnoland-testnet");
     expect(ritual.chainId).toBe("ritual-testnet");
   });
 
@@ -167,5 +173,19 @@ describe("loadRuntimeConfig", () => {
     });
 
     expect(config.rpcUrl).toBe("http://localhost:26657");
+  });
+
+  it("allows Gnoland testnet to run from RPC and validator settings only", () => {
+    const config = loadRuntimeConfig({
+      CHAIN: "gnoland-testnet",
+      RPC_URL: "https://rpc.test13.testnets.gno.land",
+      VALIDATOR: "g1validator",
+    });
+
+    expect(config.chainId).toBe("gnoland-testnet");
+    expect(config.apiUrl).toBe("");
+    expect(config.rpcUrl).toBe("https://rpc.test13.testnets.gno.land");
+    expect(config.collectorAddresses).toBe("");
+    expect(config.collectorValidator).toBe("g1validator");
   });
 });
