@@ -768,7 +768,9 @@ export default class Solana extends TargetAbstract {
               60000,
               10000,
             );
-            const releaseVersion: string = String(data?.version ?? "");
+            const releaseVersion: string = String(
+              data?.software_version ?? data?.version ?? data?.stats?.release_version ?? "",
+            );
             if (releaseVersion) {
               this.validatorReleaseVersionGauge.labels(vote, releaseVersion).set(1);
             }

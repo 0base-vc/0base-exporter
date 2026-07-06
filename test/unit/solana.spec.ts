@@ -3,15 +3,18 @@ import Solana from "../../src/availables/solana";
 
 type Selector = (response: { data: unknown }) => unknown;
 type PostWithCacheMock = jest.Mock<Promise<unknown>, [string, unknown, Selector, number?, number?]>;
+type GetWithCacheMock = jest.Mock<Promise<unknown>, [string, Selector, number?, number?]>;
 type TestCollector = {
   validatorToIdentityMap: Record<string, string>;
   registry: { metrics(): Promise<string> };
   postWithCache: PostWithCacheMock;
+  getWithCache: GetWithCacheMock;
   updateBlockProductionFromRpc(validators: string): Promise<void>;
   updateCurrentEpochMetrics(validators: string): Promise<void>;
   updateCurrentEpochMetricsFromIndexer(validators: string): Promise<boolean>;
   updateEpochIncomeFromVx(validators: string): Promise<void>;
   updateEpochMedianFeesAverages(): Promise<void>;
+  updateValidatorReleaseVersions(): Promise<void>;
   applyEffBidToVotes(
     winningTotalPmpe: number,
     baseInflPmpe: number,
@@ -266,6 +269,36 @@ describe("Solana vx.tools fallbacks", () => {
       'solana_marinade_min_effective_bid_sol{vote="vote-2",commission="5",mev_commission="0"} 23',
     );
     expect(metrics).not.toContain('mev_commission="2"');
+  });
+
+  it("emits validator release version from JPool software_version", async () => {
+    const collector = new Solana(
+      "",
+      "https://rpc.example",
+      "https://rpc.example",
+      "vote-1",
+      "identity-1",
+      "",
+    ) as unknown as TestCollector;
+
+    collector.getWithCache = jest.fn(async (url: string, selector: Selector): Promise<unknown> => {
+      expect(url).toBe("https://api.jpool.one/validators/vote-1");
+      return selector({
+        data: {
+          vote_account: "vote-1",
+          software_version: "4.1.0",
+          software_client: "AgaveBam",
+        },
+      });
+    });
+
+    await collector.updateValidatorReleaseVersions();
+
+    const metrics = await collector.registry.metrics();
+    expect(metrics).toContain(
+      'solana_validator_release_version{vote="vote-1",release_version="4.1.0"} 1',
+    );
+    expect(metrics).not.toContain('release_version=""');
   });
 
   it("emits numeric indexer metrics independently from status and exposes status gauges", async () => {
