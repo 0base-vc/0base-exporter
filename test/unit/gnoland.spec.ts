@@ -157,7 +157,7 @@ describe("Gnoland testnet collector", () => {
           {
             result: {
               response: {
-                ResponseBase: { Data: balanceData },
+                ResponseBase: { Error: null, Data: balanceData },
               },
             },
           },
@@ -175,6 +175,80 @@ describe("Gnoland testnet collector", () => {
     expect(metrics).toContain('gnoland_validator_commission_available{validator="g1validator"} 0');
   });
 
+  it("marks ABCI balance errors as wallet query failures", async () => {
+    const collector = createCollector("g1validator", "invalid");
+    installRpcMocks(
+      collector,
+      VALIDATORS_RESPONSE,
+      STATUS_RESPONSE,
+      new Map([
+        [
+          "https://rpc.example/abci_query?path=bank%2Fbalances%2Finvalid",
+          {
+            result: {
+              response: {
+                ResponseBase: {
+                  Error: { "@type": "/std.InvalidAddressError" },
+                  Data: Buffer.from(JSON.stringify("")).toString("base64"),
+                },
+              },
+            },
+          },
+        ],
+      ]),
+    );
+
+    const metrics = await collector.makeMetrics();
+
+    expect(metrics).toContain('gnoland_wallet_query_up{address="invalid"} 0');
+    expect(metrics).toContain('gnoland_address_available{address="invalid",denom="ugnot"} 0');
+    expect(metrics).not.toContain('gnoland_wallet_query_up{address="invalid"} 1');
+  });
+
+  it("does not block startup on the initial signing backfill", async () => {
+    const collector = createCollector();
+    let releaseStatus: () => void = () => undefined;
+    const statusGate = new Promise<void>((resolve) => {
+      releaseStatus = resolve;
+    });
+    const blockedStatus = {
+      ...STATUS_RESPONSE,
+      result: {
+        ...STATUS_RESPONSE.result,
+        sync_info: {
+          ...STATUS_RESPONSE.result.sync_info,
+          latest_block_height: "0",
+        },
+      },
+    };
+
+    collector.getWithCache = jest.fn(async (_url, transform) => {
+      await statusGate;
+      return transform({ data: blockedStatus });
+    });
+
+    const startPromise = collector.start();
+    let timeout: NodeJS.Timeout | undefined;
+
+    try {
+      const result = await Promise.race([
+        startPromise.then(() => "started"),
+        new Promise<string>((resolve) => {
+          timeout = setTimeout(() => resolve("blocked"), 100);
+        }),
+      ]);
+
+      expect(result).toBe("started");
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      releaseStatus();
+      await startPromise;
+      await collector.stop();
+    }
+  });
+
   it("tracks signed, missed, and proposed blocks for the configured validator", async () => {
     const collector = createCollector();
     const statusResponse = {
@@ -183,30 +257,43 @@ describe("Gnoland testnet collector", () => {
         ...STATUS_RESPONSE.result,
         sync_info: {
           ...STATUS_RESPONSE.result.sync_info,
-          latest_block_height: "3",
+          latest_block_height: "4",
         },
       },
     };
     installRpcMocks(collector, VALIDATORS_RESPONSE, statusResponse);
 
-    const commit = (height: number, signed: boolean, proposed = false) => ({
-      result: {
-        signed_header: {
-          header: {
-            height: String(height),
-            proposer_address: proposed ? "g1validator" : "g1other",
-            validators_hash: "validator-set-a",
-          },
-          commit: {
-            precommits: signed ? [{ validator_address: "g1validator" }] : [null],
+    const commit = (height: number, vote: "match" | "mismatch" | "nil", proposed = false) => {
+      const blockId = {
+        hash: `block-${height}`,
+        parts: { total: "1", hash: `parts-${height}` },
+      };
+      const voteBlockId = vote === "mismatch" ? { ...blockId, hash: "other-block" } : blockId;
+
+      return {
+        result: {
+          signed_header: {
+            header: {
+              height: String(height),
+              proposer_address: proposed ? "g1validator" : "g1other",
+              validators_hash: "validator-set-a",
+            },
+            commit: {
+              block_id: blockId,
+              precommits:
+                vote === "nil"
+                  ? [null]
+                  : [{ validator_address: "g1validator", block_id: voteBlockId }],
+            },
           },
         },
-      },
-    });
+      };
+    };
     const responses = new Map<string, unknown>([
-      ["https://rpc.example/commit?height=1", commit(1, true)],
-      ["https://rpc.example/commit?height=2", commit(2, false)],
-      ["https://rpc.example/commit?height=3", commit(3, true, true)],
+      ["https://rpc.example/commit?height=1", commit(1, "match")],
+      ["https://rpc.example/commit?height=2", commit(2, "mismatch")],
+      ["https://rpc.example/commit?height=3", commit(3, "nil")],
+      ["https://rpc.example/commit?height=4", commit(4, "match", true)],
       [
         "https://rpc.example/validators?height=1&page=1&per_page=100",
         {
@@ -237,22 +324,21 @@ describe("Gnoland testnet collector", () => {
 
     await collector.start();
     try {
+      await new Promise<void>((resolve) => setImmediate(resolve));
       const metrics = await collector.makeMetrics();
 
       expect(metrics).toContain('gnoland_validator_signing_tracker_up{validator="g1validator"} 1');
       expect(metrics).toContain(
-        'gnoland_validator_signing_window_blocks{validator="g1validator"} 3',
+        'gnoland_validator_signing_window_blocks{validator="g1validator"} 4',
       );
       expect(metrics).toContain('gnoland_validator_signed_blocks{validator="g1validator"} 2');
-      expect(metrics).toContain('gnoland_validator_missed_blocks{validator="g1validator"} 1');
-      expect(metrics).toContain(
-        'gnoland_validator_miss_rate{validator="g1validator"} 0.3333333333333333',
-      );
+      expect(metrics).toContain('gnoland_validator_missed_blocks{validator="g1validator"} 2');
+      expect(metrics).toContain('gnoland_validator_miss_rate{validator="g1validator"} 0.5');
       expect(metrics).toContain(
         'gnoland_validator_consecutive_missed_blocks{validator="g1validator"} 0',
       );
-      expect(metrics).toContain('gnoland_validator_last_signed_height{validator="g1validator"} 3');
-      expect(metrics).toContain('gnoland_validator_last_missed_height{validator="g1validator"} 2');
+      expect(metrics).toContain('gnoland_validator_last_signed_height{validator="g1validator"} 4');
+      expect(metrics).toContain('gnoland_validator_last_missed_height{validator="g1validator"} 3');
       expect(metrics).toContain('gnoland_validator_proposed_blocks{validator="g1validator"} 1');
       expect(metrics).toContain('gnoland_validator_signed_latest{validator="g1validator"} 1');
       expect(collector.get).toHaveBeenCalledWith(

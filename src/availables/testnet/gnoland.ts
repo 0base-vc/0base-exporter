@@ -41,6 +41,19 @@ interface GnolandValidatorsResponse {
   };
 }
 
+interface GnolandBlockId {
+  hash?: string;
+  parts?: {
+    total?: number | string;
+    hash?: string;
+  };
+}
+
+interface GnolandPrecommit {
+  validator_address?: string;
+  block_id?: GnolandBlockId;
+}
+
 interface GnolandCommitResponse {
   result?: {
     signed_header?: {
@@ -50,7 +63,8 @@ interface GnolandCommitResponse {
         validators_hash?: string;
       };
       commit?: {
-        precommits?: Array<{ validator_address?: string } | null>;
+        block_id?: GnolandBlockId;
+        precommits?: Array<GnolandPrecommit | null>;
       };
     };
   };
@@ -60,6 +74,7 @@ interface GnolandBalanceResponse {
   result?: {
     response?: {
       ResponseBase?: {
+        Error?: unknown;
         Data?: string;
       };
     };
@@ -131,6 +146,18 @@ function normalizeLabel(value: unknown): string {
 
 function normalizeAddress(value: unknown): string {
   return normalizeLabel(value).toLowerCase();
+}
+
+function blockIdsMatch(left: GnolandBlockId | undefined, right: GnolandBlockId): boolean {
+  const leftHash = normalizeLabel(left?.hash);
+  const rightHash = normalizeLabel(right.hash);
+
+  return (
+    leftHash.length > 0 &&
+    leftHash === rightHash &&
+    parseNumber(left?.parts?.total) === parseNumber(right.parts?.total) &&
+    normalizeLabel(left?.parts?.hash) === normalizeLabel(right.parts?.hash)
+  );
 }
 
 function splitCsv(value: string): string[] {
@@ -417,7 +444,7 @@ export default class GnolandTestnet extends TargetAbstract {
       return;
     }
 
-    await this.refreshSigningMetrics();
+    void this.refreshSigningMetrics();
     this.signingRefreshTimer = setInterval(
       () => void this.refreshSigningMetrics(),
       SIGNING_REFRESH_MS,
@@ -782,8 +809,15 @@ export default class GnolandTestnet extends TargetAbstract {
     const signedHeader = typeof response === "object" ? response.result?.signed_header : undefined;
     const heightValue = parseNumber(signedHeader?.header?.height);
     const validatorsHash = normalizeLabel(signedHeader?.header?.validators_hash);
+    const committedBlockId = signedHeader?.commit?.block_id;
 
-    if (!signedHeader?.header || !signedHeader.commit || !heightValue || !validatorsHash) {
+    if (
+      !signedHeader?.header ||
+      !signedHeader.commit ||
+      !heightValue ||
+      !validatorsHash ||
+      !normalizeLabel(committedBlockId?.hash)
+    ) {
       throw new Error(`Gno.land commit ${height} is unavailable`);
     }
 
@@ -792,9 +826,8 @@ export default class GnolandTestnet extends TargetAbstract {
       proposerAddress: normalizeAddress(signedHeader.header.proposer_address),
       validatorsHash,
       precommitAddresses: (signedHeader.commit.precommits ?? [])
-        .map((vote: { validator_address?: string } | null) =>
-          normalizeAddress(vote?.validator_address),
-        )
+        .filter((vote: GnolandPrecommit | null) => blockIdsMatch(vote?.block_id, committedBlockId))
+        .map((vote: GnolandPrecommit | null) => normalizeAddress(vote?.validator_address))
         .filter(Boolean),
     };
   }
@@ -828,6 +861,9 @@ export default class GnolandTestnet extends TargetAbstract {
 
     if (!responseBase) {
       throw new Error(`Invalid Gno.land balance response for ${address}`);
+    }
+    if (responseBase.Error !== undefined && responseBase.Error !== null) {
+      throw new Error(`Gno.land balance query failed for ${address}`);
     }
 
     return parseCoins(decodeBase64String(responseBase.Data ?? ""));
