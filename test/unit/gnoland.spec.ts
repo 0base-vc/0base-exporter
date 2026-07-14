@@ -4,6 +4,7 @@ import GnolandTestnet from "../../src/availables/testnet/gnoland";
 type GetWithCacheTransform = (response: { data: unknown }) => unknown;
 type TestCollector = GnolandTestnet & {
   getWithCache: jest.Mock<Promise<unknown>, [string, GetWithCacheTransform, number?, number?]>;
+  get: jest.Mock<Promise<unknown>, [string, GetWithCacheTransform, number?]>;
 };
 
 const STATUS_RESPONSE = {
@@ -60,21 +61,27 @@ const VALIDATORS_RESPONSE = {
   },
 };
 
-function createCollector(validator = "g1validator"): TestCollector {
+function createCollector(validator = "g1validator", addresses = ""): TestCollector {
   return new GnolandTestnet(
     "",
     "",
     "https://rpc.example/",
-    "",
+    addresses,
     validator,
   ) as unknown as TestCollector;
 }
 
-function installRpcMocks(collector: TestCollector, validatorsResponse = VALIDATORS_RESPONSE): void {
+function installRpcMocks(
+  collector: TestCollector,
+  validatorsResponse = VALIDATORS_RESPONSE,
+  statusResponse = STATUS_RESPONSE,
+  additionalResponses: ReadonlyMap<string, unknown> = new Map(),
+): void {
   const responses = new Map<string, unknown>([
-    ["https://rpc.example/status", STATUS_RESPONSE],
+    ["https://rpc.example/status", statusResponse],
     ["https://rpc.example/net_info", NET_INFO_RESPONSE],
     ["https://rpc.example/validators", validatorsResponse],
+    ...additionalResponses,
   ]);
 
   collector.getWithCache = jest.fn(async (url, transform) => {
@@ -135,6 +142,127 @@ describe("Gnoland testnet collector", () => {
     expect(metrics).toContain('gnoland_validator_rank{validator="g1missing"} 0');
     expect(metrics).toContain('gnoland_validator_power_rivals{rank="above"} 0');
     expect(metrics).toContain('gnoland_validator_power_rivals{rank="below"} 0');
+  });
+
+  it("emits operator wallet balances and reports commission field availability", async () => {
+    const collector = createCollector("g1validator", "g1operator");
+    const balanceData = Buffer.from(JSON.stringify("2500000ugnot,42foo/bar")).toString("base64");
+    installRpcMocks(
+      collector,
+      VALIDATORS_RESPONSE,
+      STATUS_RESPONSE,
+      new Map([
+        [
+          "https://rpc.example/abci_query?path=bank%2Fbalances%2Fg1operator",
+          {
+            result: {
+              response: {
+                ResponseBase: { Data: balanceData },
+              },
+            },
+          },
+        ],
+      ]),
+    );
+
+    const metrics = await collector.makeMetrics();
+
+    expect(metrics).toContain('gnoland_wallet_query_up{address="g1operator"} 1');
+    expect(metrics).toContain(
+      'gnoland_address_available{address="g1operator",denom="ugnot"} 2500000',
+    );
+    expect(metrics).toContain('gnoland_address_available{address="g1operator",denom="foo/bar"} 42');
+    expect(metrics).toContain('gnoland_validator_commission_available{validator="g1validator"} 0');
+  });
+
+  it("tracks signed, missed, and proposed blocks for the configured validator", async () => {
+    const collector = createCollector();
+    const statusResponse = {
+      ...STATUS_RESPONSE,
+      result: {
+        ...STATUS_RESPONSE.result,
+        sync_info: {
+          ...STATUS_RESPONSE.result.sync_info,
+          latest_block_height: "3",
+        },
+      },
+    };
+    installRpcMocks(collector, VALIDATORS_RESPONSE, statusResponse);
+
+    const commit = (height: number, signed: boolean, proposed = false) => ({
+      result: {
+        signed_header: {
+          header: {
+            height: String(height),
+            proposer_address: proposed ? "g1validator" : "g1other",
+            validators_hash: "validator-set-a",
+          },
+          commit: {
+            precommits: signed ? [{ validator_address: "g1validator" }] : [null],
+          },
+        },
+      },
+    });
+    const responses = new Map<string, unknown>([
+      ["https://rpc.example/commit?height=1", commit(1, true)],
+      ["https://rpc.example/commit?height=2", commit(2, false)],
+      ["https://rpc.example/commit?height=3", commit(3, true, true)],
+      [
+        "https://rpc.example/validators?height=1&page=1&per_page=100",
+        {
+          result: {
+            total: "2",
+            validators: [{ address: "g1other" }],
+          },
+        },
+      ],
+      [
+        "https://rpc.example/validators?height=1&page=2&per_page=100",
+        {
+          result: {
+            total: "2",
+            validators: [{ address: "g1validator" }],
+          },
+        },
+      ],
+    ]);
+
+    collector.get = jest.fn(async (url, transform) => {
+      if (!responses.has(url)) {
+        throw new Error(`Unexpected URL ${url}`);
+      }
+
+      return transform({ data: responses.get(url) });
+    });
+
+    await collector.start();
+    try {
+      const metrics = await collector.makeMetrics();
+
+      expect(metrics).toContain('gnoland_validator_signing_tracker_up{validator="g1validator"} 1');
+      expect(metrics).toContain(
+        'gnoland_validator_signing_window_blocks{validator="g1validator"} 3',
+      );
+      expect(metrics).toContain('gnoland_validator_signed_blocks{validator="g1validator"} 2');
+      expect(metrics).toContain('gnoland_validator_missed_blocks{validator="g1validator"} 1');
+      expect(metrics).toContain(
+        'gnoland_validator_miss_rate{validator="g1validator"} 0.3333333333333333',
+      );
+      expect(metrics).toContain(
+        'gnoland_validator_consecutive_missed_blocks{validator="g1validator"} 0',
+      );
+      expect(metrics).toContain('gnoland_validator_last_signed_height{validator="g1validator"} 3');
+      expect(metrics).toContain('gnoland_validator_last_missed_height{validator="g1validator"} 2');
+      expect(metrics).toContain('gnoland_validator_proposed_blocks{validator="g1validator"} 1');
+      expect(metrics).toContain('gnoland_validator_signed_latest{validator="g1validator"} 1');
+      expect(collector.get).toHaveBeenCalledWith(
+        "https://rpc.example/validators?height=1&page=2&per_page=100",
+        expect.any(Function),
+        10000,
+      );
+    } finally {
+      await collector.stop();
+    }
   });
 
   it("sets the RPC up metric to zero when RPC data cannot be fetched", async () => {

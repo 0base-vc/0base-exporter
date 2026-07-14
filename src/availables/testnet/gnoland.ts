@@ -36,7 +36,33 @@ interface GnolandValidator {
 interface GnolandValidatorsResponse {
   result?: {
     block_height?: number | string;
+    total?: number | string;
     validators?: GnolandValidator[];
+  };
+}
+
+interface GnolandCommitResponse {
+  result?: {
+    signed_header?: {
+      header?: {
+        height?: number | string;
+        proposer_address?: string;
+        validators_hash?: string;
+      };
+      commit?: {
+        precommits?: Array<{ validator_address?: string } | null>;
+      };
+    };
+  };
+}
+
+interface GnolandBalanceResponse {
+  result?: {
+    response?: {
+      ResponseBase?: {
+        Data?: string;
+      };
+    };
   };
 }
 
@@ -47,8 +73,32 @@ interface RankedValidator {
   votingPower: number;
 }
 
+interface SigningCommit {
+  height: number;
+  proposerAddress: string;
+  validatorsHash: string;
+  precommitAddresses: string[];
+}
+
+interface SigningRow {
+  height: number;
+  active: boolean;
+  signed: boolean;
+  proposed: boolean;
+}
+
+interface CoinBalance {
+  amount: number;
+  denom: string;
+}
+
 const CACHE_DURATION_MS = 30000;
 const REQUEST_TIMEOUT_MS = 10000;
+const SIGNING_LOOKBACK_BLOCKS = 100;
+const SIGNING_REFRESH_MS = 15000;
+const SIGNING_CONCURRENCY = 8;
+const VALIDATOR_SET_CACHE_SIZE = 16;
+const DEFAULT_DENOM = "ugnot";
 
 function parseNumber(value: unknown): number {
   if (typeof value === "number") {
@@ -83,9 +133,69 @@ function normalizeAddress(value: unknown): string {
   return normalizeLabel(value).toLowerCase();
 }
 
+function splitCsv(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function decodeBase64String(value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  const decoded = Buffer.from(value, "base64").toString("utf8");
+  try {
+    const parsed = JSON.parse(decoded) as unknown;
+    return typeof parsed === "string" ? parsed : String(parsed ?? "");
+  } catch {
+    return decoded.replace(/^"|"$/g, "");
+  }
+}
+
+function parseCoins(value: string): CoinBalance[] {
+  const coins: CoinBalance[] = [];
+  const matcher = /(\d+)\s*([a-zA-Z][a-zA-Z0-9/]*)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = matcher.exec(value)) !== null) {
+    coins.push({ amount: parseNumber(match[1]), denom: match[2] });
+  }
+
+  return coins;
+}
+
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  const workerCount = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 export default class GnolandTestnet extends TargetAbstract {
   private readonly metricPrefix = "gnoland";
   private readonly registry = new Registry();
+  private readonly signingWindow: SigningRow[] = [];
+  private readonly validatorSetCache = new Map<string, Set<string>>();
+  private signingLastObservedHeight = 0;
+  private signingLastUpdatedSeconds = 0;
+  private signingRefreshPromise?: Promise<void>;
+  private signingRefreshTimer?: NodeJS.Timeout;
 
   private readonly rpcUpGauge = new Gauge({
     name: `${this.metricPrefix}_rpc_up`,
@@ -169,6 +279,96 @@ export default class GnolandTestnet extends TargetAbstract {
     labelNames: ["address", "pub_key_type", "pub_key"],
   });
 
+  private readonly walletQueryUpGauge = new Gauge({
+    name: `${this.metricPrefix}_wallet_query_up`,
+    help: "Whether the Gno.land operator wallet balance query succeeded",
+    labelNames: ["address"],
+  });
+
+  private readonly addressAvailableGauge = new Gauge({
+    name: `${this.metricPrefix}_address_available`,
+    help: "Available balance of the configured Gno.land operator address",
+    labelNames: ["address", "denom"],
+  });
+
+  private readonly validatorCommissionAvailableGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_commission_available`,
+    help: "Whether Gno.land exposes a commission field for the configured validator",
+    labelNames: ["validator"],
+  });
+
+  private readonly signingTrackerUpGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signing_tracker_up`,
+    help: "Whether recent Gno.land validator signatures can be read from RPC",
+    labelNames: ["validator"],
+  });
+
+  private readonly signingWindowBlocksGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signing_window_blocks`,
+    help: "Number of eligible blocks in the rolling Gno.land validator signing window",
+    labelNames: ["validator"],
+  });
+
+  private readonly signedBlocksGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signed_blocks`,
+    help: "Number of signed blocks in the rolling Gno.land validator signing window",
+    labelNames: ["validator"],
+  });
+
+  private readonly missedBlocksGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_missed_blocks`,
+    help: "Number of missed blocks in the rolling Gno.land validator signing window",
+    labelNames: ["validator"],
+  });
+
+  private readonly missRateGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_miss_rate`,
+    help: "Missed block ratio in the rolling Gno.land validator signing window",
+    labelNames: ["validator"],
+  });
+
+  private readonly consecutiveMissedBlocksGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_consecutive_missed_blocks`,
+    help: "Current consecutive missed Gno.land validator block count",
+    labelNames: ["validator"],
+  });
+
+  private readonly lastSignedHeightGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_last_signed_height`,
+    help: "Last block height signed by the configured Gno.land validator",
+    labelNames: ["validator"],
+  });
+
+  private readonly lastMissedHeightGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_last_missed_height`,
+    help: "Last block height missed by the configured Gno.land validator",
+    labelNames: ["validator"],
+  });
+
+  private readonly proposedBlocksGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_proposed_blocks`,
+    help: "Number of proposed blocks in the rolling Gno.land validator signing window",
+    labelNames: ["validator"],
+  });
+
+  private readonly signedLatestGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signed_latest`,
+    help: "Whether the latest eligible block was signed by the configured Gno.land validator",
+    labelNames: ["validator"],
+  });
+
+  private readonly signingLastObservedHeightGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signing_last_observed_height`,
+    help: "Last block height inspected by the Gno.land validator signing tracker",
+    labelNames: ["validator"],
+  });
+
+  private readonly signingLastUpdatedGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_signing_last_updated_seconds`,
+    help: "Unix timestamp of the last successful Gno.land validator signing tracker update",
+    labelNames: ["validator"],
+  });
+
   public constructor(
     protected readonly existMetrics: string,
     protected readonly apiUrl: string,
@@ -193,21 +393,61 @@ export default class GnolandTestnet extends TargetAbstract {
     this.registry.registerMetric(this.rivalsPowerGauge);
     this.registry.registerMetric(this.validatorsPowerGauge);
     this.registry.registerMetric(this.validatorInfoGauge);
+    this.registry.registerMetric(this.walletQueryUpGauge);
+    this.registry.registerMetric(this.addressAvailableGauge);
+    this.registry.registerMetric(this.validatorCommissionAvailableGauge);
+    this.registry.registerMetric(this.signingTrackerUpGauge);
+    this.registry.registerMetric(this.signingWindowBlocksGauge);
+    this.registry.registerMetric(this.signedBlocksGauge);
+    this.registry.registerMetric(this.missedBlocksGauge);
+    this.registry.registerMetric(this.missRateGauge);
+    this.registry.registerMetric(this.consecutiveMissedBlocksGauge);
+    this.registry.registerMetric(this.lastSignedHeightGauge);
+    this.registry.registerMetric(this.lastMissedHeightGauge);
+    this.registry.registerMetric(this.proposedBlocksGauge);
+    this.registry.registerMetric(this.signedLatestGauge);
+    this.registry.registerMetric(this.signingLastObservedHeightGauge);
+    this.registry.registerMetric(this.signingLastUpdatedGauge);
+
+    this.updateSigningGauges(0);
+  }
+
+  public async start(): Promise<void> {
+    if (!this.configuredValidator()) {
+      return;
+    }
+
+    await this.refreshSigningMetrics();
+    this.signingRefreshTimer = setInterval(
+      () => void this.refreshSigningMetrics(),
+      SIGNING_REFRESH_MS,
+    );
+    this.signingRefreshTimer.unref();
+  }
+
+  public async stop(): Promise<void> {
+    if (this.signingRefreshTimer) {
+      clearInterval(this.signingRefreshTimer);
+      this.signingRefreshTimer = undefined;
+    }
+
+    await this.signingRefreshPromise;
   }
 
   public async makeMetrics(): Promise<string> {
-    let customMetrics = "";
+    await Promise.all([this.updateRpcMetricsSafely(), this.updateWalletMetrics()]);
+    const customMetrics = await this.registry.metrics();
+    return customMetrics + "\n" + (await this.loadExistMetrics());
+  }
 
+  private async updateRpcMetricsSafely(): Promise<void> {
     try {
       await this.updateRpcMetrics();
-      customMetrics = await this.registry.metrics();
+      this.rpcUpGauge.set(1);
     } catch (error) {
-      console.error("makeMetrics", error);
+      console.error("Gnoland RPC metrics failed", error);
       this.rpcUpGauge.set(0);
-      customMetrics = await this.registry.metrics();
     }
-
-    return customMetrics + "\n" + (await this.loadExistMetrics());
   }
 
   private async updateRpcMetrics(): Promise<void> {
@@ -217,7 +457,6 @@ export default class GnolandTestnet extends TargetAbstract {
       this.fetchValidators(),
     ]);
 
-    this.rpcUpGauge.set(1);
     this.updateStatusMetrics(status);
     this.updateNetInfoMetrics(netInfo);
     this.updateValidatorMetrics(validatorsResponse);
@@ -249,7 +488,7 @@ export default class GnolandTestnet extends TargetAbstract {
   private updateValidatorMetrics(validatorsResponse: GnolandValidatorsResponse): void {
     const validators = this.normalizeValidators(validatorsResponse.result?.validators ?? []);
     const sorted = [...validators].sort((a, b) => b.votingPower - a.votingPower);
-    const configuredValidator = normalizeLabel(this.validator.split(",")[0]);
+    const configuredValidator = this.configuredValidator();
     const configuredValidatorAddress = normalizeAddress(configuredValidator);
     const validatorIndex = sorted.findIndex(
       (entry) => normalizeAddress(entry.address) === configuredValidatorAddress,
@@ -289,31 +528,313 @@ export default class GnolandTestnet extends TargetAbstract {
       .filter((entry) => entry.address.length > 0);
   }
 
+  private async updateWalletMetrics(): Promise<void> {
+    const addresses = splitCsv(this.addresses);
+    const validator = this.configuredValidator();
+
+    this.walletQueryUpGauge.reset();
+    this.addressAvailableGauge.reset();
+    this.validatorCommissionAvailableGauge.reset();
+
+    await Promise.all(
+      addresses.map(async (address) => {
+        try {
+          const coins = await this.fetchBalance(address);
+          const balances = coins.length > 0 ? coins : [{ amount: 0, denom: DEFAULT_DENOM }];
+
+          this.walletQueryUpGauge.labels(address).set(1);
+          for (const balance of balances) {
+            this.addressAvailableGauge.labels(address, balance.denom).set(balance.amount);
+          }
+        } catch (error) {
+          console.error(`Gnoland wallet balance query failed for ${address}`, error);
+          this.walletQueryUpGauge.labels(address).set(0);
+          this.addressAvailableGauge.labels(address, DEFAULT_DENOM).set(0);
+        }
+      }),
+    );
+
+    if (validator) {
+      this.validatorCommissionAvailableGauge.labels(validator).set(0);
+    }
+  }
+
+  private async refreshSigningMetrics(): Promise<void> {
+    if (!this.configuredValidator()) {
+      return;
+    }
+
+    if (this.signingRefreshPromise) {
+      return this.signingRefreshPromise;
+    }
+
+    const refresh = this.collectSigningMetrics()
+      .then(() => {
+        this.signingLastUpdatedSeconds = Math.floor(Date.now() / 1000);
+        this.updateSigningGauges(1);
+      })
+      .catch((error: unknown) => {
+        console.error("Gnoland validator signing tracker failed", error);
+        this.updateSigningGauges(0);
+      })
+      .finally(() => {
+        this.signingRefreshPromise = undefined;
+      });
+
+    this.signingRefreshPromise = refresh;
+    return refresh;
+  }
+
+  private async collectSigningMetrics(): Promise<void> {
+    const status = await this.fetchStatus();
+    const latestHeight = parseNumber(status.result?.sync_info?.latest_block_height);
+
+    if (!Number.isSafeInteger(latestHeight) || latestHeight < 1) {
+      throw new Error("Latest Gno.land block height is unavailable");
+    }
+
+    let startHeight = this.signingLastObservedHeight + 1;
+    if (
+      this.signingLastObservedHeight === 0 ||
+      latestHeight < this.signingLastObservedHeight ||
+      latestHeight - this.signingLastObservedHeight >= SIGNING_LOOKBACK_BLOCKS
+    ) {
+      startHeight = Math.max(1, latestHeight - SIGNING_LOOKBACK_BLOCKS + 1);
+    }
+
+    if (startHeight > latestHeight) {
+      return;
+    }
+
+    const heights = Array.from(
+      { length: latestHeight - startHeight + 1 },
+      (_, index) => startHeight + index,
+    );
+    const commits = await mapLimit(heights, SIGNING_CONCURRENCY, (height) =>
+      this.fetchCommit(height),
+    );
+    const validatorSetHeights = new Map<string, number>();
+
+    for (const commit of commits) {
+      if (!validatorSetHeights.has(commit.validatorsHash)) {
+        validatorSetHeights.set(commit.validatorsHash, commit.height);
+      }
+    }
+
+    const validatorSets = new Map<string, Set<string>>();
+    await Promise.all(
+      [...validatorSetHeights].map(async ([hash, height]) => {
+        validatorSets.set(hash, await this.getValidatorSet(hash, height));
+      }),
+    );
+
+    const validator = normalizeAddress(this.configuredValidator());
+    const rows = commits.map((commit) => ({
+      height: commit.height,
+      active: validatorSets.get(commit.validatorsHash)?.has(validator) ?? false,
+      signed: commit.precommitAddresses.includes(validator),
+      proposed: normalizeAddress(commit.proposerAddress) === validator,
+    }));
+
+    const retainedRows = this.signingWindow.filter((row) => row.height < startHeight);
+    this.signingWindow.splice(
+      0,
+      this.signingWindow.length,
+      ...[...retainedRows, ...rows].slice(-SIGNING_LOOKBACK_BLOCKS),
+    );
+    this.signingLastObservedHeight = latestHeight;
+  }
+
+  private updateSigningGauges(trackerUp: number): void {
+    const validator = this.configuredValidator();
+    if (!validator) {
+      return;
+    }
+
+    const eligibleRows = this.signingWindow.filter((row) => row.active);
+    const signedRows = eligibleRows.filter((row) => row.signed);
+    const missedRows = eligibleRows.filter((row) => !row.signed);
+    const latestRow = eligibleRows[eligibleRows.length - 1];
+    let consecutiveMisses = 0;
+
+    for (let index = eligibleRows.length - 1; index >= 0; index -= 1) {
+      if (eligibleRows[index].signed) {
+        break;
+      }
+      consecutiveMisses += 1;
+    }
+
+    this.signingTrackerUpGauge.labels(validator).set(trackerUp);
+    this.signingWindowBlocksGauge.labels(validator).set(eligibleRows.length);
+    this.signedBlocksGauge.labels(validator).set(signedRows.length);
+    this.missedBlocksGauge.labels(validator).set(missedRows.length);
+    this.missRateGauge
+      .labels(validator)
+      .set(eligibleRows.length > 0 ? missedRows.length / eligibleRows.length : 0);
+    this.consecutiveMissedBlocksGauge.labels(validator).set(consecutiveMisses);
+    this.lastSignedHeightGauge
+      .labels(validator)
+      .set(signedRows[signedRows.length - 1]?.height ?? 0);
+    this.lastMissedHeightGauge
+      .labels(validator)
+      .set(missedRows[missedRows.length - 1]?.height ?? 0);
+    this.proposedBlocksGauge
+      .labels(validator)
+      .set(eligibleRows.filter((row) => row.proposed).length);
+    this.signedLatestGauge.labels(validator).set(latestRow?.signed ? 1 : 0);
+    this.signingLastObservedHeightGauge.labels(validator).set(this.signingLastObservedHeight);
+    this.signingLastUpdatedGauge.labels(validator).set(this.signingLastUpdatedSeconds);
+  }
+
+  private async getValidatorSet(hash: string, height: number): Promise<Set<string>> {
+    const cached = this.validatorSetCache.get(hash);
+    if (cached) {
+      this.validatorSetCache.delete(hash);
+      this.validatorSetCache.set(hash, cached);
+      return cached;
+    }
+
+    const addresses = await this.fetchValidatorSet(height);
+    this.validatorSetCache.set(hash, addresses);
+
+    while (this.validatorSetCache.size > VALIDATOR_SET_CACHE_SIZE) {
+      const oldestKey = this.validatorSetCache.keys().next().value as string | undefined;
+      if (!oldestKey) {
+        break;
+      }
+      this.validatorSetCache.delete(oldestKey);
+    }
+
+    return addresses;
+  }
+
+  private async fetchValidatorSet(height: number): Promise<Set<string>> {
+    const addresses = new Set<string>();
+
+    for (let page = 1; page <= 100; page += 1) {
+      const response = await this.fetchValidatorPage(height, page);
+      const validators = response.result?.validators ?? [];
+      const total = parseNumber(response.result?.total) || validators.length;
+
+      for (const entry of validators) {
+        const address = normalizeAddress(entry.address);
+        if (address) {
+          addresses.add(address);
+        }
+      }
+
+      if (validators.length === 0 || addresses.size >= total) {
+        break;
+      }
+    }
+
+    return addresses;
+  }
+
   private async fetchStatus(): Promise<GnolandStatusResponse> {
-    return this.getWithCache(
+    const response = await this.getWithCache(
       this.rpcEndpoint("/status"),
-      (response) => response.data as GnolandStatusResponse,
+      (rpcResponse) => rpcResponse.data as GnolandStatusResponse,
       CACHE_DURATION_MS,
       REQUEST_TIMEOUT_MS,
     );
+
+    if (typeof response !== "object" || response === null || !response.result) {
+      throw new Error("Invalid Gno.land status response");
+    }
+    return response;
   }
 
   private async fetchNetInfo(): Promise<GnolandNetInfoResponse> {
-    return this.getWithCache(
+    const response = await this.getWithCache(
       this.rpcEndpoint("/net_info"),
-      (response) => response.data as GnolandNetInfoResponse,
+      (rpcResponse) => rpcResponse.data as GnolandNetInfoResponse,
       CACHE_DURATION_MS,
       REQUEST_TIMEOUT_MS,
     );
+
+    if (typeof response !== "object" || response === null || !response.result) {
+      throw new Error("Invalid Gno.land net_info response");
+    }
+    return response;
   }
 
   private async fetchValidators(): Promise<GnolandValidatorsResponse> {
-    return this.getWithCache(
+    const response = await this.getWithCache(
       this.rpcEndpoint("/validators"),
-      (response) => response.data as GnolandValidatorsResponse,
+      (rpcResponse) => rpcResponse.data as GnolandValidatorsResponse,
       CACHE_DURATION_MS,
       REQUEST_TIMEOUT_MS,
     );
+
+    if (typeof response !== "object" || response === null || !response.result) {
+      throw new Error("Invalid Gno.land validators response");
+    }
+    return response;
+  }
+
+  private async fetchCommit(height: number): Promise<SigningCommit> {
+    const response = await this.get(
+      this.rpcEndpoint(`/commit?height=${height}`),
+      (rpcResponse) => rpcResponse.data as GnolandCommitResponse,
+      REQUEST_TIMEOUT_MS,
+    );
+    const signedHeader = typeof response === "object" ? response.result?.signed_header : undefined;
+    const heightValue = parseNumber(signedHeader?.header?.height);
+    const validatorsHash = normalizeLabel(signedHeader?.header?.validators_hash);
+
+    if (!signedHeader?.header || !signedHeader.commit || !heightValue || !validatorsHash) {
+      throw new Error(`Gno.land commit ${height} is unavailable`);
+    }
+
+    return {
+      height: heightValue,
+      proposerAddress: normalizeAddress(signedHeader.header.proposer_address),
+      validatorsHash,
+      precommitAddresses: (signedHeader.commit.precommits ?? [])
+        .map((vote: { validator_address?: string } | null) =>
+          normalizeAddress(vote?.validator_address),
+        )
+        .filter(Boolean),
+    };
+  }
+
+  private async fetchValidatorPage(
+    height: number,
+    page: number,
+  ): Promise<GnolandValidatorsResponse> {
+    const response = await this.get(
+      this.rpcEndpoint(`/validators?height=${height}&page=${page}&per_page=100`),
+      (rpcResponse) => rpcResponse.data as GnolandValidatorsResponse,
+      REQUEST_TIMEOUT_MS,
+    );
+
+    if (typeof response !== "object" || response === null || !response.result) {
+      throw new Error(`Invalid Gno.land validator set response at height ${height}`);
+    }
+    return response;
+  }
+
+  private async fetchBalance(address: string): Promise<CoinBalance[]> {
+    const path = encodeURIComponent(`bank/balances/${address}`);
+    const response = await this.getWithCache(
+      this.rpcEndpoint(`/abci_query?path=${path}`),
+      (rpcResponse) => rpcResponse.data as GnolandBalanceResponse,
+      CACHE_DURATION_MS,
+      REQUEST_TIMEOUT_MS,
+    );
+    const responseBase =
+      typeof response === "object" ? response.result?.response?.ResponseBase : null;
+
+    if (!responseBase) {
+      throw new Error(`Invalid Gno.land balance response for ${address}`);
+    }
+
+    return parseCoins(decodeBase64String(responseBase.Data ?? ""));
+  }
+
+  private configuredValidator(): string {
+    return normalizeLabel(splitCsv(this.validator)[0]);
   }
 
   private rpcEndpoint(path: string): string {
