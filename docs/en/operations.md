@@ -18,15 +18,20 @@ Recommended settings:
 
 ## Main Branch Protection
 
-Use a solo-maintainer-friendly protection rule for `main`:
+Use branch protection and the `main-review-and-ci` repository ruleset for `main`:
 
 - require pull requests before merging;
 - require one approving review before merging;
+- require review from CODEOWNERS;
+- require approval of the most recent reviewable push;
 - dismiss stale approvals when new commits are pushed;
 - require status checks `verify (20.19.0)`, `verify (22.x)`, `analyze`, `dependency-review`, and `scorecard-pr`;
+- require branches to be up to date with `main` before merging;
 - require conversation resolution before merge;
-- allow maintainers to use emergency bypass when the repository owner permits it;
-- require CODEOWNERS review only after the maintainer team grows beyond a single maintainer.
+- apply the rule to administrators by default and avoid permanent bypass actors;
+- keep the required approving review count at one until the maintainer team can support two-reviewer merges without blocking routine maintenance.
+
+Temporary administrator bypass should be treated as an incident response action and removed after the emergency is resolved.
 
 ## Labels
 
