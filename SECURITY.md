@@ -2,14 +2,17 @@
 
 Please report security-sensitive issues privately instead of opening a public GitHub issue.
 
+Preferred private reporting channel:
+[GitHub private vulnerability report](https://github.com/0base-vc/0base-exporter/security/advisories/new).
+
 ## Supported Versions
 
 Security fixes target the `main` branch and the latest tagged GitHub Release. Older untagged commits are not supported unless maintainers explicitly decide otherwise.
 
 ## Reporting
 
-- Open a GitHub security advisory if you have repository access.
-- Otherwise contact the maintainer listed in [MAINTAINERS.md](./MAINTAINERS.md) before disclosing details publicly.
+- Open a [GitHub private vulnerability report](https://github.com/0base-vc/0base-exporter/security/advisories/new).
+- If GitHub private reporting is unavailable, contact the maintainer listed in [MAINTAINERS.md](./MAINTAINERS.md) before disclosing details publicly.
 - Do not include secrets, private RPC credentials, validator keys, or exploit details in public issues or discussions.
 
 Maintainers will acknowledge actionable reports as soon as practical and will coordinate disclosure timing for confirmed vulnerabilities.

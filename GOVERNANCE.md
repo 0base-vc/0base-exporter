@@ -8,7 +8,7 @@ Maintainers are listed in [MAINTAINERS.md](./MAINTAINERS.md). Maintainers can tr
 
 ## Decision Making
 
-Routine changes can be merged by a maintainer after CI passes and review comments are resolved.
+Routine changes can be merged after CI passes, review comments are resolved, and the pull request has at least one approving review.
 
 Changes that affect metric contracts, required environment variables, release process, or repository security settings should be discussed in an issue or pull request before merge.
 

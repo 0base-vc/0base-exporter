@@ -21,12 +21,12 @@ Recommended settings:
 Use a solo-maintainer-friendly protection rule for `main`:
 
 - require pull requests before merging;
-- require status checks `verify (20.19.0)` and `verify (22.x)`;
+- require one approving review before merging;
+- dismiss stale approvals when new commits are pushed;
+- require status checks `verify (20.19.0)`, `verify (22.x)`, `analyze`, `dependency-review`, and `scorecard-pr`;
 - require conversation resolution before merge;
 - allow maintainers to use emergency bypass when the repository owner permits it;
-- do not require approving reviews until there is a larger maintainer team.
-
-When the maintainer team grows, add required approvals and CODEOWNERS review.
+- require CODEOWNERS review only after the maintainer team grows beyond a single maintainer.
 
 ## Labels
 
@@ -47,6 +47,6 @@ Keep issues small enough to be closed by one focused pull request. Use `priority
 
 ## Action Pinning
 
-Release and security-sensitive workflows should pin third-party actions by full commit SHA. General CI may use maintained major tags when Dependabot monitors GitHub Actions updates.
+Release, CI, and security-sensitive workflows should pin third-party actions by full commit SHA. Dependabot monitors GitHub Actions updates and opens SHA bump pull requests.
 
 Document any exception in the workflow comments.
