@@ -124,8 +124,7 @@ function createLegacyCustomCollector({ config }: CollectorContext): TargetAbstra
   const runtimeRequire = createRequire(__filename);
   const modulePath = resolveLegacyCustomModulePath(config.rawChainInput);
   const imported = runtimeRequire(modulePath) as
-    | { default?: LegacyCollectorConstructor }
-    | LegacyCollectorConstructor;
+    { default?: LegacyCollectorConstructor } | LegacyCollectorConstructor;
   const Collector = (
     "default" in imported && imported.default ? imported.default : imported
   ) as LegacyCollectorConstructor;

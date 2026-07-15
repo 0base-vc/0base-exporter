@@ -11,8 +11,7 @@ const gaugeStartTimes = new WeakMap<Gauge, number>();
 // Keep original methods
 const originalReset = promClient.Gauge?.prototype?.reset as (() => void) | undefined;
 const originalLabels = promClient.Gauge?.prototype?.labels as
-  | ((...labels: string[]) => any)
-  | undefined;
+  ((...labels: string[]) => any) | undefined;
 const originalSet = promClient.Gauge?.prototype?.set as ((value: number) => void) | undefined;
 
 // Patch only once
@@ -23,8 +22,7 @@ export function enablePromClientGaugeTiming(): void {
 
   // Patch Registry.registerMetric to attach back-reference to the registry
   const origRegisterMetric = promClient.Registry?.prototype?.registerMetric as
-    | ((metric: any) => void)
-    | undefined;
+    ((metric: any) => void) | undefined;
   if (origRegisterMetric) {
     promClient.Registry.prototype.registerMetric = function patchedRegisterMetric(
       this: any,

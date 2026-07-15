@@ -27,6 +27,10 @@ updates:
       - dependency-name: "@eslint/js"
         update-types:
           - "version-update:semver-major"
+      - dependency-name: "markdownlint-cli2"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
     groups:
       npm-production:
         dependency-type: production
