@@ -14,6 +14,7 @@ type TestCollector = {
   updateCurrentEpochMetricsFromIndexer(validators: string): Promise<boolean>;
   updateEpochIncomeFromVx(validators: string): Promise<void>;
   updateEpochMedianFeesAverages(): Promise<void>;
+  updateMarinadeSelectBonds(validators: string): Promise<void>;
   updateValidatorReleaseVersions(): Promise<void>;
   applyEffBidToVotes(
     winningTotalPmpe: number,
@@ -269,6 +270,67 @@ describe("Solana vx.tools fallbacks", () => {
       'solana_marinade_min_effective_bid_sol{vote="vote-2",commission="5",mev_commission="0"} 23',
     );
     expect(metrics).not.toContain('mev_commission="2"');
+  });
+
+  it("emits the effective Marinade Select bond balance for configured validators", async () => {
+    const collector = new Solana(
+      "",
+      "https://rpc.example",
+      "https://rpc.example",
+      "vote-1,vote-2",
+      "identity-1,identity-2",
+      "",
+    ) as unknown as TestCollector;
+
+    collector.getWithCache = jest.fn(async (url: string, selector: Selector): Promise<unknown> => {
+      expect(url).toBe("https://validator-bonds-api.marinade.finance/bonds/institutional");
+      return selector({
+        data: {
+          bonds: [
+            {
+              vote_account: "vote-1",
+              funded_amount: 25_000_000_000,
+              effective_amount: 20_500_000_000,
+            },
+            {
+              vote_account: "vote-2",
+              funded_amount: 10_000_000_000,
+              effective_amount: "9750000000",
+            },
+            {
+              vote_account: "vote-not-configured",
+              effective_amount: 30_000_000_000,
+            },
+          ],
+        },
+      });
+    });
+
+    await collector.updateMarinadeSelectBonds("vote-1,vote-2");
+
+    const metrics = await collector.registry.metrics();
+    expect(metrics).toContain('solana_validator_select_bonds{vote="vote-1"} 20.5');
+    expect(metrics).toContain('solana_validator_select_bonds{vote="vote-2"} 9.75');
+    expect(metrics).not.toContain('vote="vote-not-configured"');
+  });
+
+  it("clears stale Marinade Select bond balances when the API has no matching bond", async () => {
+    const collector = createCollector();
+    let bonds: unknown[] = [{ vote_account: "vote-1", effective_amount: 1_000_000_000 }];
+    collector.getWithCache = jest.fn(async (_url: string, selector: Selector): Promise<unknown> =>
+      selector({ data: { bonds } }),
+    );
+
+    await collector.updateMarinadeSelectBonds("vote-1");
+    expect(await collector.registry.metrics()).toContain(
+      'solana_validator_select_bonds{vote="vote-1"} 1',
+    );
+
+    bonds = [];
+    await collector.updateMarinadeSelectBonds("vote-1");
+    expect(await collector.registry.metrics()).not.toContain(
+      'solana_validator_select_bonds{vote="vote-1"}',
+    );
   });
 
   it("emits validator release version from JPool software_version", async () => {
