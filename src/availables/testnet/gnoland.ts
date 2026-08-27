@@ -214,7 +214,7 @@ async function mapLimit<T, R>(
   return results;
 }
 
-export default class GnolandTestnet extends TargetAbstract {
+export default class Gnoland extends TargetAbstract {
   private readonly metricPrefix = "gnoland";
   private readonly registry = new Registry();
   private readonly signingWindow: SigningRow[] = [];

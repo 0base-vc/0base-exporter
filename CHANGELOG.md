@@ -16,6 +16,7 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 - Shared collector modules for Cosmos/Tendermint, Solana, and EVM-oriented runtimes.
 - Example environment files under `examples/env/`.
 - Gno.land operator balance and rolling validator signing metrics.
+- Gno.land mainnet collector profile through `CHAIN=gnoland` while preserving `gnoland-testnet` compatibility.
 
 ### Changed
 

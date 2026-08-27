@@ -1,5 +1,6 @@
 import AtomOne from "../availables/atomone";
 import Berachain from "../availables/berachain";
+import Gnoland from "../availables/gnoland";
 import { createRequire } from "module";
 import * as path from "path";
 import Mitosis from "../availables/mitosis";
@@ -13,7 +14,6 @@ import TendermintV1beta1 from "../availables/tendermint-v1beta1";
 import TerraV2 from "../availables/terra-v2";
 import Terra from "../availables/terra";
 import CanopyTestnet from "../availables/testnet/canopy";
-import GnolandTestnet from "../availables/testnet/gnoland";
 import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
@@ -327,14 +327,24 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     factory: createFactory(RitualTestnet),
   },
   {
+    id: "gnoland",
+    family: "cosmos",
+    description: "Gno.land mainnet RPC collector",
+    aliases: ["gnoland-mainnet"],
+    legacyModulePaths: ["./availables/gnoland.ts"],
+    requiredEnv: ["RPC_URL", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "API_URL", "COLLECTOR_ADDRESSES"],
+    factory: createFactory(Gnoland),
+  },
+  {
     id: "gnoland-testnet",
     family: "cosmos",
     description: "Gno.land testnet RPC collector",
-    aliases: ["testnet/gnoland", "gnoland", "gno-testnet"],
+    aliases: ["testnet/gnoland", "gno-testnet"],
     legacyModulePaths: ["./availables/testnet/gnoland.ts"],
     requiredEnv: ["RPC_URL", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "API_URL", "COLLECTOR_ADDRESSES"],
-    factory: createFactory(GnolandTestnet),
+    factory: createFactory(Gnoland),
   },
   {
     id: "initia-testnet",
