@@ -66,3 +66,7 @@ npm start
 `API_URL` points to Ritual CL JSON-RPC, `EVM_API_URL` points to EL JSON-RPC, and
 `EXISTING_METRICS_URL` merges the native EL/CL Prometheus endpoints into the same
 exporter `/metrics` response.
+
+## HashKinetics
+
+[Environment example](../../examples/env/hashkinetics-testnet.env). See [configuration and metric semantics](./configuration.md#hashkinetics-testnet).
