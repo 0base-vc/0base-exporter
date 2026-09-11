@@ -79,6 +79,23 @@ export default class CachedHttpClient {
     }
   }
 
+  /** Strict POST for health/consensus checks: never return a stale fallback. */
+  public async postFresh<T>(
+    url: string,
+    data: Record<string, unknown>,
+    transform: ResponseTransform<T>,
+    timeoutMs: number,
+  ): Promise<T> {
+    return this.runWithDeduplication(`POST_FRESH:${url}:${JSON.stringify(data)}`, async () => {
+      const response = await axios.post(
+        url,
+        this.buildPostBody(data),
+        this.createConfig(timeoutMs),
+      );
+      return transform(response);
+    });
+  }
+
   public async post<T>(
     url: string,
     data: { method: string; params?: unknown[] } | Record<string, unknown>,
