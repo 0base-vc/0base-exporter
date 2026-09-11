@@ -1,6 +1,7 @@
 import Limonata from "../availables/testnet/limonata";
 import AtomOne from "../availables/atomone";
 import Berachain from "../availables/berachain";
+import Hashkinetics from "../availables/testnet/hashkinetics";
 import Gnoland from "../availables/gnoland";
 import { createRequire } from "module";
 import * as path from "path";
@@ -149,6 +150,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL"],
     factory: createFactory(Limonata),
+  },
+  {
+    id: "hashkinetics-testnet",
+    family: "hybrid",
+    description: "HashKinetics post-quantum BFT testnet",
+    aliases: ["hashkinetics", "testnet/hashkinetics"],
+    legacyModulePaths: ["./availables/testnet/hashkinetics.ts"],
+    requiredEnv: ["RPC_URL"],
+    optionalEnv: ["API_URL", "VALIDATOR"],
+    factory: createFactory(Hashkinetics),
   },
   {
     id: "tendermint",

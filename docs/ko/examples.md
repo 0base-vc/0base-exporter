@@ -70,3 +70,7 @@ npm start
 ## Limonata
 
 See [Limonata configuration](./configuration.md#limonata-테스트넷) and `examples/env/limonata-testnet.env`.
+
+## HashKinetics
+
+[환경 예시](../../examples/env/hashkinetics-testnet.env)와 [설정 및 지표 의미](./configuration.md#hashkinetics-테스트넷)를 참고한다.

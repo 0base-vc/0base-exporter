@@ -70,3 +70,7 @@ exporter `/metrics` response.
 ## Limonata
 
 See [Limonata configuration](./configuration.md#limonata-testnet) and `examples/env/limonata-testnet.env`.
+
+## HashKinetics
+
+[Environment example](../../examples/env/hashkinetics-testnet.env). See [configuration and metric semantics](./configuration.md#hashkinetics-testnet).

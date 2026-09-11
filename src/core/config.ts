@@ -121,7 +121,11 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     chainSource: chainResolution.chainSource,
     rawChainInput: chainResolution.rawChainInput,
     apiUrl: env.API_URL?.trim() ?? "",
-    rpcUrl: env.RPC_URL?.trim() ?? (profile?.family === "solana" ? "" : DEFAULT_RPC_URL),
+    rpcUrl:
+      env.RPC_URL?.trim() ??
+      (profile?.family === "solana" || profile?.id === "hashkinetics-testnet"
+        ? ""
+        : DEFAULT_RPC_URL),
     existingMetricsUrl: env.EXISTING_METRICS_URL?.trim() ?? "",
     collectorAddresses,
     collectorValidator,

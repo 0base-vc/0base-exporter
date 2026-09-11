@@ -10,6 +10,8 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Added
 
+- HashKinetics testnet collector: fresh RPC health, reference height/state checks, validator root identity, and one-time signing-key budget metrics.
+
 - Typed runtime configuration with `CHAIN`-based collector selection and legacy `BLOCKCHAIN` compatibility.
 - OSS baseline files: MIT `LICENSE`, contribution policy, security policy, code of conduct, issue templates, PR template, Husky hooks, ESLint, Prettier, and GitHub Actions.
 - Open source operations docs for collector additions, metrics compatibility, releases, repository operations, support, maintainers, and governance.
