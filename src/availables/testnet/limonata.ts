@@ -30,6 +30,22 @@ export default class Limonata extends CosmosCollectorBase {
     return this.fresh.getFresh(url, process, 4000);
   }
 
+  protected getAmount(
+    url: string,
+    selector: (json: any) => Array<{ denom?: string; amount: number | string }>,
+    decimal: number,
+  ): Promise<Array<{ denom: string; amount: number }>> {
+    return super.getAmount(
+      url,
+      (json) =>
+        selector(json)
+          .filter((coin) => coin.denom === "aLIMO" || coin.denom === undefined)
+          // Cosmos unbonding entries omit denom; the chain's bond denom is aLIMO.
+          .map((coin) => ({ ...coin, denom: "aLIMO" })),
+      decimal,
+    );
+  }
+
   public makeMetrics(): Promise<string> {
     if (!this.pending)
       this.pending = this.collect().finally(() => {
@@ -119,12 +135,12 @@ export default class Limonata extends CosmosCollectorBase {
         );
       }),
     ]);
-    return (
-      (await this.registry.metrics()) +
-      "\n" +
-      (await status.metrics()) +
-      "\n" +
-      (await this.loadExistMetrics())
-    );
+    let native = "";
+    if (this.existMetrics) {
+      await health("native_metrics_up", async () => {
+        native = await this.loadExistMetrics();
+      });
+    }
+    return (await this.registry.metrics()) + "\n" + (await status.metrics()) + "\n" + native;
   }
 }

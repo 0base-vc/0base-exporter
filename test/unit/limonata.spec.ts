@@ -7,11 +7,16 @@ const API = "http://limo-api.example";
 const RPC = "http://limo-rpc.example";
 const account = "cosmos1operator";
 const validator = "cosmosvaloper1operator";
-function cosmos() {
+function cosmos(mixed = false) {
   const root = "/cosmos";
   nock(API)
     .get(`${root}/bank/v1beta1/balances/${account}`)
-    .reply(200, { balances: [{ denom: "aLIMO", amount: "2000000000000000000" }] });
+    .reply(200, {
+      balances: [
+        { denom: "aLIMO", amount: "2000000000000000000" },
+        ...(mixed ? [{ denom: "uatom", amount: "1000000" }] : []),
+      ],
+    });
   nock(API)
     .get(`${root}/staking/v1beta1/delegations/${account}`)
     .reply(200, {
@@ -127,6 +132,20 @@ describe("Limonata", () => {
     const out = await collector().makeMetrics();
     expect(out).toContain("limonata_validator_query_up 0");
     expect(out).not.toContain("limonata_validator_bonded");
+  });
+  it("does not apply aLIMO precision to other bank denominations", async () => {
+    cosmos(true);
+    health();
+    const out = await collector().makeMetrics();
+    expect(out).not.toContain('denom="uatom"');
+  });
+  it("keeps chain metrics available when optional native metrics fail", async () => {
+    cosmos();
+    health();
+    nock("http://native.example").get("/metrics").reply(503);
+    const out = await collector("http://native.example/metrics").makeMetrics();
+    expect(out).toContain("limonata_rpc_up 1");
+    expect(out).toContain("limonata_native_metrics_up 0");
   });
   it("deduplicates concurrent scrapes", async () => {
     cosmos();

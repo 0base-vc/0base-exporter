@@ -67,3 +67,5 @@ Failed requests never replay cached successes; partial Cosmos data is marked by
 `limonata_cosmos_up=0`. Native metrics retain the common name normalization
 (`cometbft` to `tendermint`). No DKG membership is inferred from rank, and no
 Proving Grounds score is fabricated.
+
+Limonata: only aLIMO coin amounts are exported. Optional native metric failures retain chain metrics and set `limonata_native_metrics_up=0`.

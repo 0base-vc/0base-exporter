@@ -63,3 +63,5 @@ Cosmos 공통 수집기를 재사용해 잔액·위임·언본딩·보상·커�
 `limonata_cosmos_up=0`으로 표시한다. 미등록 validator 조회 실패를 unbonded로
 단정하지 않는다. 네이티브 메트릭의 공통 이름 변환(`cometbft` → `tendermint`)을
 유지한다. 순위를 DKG 위원회 편입으로 간주하거나 운영 점수를 추정하지 않는다.
+
+Limonata 금액은 aLIMO만 수집한다. 선택 native endpoint 장애는 체인 메트릭을 유지하고 `limonata_native_metrics_up=0`으로 표시한다.
