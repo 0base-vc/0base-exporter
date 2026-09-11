@@ -271,6 +271,6 @@ export default class Hashkinetics extends TargetAbstract {
         }
       }
     }
-    return registry.metrics();
+    return (await registry.metrics()) + "\n" + (await this.loadExistMetrics());
   }
 }

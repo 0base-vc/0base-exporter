@@ -34,8 +34,9 @@ function collector(reference = REFERENCE, validator = ROOT) {
 describe("Hashkinetics collector", () => {
   beforeAll(() => nock.disableNetConnect());
   afterEach(() => {
-    expect(nock.isDone()).toBe(true);
+    const completed = nock.isDone();
     nock.cleanAll();
+    expect(completed).toBe(true);
     jest.restoreAllMocks();
   });
   afterAll(() => nock.enableNetConnect());
@@ -78,6 +79,14 @@ describe("Hashkinetics collector", () => {
       expect(result).toContain(`hashkinetics_${sample}`);
     }
     expect(result).not.toContain("latest_block_time"); // RPC block timestamps are synthetic.
+  });
+  it("includes configured existing metrics alongside collector metrics", async () => {
+    local();
+    nock("http://native.example").get("/metrics").reply(200, "native_connections 7\n");
+    const target = new Hashkinetics("http://native.example/metrics", "", LOCAL, "", ROOT);
+    const result = await target.makeMetrics();
+    expect(result).toContain("hashkinetics_rpc_up 1");
+    expect(result).toContain("native_connections 7");
   });
   it("reports an observer without inventing a signing epoch in the validator set", async () => {
     local(chain, { ...set, validators: [] });
