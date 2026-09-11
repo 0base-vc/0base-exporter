@@ -106,3 +106,5 @@ Progress age is the exporter's last observed height change, resets on exporter
 restart, and is **not** chain block time (HashKinetics timestamps are synthetic).
 A failed reference check is unknown, not a chain fork. No wallet balance,
 commission, or missed-vote metrics are fabricated. Existing metric contracts are unchanged.
+
+Limonata collection uses one shared four-second request deadline, including native endpoints. Partial native failures retain successful endpoint metrics and report `limonata_native_metrics_up=0`.

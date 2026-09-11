@@ -81,6 +81,7 @@ describe("Limonata", () => {
   beforeEach(() => register.clear());
   afterEach(() => {
     const done = nock.isDone();
+    nock.abortPendingRequests();
     nock.cleanAll();
     expect(done).toBe(true);
   });
@@ -146,6 +147,54 @@ describe("Limonata", () => {
     const out = await collector("http://native.example/metrics").makeMetrics();
     expect(out).toContain("limonata_rpc_up 1");
     expect(out).toContain("limonata_native_metrics_up 0");
+  });
+  it("retains successful native endpoints on partial failure", async () => {
+    cosmos();
+    health();
+    nock("http://native.example").get("/good").reply(200, "cometbft_height 100\n");
+    nock("http://native.example").get("/bad").reply(503);
+    const out = await collector(
+      "http://native.example/good,http://native.example/bad",
+    ).makeMetrics();
+    expect(out).toContain("tendermint_height 100");
+    expect(out).toContain("limonata_native_metrics_up 0");
+  });
+  it("bounds serial Cosmos requests by one collection deadline", async () => {
+    nock(API)
+      .get(`/cosmos/bank/v1beta1/balances/${account}`)
+      .delay(3000)
+      .reply(200, { balances: [] });
+    nock(API)
+      .get(`/cosmos/staking/v1beta1/delegations/${account}`)
+      .delay(3000)
+      .reply(200, { delegation_responses: [] });
+    nock(API)
+      .get(/\/cosmos\/(staking\/v1beta1\/(validators|params)|gov\/v1\/proposals)/)
+      .query(true)
+      .times(4)
+      .reply(503);
+    nock(RPC).get(/.*/).times(2).reply(503);
+    const target = collector();
+    const start = Date.now();
+    const out = await target.makeMetrics();
+    expect(Date.now() - start).toBeLessThan(5000);
+    expect(out).toContain("limonata_cosmos_up 0");
+    expect(nock.isDone()).toBe(true);
+    cosmos();
+    health();
+    expect(await target.makeMetrics()).toContain("limonata_cosmos_up 1");
+  }, 10000);
+  it("emits performance metadata once across repeated scrapes", async () => {
+    const { enablePromClientGaugeTiming } = await import("../../src/lib/prom-perf");
+    enablePromClientGaugeTiming();
+    const target = collector();
+    for (let i = 0; i < 2; i++) {
+      cosmos();
+      health();
+      const out = await target.makeMetrics();
+      expect(out.match(/^# HELP metric_set_duration_ms /gm)).toHaveLength(1);
+      expect(out.match(/^# TYPE metric_set_duration_ms /gm)).toHaveLength(1);
+    }
   });
   it("deduplicates concurrent scrapes", async () => {
     cosmos();

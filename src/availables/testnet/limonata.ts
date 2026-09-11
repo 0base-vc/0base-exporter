@@ -1,4 +1,4 @@
-import { Gauge, Registry } from "prom-client";
+import { Gauge } from "prom-client";
 import CosmosCollectorBase, { cosmosV1beta1Profile } from "../shared/cosmos-base";
 import CachedHttpClient from "../../core/http/cached-http-client";
 
@@ -7,6 +7,7 @@ export default class Limonata extends CosmosCollectorBase {
   protected readonly decimalPlaces = 18;
   private readonly fresh = new CachedHttpClient();
   private pending?: Promise<string>;
+  private deadline = 0;
 
   constructor(
     existMetrics: string,
@@ -26,8 +27,10 @@ export default class Limonata extends CosmosCollectorBase {
   }
 
   // Health and balances must not silently replay a previous successful response.
-  protected get(url: string, process: (response: { data: any }) => any): Promise<any> {
-    return this.fresh.getFresh(url, process, 4000);
+  protected async get(url: string, process: (response: { data: any }) => any): Promise<any> {
+    const remaining = this.deadline - Date.now();
+    if (remaining <= 0) throw new Error("Limonata collection deadline exceeded");
+    return this.fresh.getFresh(url, process, remaining);
   }
 
   protected getAmount(
@@ -55,11 +58,15 @@ export default class Limonata extends CosmosCollectorBase {
   }
 
   private async collect(): Promise<string> {
+    this.deadline = Date.now() + 4000;
+    // Keep one registry, including when performance instrumentation is enabled.
+    for (const metric of this.registry.getMetricsAsArray()) {
+      if (metric.name.startsWith("limonata_")) this.registry.removeSingleMetric(metric.name);
+    }
     this.registry.resetMetrics();
-    const status = new Registry();
     const gauge = (name: string, help: string, value: number) => {
       if (!Number.isFinite(value)) throw new Error(`Invalid ${name}`);
-      new Gauge({ name: `limonata_${name}`, help, registers: [status] }).set(value);
+      new Gauge({ name: `limonata_${name}`, help, registers: [this.registry] }).set(value);
     };
     const health = async (name: string, work: () => Promise<void>) => {
       try {
@@ -69,7 +76,28 @@ export default class Limonata extends CosmosCollectorBase {
         gauge(name, `Whether ${name} data was collected this scrape`, 0);
       }
     };
+    let native = "";
     await Promise.all([
+      ...(this.existMetrics
+        ? [
+            health("native_metrics_up", async () => {
+              const urls = this.existMetrics
+                .split(",")
+                .map((url) => url.trim())
+                .filter(Boolean);
+              const results = await Promise.allSettled(
+                urls.map((url) =>
+                  this.get(url, ({ data }) => String(data).replace(/cometbft/g, "tendermint")),
+                ),
+              );
+              native = results
+                .flatMap((result) => (result.status === "fulfilled" ? [result.value] : []))
+                .join("\n");
+              if (results.some((result) => result.status === "rejected"))
+                throw new Error("Incomplete native scrape");
+            }),
+          ]
+        : []),
       health("cosmos_up", async () => {
         // Wait for every task even when one fails, so no late writes leak into the next scrape.
         const results = await Promise.allSettled([
@@ -135,12 +163,6 @@ export default class Limonata extends CosmosCollectorBase {
         );
       }),
     ]);
-    let native = "";
-    if (this.existMetrics) {
-      await health("native_metrics_up", async () => {
-        native = await this.loadExistMetrics();
-      });
-    }
-    return (await this.registry.metrics()) + "\n" + (await status.metrics()) + "\n" + native;
+    return (await this.registry.metrics()) + "\n" + native;
   }
 }

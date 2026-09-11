@@ -101,3 +101,5 @@ Limonata 금액은 aLIMO만 수집한다. 선택 native endpoint 장애는 체�
 시 초기화된다. 체인 블록 시각은 합성된 값이므로 실제 시간으로 취급하지 않는다.
 기준 조회 실패는 fork가 아니다. 지갑 잔고·커미션·미서명 지표를 임의로 만들지 않는다.
 기존 지표 계약은 변경하지 않는다.
+
+Limonata 수집은 native endpoint를 포함한 모든 요청에 하나의 4초 제한을 공유한다. native endpoint 일부가 실패해도 정상 응답 지표는 유지하며 `limonata_native_metrics_up=0`으로 표시한다.
