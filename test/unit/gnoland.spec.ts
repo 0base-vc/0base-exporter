@@ -1,8 +1,8 @@
 import { register } from "prom-client";
-import GnolandTestnet from "../../src/availables/testnet/gnoland";
+import Gnoland from "../../src/availables/gnoland";
 
 type GetWithCacheTransform = (response: { data: unknown }) => unknown;
-type TestCollector = GnolandTestnet & {
+type TestCollector = Gnoland & {
   getWithCache: jest.Mock<Promise<unknown>, [string, GetWithCacheTransform, number?, number?]>;
   get: jest.Mock<Promise<unknown>, [string, GetWithCacheTransform, number?]>;
 };
@@ -11,7 +11,7 @@ const STATUS_RESPONSE = {
   result: {
     node_info: {
       moniker: "gno-node",
-      network: "test-13",
+      network: "gno-example-1",
       version: "0.2.0",
     },
     sync_info: {
@@ -62,7 +62,7 @@ const VALIDATORS_RESPONSE = {
 };
 
 function createCollector(validator = "g1validator", addresses = ""): TestCollector {
-  return new GnolandTestnet(
+  return new Gnoland(
     "",
     "",
     "https://rpc.example/",
@@ -93,7 +93,7 @@ function installRpcMocks(
   });
 }
 
-describe("Gnoland testnet collector", () => {
+describe("Gnoland RPC collector", () => {
   beforeEach(() => {
     register.clear();
   });
@@ -111,7 +111,7 @@ describe("Gnoland testnet collector", () => {
 
     expect(metrics).toContain("gnoland_rpc_up 1");
     expect(metrics).toContain(
-      'gnoland_network_info{network="test-13",moniker="gno-node",version="0.2.0"} 1',
+      'gnoland_network_info{network="gno-example-1",moniker="gno-node",version="0.2.0"} 1',
     );
     expect(metrics).toContain("gnoland_latest_block_height 123");
     expect(metrics).toContain(`gnoland_latest_block_time_seconds ${latestBlockTimeSeconds}`);
