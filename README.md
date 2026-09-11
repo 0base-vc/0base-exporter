@@ -115,3 +115,5 @@ Pre-commit formatting and linting run through Husky + `lint-staged`. CI runs on 
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+Limonata testnet: `CHAIN=limonata-testnet` ([configuration](./docs/en/configuration.md)).

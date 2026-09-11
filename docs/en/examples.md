@@ -66,3 +66,7 @@ npm start
 `API_URL` points to Ritual CL JSON-RPC, `EVM_API_URL` points to EL JSON-RPC, and
 `EXISTING_METRICS_URL` merges the native EL/CL Prometheus endpoints into the same
 exporter `/metrics` response.
+
+## Limonata
+
+See [Limonata configuration](./configuration.md#limonata-testnet) and `examples/env/limonata-testnet.env`.

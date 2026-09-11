@@ -21,6 +21,18 @@ export default class CachedHttpClient {
   private readonly inFlightRequests = new Map<string, Promise<unknown>>();
   private readonly immutablePostLRUMaxEntries = 5000;
 
+  /** Strict GET for scrape health: deduplicates in-flight calls, never returns stale data. */
+  public async getFresh<T>(
+    url: string,
+    transform: ResponseTransform<T>,
+    timeoutMs?: number,
+  ): Promise<T> {
+    return this.runWithDeduplication(`FRESH_GET:${url}`, async () => {
+      const response = await axios.get(url, this.createConfig(timeoutMs));
+      return transform(response);
+    });
+  }
+
   public async get<T>(
     url: string,
     transform: ResponseTransform<T>,

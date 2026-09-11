@@ -66,3 +66,7 @@ npm start
 `API_URL`은 Ritual CL JSON-RPC, `EVM_API_URL`은 EL JSON-RPC를 가리킵니다.
 `EXISTING_METRICS_URL`에 EL/CL Prometheus endpoint를 넣으면 exporter의
 `/metrics` 응답에 함께 병합됩니다.
+
+## Limonata
+
+See [Limonata configuration](./configuration.md#limonata-테스트넷) and `examples/env/limonata-testnet.env`.

@@ -43,3 +43,27 @@ For backward compatibility, the runtime still checks `VOTE` before `ADDRESS` and
 The `solana` collector reads current-epoch slot, fee, and tip income data from `https://whoearns.live`. Numeric metrics are emitted whenever the indexer returns a finite value. Completeness is exposed through boolean gauges such as `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, and `solana_validator_epoch_final`.
 
 Income is derived from Solana RPC block data: base fees, priority fees, and on-chain Jito tips. `solana_mev_fees_total_sol` is kept as a compatibility alias for `solana_block_tips_total_sol`; it no longer represents Jito Kobe payout data.
+
+## Limonata testnet
+
+Use `CHAIN=limonata-testnet` with `API_URL` (Cosmos REST), `RPC_URL` (CometBFT),
+`ADDRESS` (cosmos account) and `VALIDATOR` (cosmosvaloper operator).
+Legacy `BLOCKCHAIN=./availables/testnet/limonata.js` is also supported.
+`EXISTING_METRICS_URL` optionally appends native Prometheus metrics.
+Limonata fixes aLIMO conversion at 18 decimals; `DECIMAL_PLACES` does not override it.
+
+The collector reuses Cosmos bank, delegation, unbonding, rewards, commission,
+account sequence, bonded rank, staking params and governance profiles.
+These retain `tendermint_*` metric names. Amounts are LIMO (labels retain `aLIMO`).
+Rank 0 means absent from the returned bonded set; rank is limited to the first 256
+validators (the current testnet maximum is 100).
+
+Additional `limonata_*` gauges expose `rpc_up`, `cosmos_up`, `peers_up`,
+`validator_query_up`, `latest_block_height`, `latest_block_time_seconds`,
+`catching_up`, `voting_power`, `peers`, `validator_bonded`, `validator_jailed`,
+and `validator_tokens`. Availability gauges describe the current scrape.
+A missing validator query is unavailable, not proof of unbonded status.
+Failed requests never replay cached successes; partial Cosmos data is marked by
+`limonata_cosmos_up=0`. Native metrics retain the common name normalization
+(`cometbft` to `tendermint`). No DKG membership is inferred from rank, and no
+Proving Grounds score is fabricated.

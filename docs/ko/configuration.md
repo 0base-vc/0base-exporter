@@ -43,3 +43,23 @@ Prometheus endpoint를 넣습니다.
 `solana` collector는 current epoch의 slot, fee, tip income 데이터를 `https://whoearns.live`에서 읽습니다. indexer가 유효한 숫자를 반환하면 numeric metric을 노출하고, 완성도는 `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, `solana_validator_epoch_final` 같은 boolean gauge로 별도 노출합니다.
 
 수입은 Solana RPC block data에서 계산한 base fee, priority fee, on-chain Jito tip 기준입니다. `solana_mev_fees_total_sol`은 `solana_block_tips_total_sol`의 호환 alias로 유지되며, 더 이상 Jito Kobe payout 값을 의미하지 않습니다.
+
+## Limonata 테스트넷
+
+`CHAIN=limonata-testnet`, `API_URL`(Cosmos REST), `RPC_URL`(CometBFT),
+`ADDRESS`(cosmos 계정), `VALIDATOR`(cosmosvaloper 주소)를 지정한다.
+기존 `BLOCKCHAIN=./availables/testnet/limonata.js` 경로도 지원한다.
+`EXISTING_METRICS_URL`로 네이티브 Prometheus 메트릭을 병합한다.
+aLIMO는 18자리로 고정 환산하며 `DECIMAL_PLACES` 설정은 적용하지 않는다.
+
+Cosmos 공통 수집기를 재사용해 잔액·위임·언본딩·보상·커미션·계정 sequence,
+본딩 순위·staking 설정·투표 중 제안을 수집한다. 기존 `tendermint_*` 이름을
+유지하고 금액은 LIMO 단위다(denom 라벨은 `aLIMO`). 순위 0은 본딩 목록에
+없음을 뜻한다. 순위는 처음 256명 기준이며 현재 테스트넷 정원은 100명이다.
+
+`limonata_*`로 RPC/REST/피어/validator 조회 성공 여부와 높이·블록 시각·동기화,
+투표 파워·피어 수·본딩·jailed·총 LIMO stake를 추가한다.
+실패 시 이전 성공값을 재사용하지 않으며 일부 Cosmos 요청 실패는
+`limonata_cosmos_up=0`으로 표시한다. 미등록 validator 조회 실패를 unbonded로
+단정하지 않는다. 네이티브 메트릭의 공통 이름 변환(`cometbft` → `tendermint`)을
+유지한다. 순위를 DKG 위원회 편입으로 간주하거나 운영 점수를 추정하지 않는다.

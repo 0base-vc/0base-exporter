@@ -23,3 +23,7 @@
 | `story-testnet`      | EVM    | `./availables/testnet/story.ts`      |
 | `ritual-testnet`     | Hybrid | `./availables/testnet/ritual.ts`     |
 | `canopy-testnet`     | Hybrid | `./availables/testnet/canopy.ts`     |
+
+## Limonata
+
+`limonata-testnet` — Cosmos REST + CometBFT, 18-decimal aLIMO. [Configuration](./configuration.md).
