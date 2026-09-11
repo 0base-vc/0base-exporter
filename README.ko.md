@@ -106,3 +106,5 @@ npm run ci:verify
 ## 라이선스
 
 MIT. 자세한 내용은 [LICENSE](./LICENSE)를 참고하세요.
+
+Limonata testnet: `CHAIN=limonata-testnet` ([configuration](./docs/ko/configuration.md)).

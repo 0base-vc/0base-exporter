@@ -44,6 +44,32 @@ The `solana` collector reads current-epoch slot, fee, and tip income data from `
 
 Income is derived from Solana RPC block data: base fees, priority fees, and on-chain Jito tips. `solana_mev_fees_total_sol` is kept as a compatibility alias for `solana_block_tips_total_sol`; it no longer represents Jito Kobe payout data.
 
+## Limonata testnet
+
+Use `CHAIN=limonata-testnet` with `API_URL` (Cosmos REST), `RPC_URL` (CometBFT),
+`ADDRESS` (cosmos account) and `VALIDATOR` (cosmosvaloper operator).
+Legacy `BLOCKCHAIN=./availables/testnet/limonata.js` is also supported.
+`EXISTING_METRICS_URL` optionally appends native Prometheus metrics.
+Limonata fixes aLIMO conversion at 18 decimals; `DECIMAL_PLACES` does not override it.
+
+The collector reuses Cosmos bank, delegation, unbonding, rewards, commission,
+account sequence, bonded rank, staking params and governance profiles.
+These retain `tendermint_*` metric names. Amounts are LIMO (labels retain `aLIMO`).
+Rank 0 means absent from the returned bonded set; rank is limited to the first 256
+validators (the current testnet maximum is 100).
+
+Additional `limonata_*` gauges expose `rpc_up`, `cosmos_up`, `peers_up`,
+`validator_query_up`, `latest_block_height`, `latest_block_time_seconds`,
+`catching_up`, `voting_power`, `peers`, `validator_bonded`, `validator_jailed`,
+and `validator_tokens`. Availability gauges describe the current scrape.
+A missing validator query is unavailable, not proof of unbonded status.
+Failed requests never replay cached successes; partial Cosmos data is marked by
+`limonata_cosmos_up=0`. Native metrics retain the common name normalization
+(`cometbft` to `tendermint`). No DKG membership is inferred from rank, and no
+Proving Grounds score is fabricated.
+
+Limonata: only aLIMO coin amounts are exported. Optional native metric failures retain chain metrics and set `limonata_native_metrics_up=0`.
+
 ## HashKinetics testnet
 
 Set `CHAIN=hashkinetics-testnet`, `RPC_URL=http://127.0.0.1:26000`, and optionally
@@ -80,3 +106,5 @@ Progress age is the exporter's last observed height change, resets on exporter
 restart, and is **not** chain block time (HashKinetics timestamps are synthetic).
 A failed reference check is unknown, not a chain fork. No wallet balance,
 commission, or missed-vote metrics are fabricated. Existing metric contracts are unchanged.
+
+Limonata collection uses one shared four-second request deadline, including native endpoints. Partial native failures retain successful endpoint metrics and report `limonata_native_metrics_up=0`.

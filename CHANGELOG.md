@@ -1,5 +1,7 @@
 # Changelog
 
+- Add Limonata testnet collector using Cosmos profiles, 18-decimal amounts and fresh CometBFT health metrics.
+
 All notable changes to this project are documented here.
 
 The format follows Keep a Changelog and this repository uses Semantic Versioning for tagged releases.

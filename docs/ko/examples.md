@@ -67,6 +67,10 @@ npm start
 `EXISTING_METRICS_URL`에 EL/CL Prometheus endpoint를 넣으면 exporter의
 `/metrics` 응답에 함께 병합됩니다.
 
+## Limonata
+
+See [Limonata configuration](./configuration.md#limonata-테스트넷) and `examples/env/limonata-testnet.env`.
+
 ## HashKinetics
 
 [환경 예시](../../examples/env/hashkinetics-testnet.env)와 [설정 및 지표 의미](./configuration.md#hashkinetics-테스트넷)를 참고한다.

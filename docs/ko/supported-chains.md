@@ -24,3 +24,7 @@
 | `ritual-testnet`       | Hybrid | `./availables/testnet/ritual.ts`       |
 | `hashkinetics-testnet` | Hybrid | `./availables/testnet/hashkinetics.ts` |
 | `canopy-testnet`       | Hybrid | `./availables/testnet/canopy.ts`       |
+
+## Limonata
+
+`limonata-testnet` — Cosmos REST + CometBFT, aLIMO 소수점 18자리. [설정](./configuration.md).

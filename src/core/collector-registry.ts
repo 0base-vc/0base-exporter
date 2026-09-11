@@ -1,3 +1,4 @@
+import Limonata from "../availables/testnet/limonata";
 import AtomOne from "../availables/atomone";
 import Berachain from "../availables/berachain";
 import Hashkinetics from "../availables/testnet/hashkinetics";
@@ -140,6 +141,16 @@ function createLegacyCustomCollector({ config }: CollectorContext): TargetAbstra
 }
 
 export const CHAIN_PROFILES: ChainProfile[] = [
+  {
+    id: "limonata-testnet",
+    family: "cosmos",
+    description: "Limonata testnet Cosmos staking and CometBFT health (18 decimals)",
+    aliases: ["limonata", "testnet/limonata"],
+    legacyModulePaths: ["./availables/testnet/limonata.ts"],
+    requiredEnv: ["API_URL", "RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL"],
+    factory: createFactory(Limonata),
+  },
   {
     id: "hashkinetics-testnet",
     family: "hybrid",
