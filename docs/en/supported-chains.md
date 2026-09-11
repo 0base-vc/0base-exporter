@@ -10,6 +10,7 @@
 | `atomone`            | Cosmos | `./availables/atomone.ts`            |
 | `tendermint-umee`    | Cosmos | `./availables/tendermint-umee.ts`    |
 | `tendermint-tgrade`  | Cosmos | `./availables/tendermint-tgrade.ts`  |
+| `gnoland`            | Cosmos | `./availables/gnoland.ts`            |
 | `gnoland-testnet`    | Cosmos | `./availables/testnet/gnoland.ts`    |
 | `initia-testnet`     | Cosmos | `./availables/testnet/initia.ts`     |
 | `solana`             | Solana | `./availables/solana.ts`             |

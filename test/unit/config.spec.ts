@@ -48,8 +48,13 @@ describe("loadRuntimeConfig", () => {
       VOTE: "init1abc",
       IDENTITY: "initvaloper1def",
     });
-    const gnoland = loadRuntimeConfig({
+    const gnolandTestnet = loadRuntimeConfig({
       BLOCKCHAIN: "./availables/testnet/gnoland.ts",
+      RPC_URL: "https://gnoland.example",
+      VALIDATOR: "g1validator",
+    });
+    const gnolandMainnet = loadRuntimeConfig({
+      BLOCKCHAIN: "./availables/gnoland.ts",
       RPC_URL: "https://gnoland.example",
       VALIDATOR: "g1validator",
     });
@@ -62,7 +67,8 @@ describe("loadRuntimeConfig", () => {
 
     expect(tgrade.chainId).toBe("tendermint-tgrade");
     expect(initia.chainId).toBe("initia-testnet");
-    expect(gnoland.chainId).toBe("gnoland-testnet");
+    expect(gnolandTestnet.chainId).toBe("gnoland-testnet");
+    expect(gnolandMainnet.chainId).toBe("gnoland");
     expect(ritual.chainId).toBe("ritual-testnet");
   });
 
@@ -185,6 +191,26 @@ describe("loadRuntimeConfig", () => {
     expect(config.chainId).toBe("gnoland-testnet");
     expect(config.apiUrl).toBe("");
     expect(config.rpcUrl).toBe("https://rpc.test13.testnets.gno.land");
+    expect(config.collectorAddresses).toBe("");
+    expect(config.collectorValidator).toBe("g1validator");
+  });
+
+  it("allows Gno.land mainnet to run from RPC and validator settings only", () => {
+    const config = loadRuntimeConfig({
+      CHAIN: "gnoland",
+      RPC_URL: "https://gnoland.example",
+      VALIDATOR: "g1validator",
+    });
+    const aliasConfig = loadRuntimeConfig({
+      CHAIN: "gnoland-mainnet",
+      RPC_URL: "https://gnoland.example",
+      VALIDATOR: "g1validator",
+    });
+
+    expect(config.chainId).toBe("gnoland");
+    expect(aliasConfig.chainId).toBe("gnoland");
+    expect(config.apiUrl).toBe("");
+    expect(config.rpcUrl).toBe("https://gnoland.example");
     expect(config.collectorAddresses).toBe("");
     expect(config.collectorValidator).toBe("g1validator");
   });
