@@ -45,6 +45,15 @@ type SolanaIndexerBatchResponse = {
   missing?: string[];
 };
 
+type MarinadeBondRecord = {
+  vote_account?: string;
+  effective_amount?: string | number | null;
+};
+
+type MarinadeBondsResponse = {
+  bonds?: MarinadeBondRecord[];
+};
+
 function toFiniteMetricValue(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -100,6 +109,12 @@ export default class Solana extends TargetAbstract {
   private readonly validatorBondsGauge = new Gauge({
     name: `${this.metricPrefix}_validator_bonds`,
     help: "Your validator bonds",
+    labelNames: ["vote"],
+  });
+
+  private readonly validatorSelectBondsGauge = new Gauge({
+    name: `${this.metricPrefix}_validator_select_bonds`,
+    help: "Effective Marinade Select bond balance in SOL",
     labelNames: ["vote"],
   });
 
@@ -391,6 +406,7 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.activeGauge);
     this.registry.registerMetric(this.commissionGauge);
     this.registry.registerMetric(this.validatorBondsGauge);
+    this.registry.registerMetric(this.validatorSelectBondsGauge);
     this.registry.registerMetric(this.lastVoteGauge);
     this.registry.registerMetric(this.delegationBySourceGauge);
     this.registry.registerMetric(this.pendingActivationBySourceGauge);
@@ -446,6 +462,7 @@ export default class Solana extends TargetAbstract {
         this.updateDelegationsFromJPool(this.votes),
         this.updatePendingStakeFromJPool(this.votes),
         this.updateMarinadeScoring(this.votes),
+        this.updateMarinadeSelectBonds(this.votes),
         this.updateGlobalEffectiveBid(),
         this.updateClusterRequiredVersions(),
         this.updateValidatorReleaseVersions(),
@@ -847,6 +864,37 @@ export default class Solana extends TargetAbstract {
       }
     } catch (e) {
       console.error("updateMarinadeScoring", e);
+    }
+  }
+
+  private async updateMarinadeSelectBonds(validators: string): Promise<void> {
+    try {
+      this.validatorSelectBondsGauge.reset();
+
+      const voteAccounts = this.toUniqueList(validators);
+      if (voteAccounts.length === 0) return;
+
+      const response = (await this.getWithCache(
+        "https://validator-bonds-api.marinade.finance/bonds/institutional",
+        (result: { data: MarinadeBondsResponse }) => result.data,
+        30 * 60 * 1000,
+        25000,
+      )) as MarinadeBondsResponse;
+      const bonds = Array.isArray(response?.bonds) ? response.bonds : [];
+      const bondsByVote = new Map(
+        bonds
+          .filter((bond) => typeof bond?.vote_account === "string")
+          .map((bond) => [bond.vote_account as string, bond]),
+      );
+
+      for (const vote of voteAccounts) {
+        const effectiveLamports = toFiniteMetricValue(bondsByVote.get(vote)?.effective_amount);
+        if (effectiveLamports === null) continue;
+
+        this.validatorSelectBondsGauge.labels(vote).set(effectiveLamports / LAMPORTS_PER_SOL);
+      }
+    } catch (e) {
+      console.error("updateMarinadeSelectBonds", e);
     }
   }
 
