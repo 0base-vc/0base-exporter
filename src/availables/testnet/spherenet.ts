@@ -1,0 +1,390 @@
+import TargetAbstract from "../../target.abstract";
+import { Gauge, Registry } from "prom-client";
+
+type RpcResult = unknown;
+
+type ClusterNode = {
+  pubkey?: string;
+  gossip?: string | null;
+  shredVersion?: unknown;
+};
+
+type VoteAccount = {
+  votePubkey?: unknown;
+  nodePubkey?: unknown;
+  activatedStake?: unknown;
+  commission?: unknown;
+  lastVote?: unknown;
+  epochCredits?: unknown;
+};
+
+type VoteAccounts = {
+  current: VoteAccount[];
+  delinquent: VoteAccount[];
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.trim() === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function isClusterNode(value: unknown): value is ClusterNode {
+  return isRecord(value);
+}
+
+function isClusterNodes(value: unknown): value is ClusterNode[] {
+  return Array.isArray(value) && value.every(isClusterNode);
+}
+
+function isVoteAccount(value: unknown): value is VoteAccount {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const account = value as VoteAccount;
+  return (
+    stringValue(account.votePubkey).trim() !== "" &&
+    stringValue(account.nodePubkey).trim() !== "" &&
+    finiteNumber(account.activatedStake) !== null &&
+    finiteNumber(account.commission) !== null &&
+    finiteNumber(account.lastVote) !== null
+  );
+}
+
+function isVoteAccounts(value: unknown): value is VoteAccounts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const payload = value as Partial<VoteAccounts>;
+  return (
+    Array.isArray(payload.current) &&
+    Array.isArray(payload.delinquent) &&
+    payload.current.every(isVoteAccount) &&
+    payload.delinquent.every(isVoteAccount)
+  );
+}
+
+function parseExpectedShredVersion(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = finiteNumber(trimmed);
+  if (parsed === null || !Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+    throw new Error("SHRED_VERSION must be an integer between 0 and 65535");
+  }
+  return parsed;
+}
+
+/**
+ * SphereNet's public testnet speaks the standard Solana JSON-RPC surface, but
+ * it is a separate permissioned cluster. This collector deliberately uses
+ * only the cluster RPC: it does not query Solana mainnet indexers or infer
+ * admission from an absent vote account.
+ */
+export default class SphereNet extends TargetAbstract {
+  private readonly registry = new Registry();
+  private pending?: Promise<string>;
+
+  private readonly rpcUpGauge = new Gauge({
+    name: "spherenet_rpc_up",
+    help: "Whether the SphereNet JSON-RPC health check succeeded",
+  });
+
+  private readonly slotGauge = new Gauge({
+    name: "spherenet_slot",
+    help: "Latest observed SphereNet slot",
+  });
+
+  private readonly epochGauge = new Gauge({
+    name: "spherenet_epoch",
+    help: "Current SphereNet epoch",
+  });
+
+  private readonly clusterNodeCountGauge = new Gauge({
+    name: "spherenet_cluster_node_count",
+    help: "Number of cluster nodes returned by getClusterNodes; this is not a connected-peer count",
+  });
+
+  private readonly validatorCountGauge = new Gauge({
+    name: "spherenet_validator_count",
+    help: "Number of current and delinquent vote accounts returned by getVoteAccounts",
+  });
+
+  private readonly voteAccountsUpGauge = new Gauge({
+    name: "spherenet_vote_accounts_up",
+    help: "Whether the getVoteAccounts request succeeded",
+  });
+
+  private readonly validatorActiveGauge = new Gauge({
+    name: "spherenet_validator_active",
+    help: "Whether the configured vote account is in the current validator set",
+    labelNames: ["vote"],
+  });
+
+  private readonly activatedStakeGauge = new Gauge({
+    name: "spherenet_validator_activated_stake_sphr",
+    help: "Activated stake for the configured vote account in SPHR",
+    labelNames: ["vote"],
+  });
+
+  private readonly commissionGauge = new Gauge({
+    name: "spherenet_validator_commission_percent",
+    help: "Commission percentage for the configured vote account",
+    labelNames: ["vote"],
+  });
+
+  private readonly lastVoteGauge = new Gauge({
+    name: "spherenet_validator_last_vote",
+    help: "Last vote slot for the configured vote account",
+    labelNames: ["vote"],
+  });
+
+  private readonly identityGauge = new Gauge({
+    name: "spherenet_identity_info",
+    help: "Identity returned by getIdentity (value is always 1)",
+    labelNames: ["identity"],
+  });
+
+  private readonly versionGauge = new Gauge({
+    name: "spherenet_version_info",
+    help: "SphereNet client version returned by getVersion (value is always 1)",
+    labelNames: ["solana_core", "sphere_version", "feature_set"],
+  });
+
+  private readonly genesisMatchGauge = new Gauge({
+    name: "spherenet_genesis_match",
+    help: "Whether getGenesisHash matches the configured expected genesis hash",
+  });
+
+  private readonly shredVersionGauge = new Gauge({
+    name: "spherenet_shred_version",
+    help: "Shred version observed from the first cluster node",
+  });
+
+  private readonly shredVersionMatchGauge = new Gauge({
+    name: "spherenet_shred_version_match",
+    help: "Whether the observed shred version matches the configured expected value",
+  });
+
+  private readonly expectedGenesisHash: string;
+  private readonly expectedShredVersion: number | null;
+
+  public constructor(
+    protected readonly existMetrics: string,
+    protected readonly apiUrl: string,
+    protected readonly rpcUrl: string,
+    protected readonly votes: string,
+    protected readonly identities: string,
+    expectedGenesisHash = "",
+    expectedShredVersion = "",
+  ) {
+    super(existMetrics, apiUrl, rpcUrl, votes, identities);
+    this.expectedGenesisHash = expectedGenesisHash.trim();
+    this.expectedShredVersion = parseExpectedShredVersion(expectedShredVersion);
+
+    this.registry.registerMetric(this.rpcUpGauge);
+    this.registry.registerMetric(this.slotGauge);
+    this.registry.registerMetric(this.epochGauge);
+    this.registry.registerMetric(this.clusterNodeCountGauge);
+    this.registry.registerMetric(this.validatorCountGauge);
+    this.registry.registerMetric(this.voteAccountsUpGauge);
+    this.registry.registerMetric(this.validatorActiveGauge);
+    this.registry.registerMetric(this.activatedStakeGauge);
+    this.registry.registerMetric(this.commissionGauge);
+    this.registry.registerMetric(this.lastVoteGauge);
+    this.registry.registerMetric(this.identityGauge);
+    this.registry.registerMetric(this.versionGauge);
+    this.registry.registerMetric(this.genesisMatchGauge);
+    this.registry.registerMetric(this.shredVersionGauge);
+    this.registry.registerMetric(this.shredVersionMatchGauge);
+  }
+
+  public makeMetrics(): Promise<string> {
+    if (!this.pending) {
+      this.pending = this.collectMetrics().finally(() => {
+        this.pending = undefined;
+      });
+    }
+    return this.pending;
+  }
+
+  private async collectMetrics(): Promise<string> {
+    this.resetMetrics();
+
+    const [health, slot, epoch, identity, version, genesis, clusterNodes, voteAccounts] =
+      await Promise.all(
+        [
+          this.rpc("getHealth"),
+          this.rpc("getSlot"),
+          this.rpc("getEpochInfo"),
+          this.rpc("getIdentity"),
+          this.rpc("getVersion"),
+          this.rpc("getGenesisHash"),
+          this.rpc("getClusterNodes"),
+          this.rpc("getVoteAccounts"),
+        ].map((request) => this.settle(request)),
+      );
+
+    if (health.ok && health.value === "ok") {
+      this.rpcUpGauge.set(1);
+    } else {
+      this.rpcUpGauge.set(0);
+    }
+
+    if (slot.ok) {
+      this.setOptionalNumber(this.slotGauge, slot.value);
+    }
+    if (epoch.ok && epoch.value && typeof epoch.value === "object") {
+      this.setOptionalNumber(this.epochGauge, (epoch.value as { epoch?: unknown }).epoch);
+    }
+    if (identity.ok && identity.value && typeof identity.value === "object") {
+      const identityValue = stringValue((identity.value as { identity?: unknown }).identity);
+      if (identityValue) this.identityGauge.labels(identityValue).set(1);
+    }
+    if (version.ok && version.value && typeof version.value === "object") {
+      const value = version.value as {
+        "solana-core"?: unknown;
+        snVersion?: unknown;
+        "feature-set"?: unknown;
+      };
+      const solanaCore = stringValue(value["solana-core"]);
+      const sphereVersion = stringValue(value.snVersion);
+      const featureSet = String(value["feature-set"] ?? "");
+      if (solanaCore || sphereVersion || featureSet) {
+        this.versionGauge.labels(solanaCore, sphereVersion, featureSet).set(1);
+      }
+    }
+    if (genesis.ok && this.expectedGenesisHash) {
+      const genesisHash = stringValue(genesis.value);
+      if (genesisHash) {
+        this.setOptionalGauge(
+          this.genesisMatchGauge,
+          genesisHash === this.expectedGenesisHash ? 1 : 0,
+        );
+      }
+    }
+    if (clusterNodes.ok && isClusterNodes(clusterNodes.value)) {
+      this.setOptionalGauge(this.clusterNodeCountGauge, clusterNodes.value.length);
+      const identityValue =
+        identity.ok && isRecord(identity.value)
+          ? stringValue((identity.value as { identity?: unknown }).identity)
+          : "";
+      const rpcNode = identityValue
+        ? clusterNodes.value.find((node) => node.pubkey === identityValue)
+        : undefined;
+      const shredVersion = finiteNumber(rpcNode?.shredVersion);
+      if (shredVersion !== null) {
+        this.setOptionalGauge(this.shredVersionGauge, shredVersion);
+        if (this.expectedShredVersion !== null) {
+          this.setOptionalGauge(
+            this.shredVersionMatchGauge,
+            shredVersion === this.expectedShredVersion ? 1 : 0,
+          );
+        }
+      }
+    }
+    if (voteAccounts.ok && isVoteAccounts(voteAccounts.value)) {
+      this.voteAccountsUpGauge.set(1);
+      this.setVoteAccounts(voteAccounts.value);
+    } else {
+      this.voteAccountsUpGauge.set(0);
+    }
+
+    return `${await this.registry.metrics()}\n${await this.loadExistMetrics()}`;
+  }
+
+  private resetMetrics(): void {
+    this.rpcUpGauge.reset();
+    this.voteAccountsUpGauge.reset();
+    this.validatorActiveGauge.reset();
+    this.activatedStakeGauge.reset();
+    this.commissionGauge.reset();
+    this.lastVoteGauge.reset();
+    this.identityGauge.reset();
+    this.versionGauge.reset();
+    this.slotGauge.reset();
+    this.epochGauge.reset();
+    this.clusterNodeCountGauge.reset();
+    this.validatorCountGauge.reset();
+    this.genesisMatchGauge.reset();
+    this.shredVersionGauge.reset();
+    this.shredVersionMatchGauge.reset();
+    for (const name of [
+      "spherenet_slot",
+      "spherenet_epoch",
+      "spherenet_cluster_node_count",
+      "spherenet_validator_count",
+      "spherenet_genesis_match",
+      "spherenet_shred_version",
+      "spherenet_shred_version_match",
+    ]) {
+      this.registry.removeSingleMetric(name);
+    }
+  }
+
+  private async rpc(method: string): Promise<RpcResult> {
+    return this.postFresh(
+      this.rpcUrl,
+      { method },
+      (response) => {
+        const body = response.data as { error?: unknown; result?: unknown };
+        if (body?.error) throw new Error(`SphereNet RPC ${method} failed`);
+        return body?.result;
+      },
+      4000,
+    );
+  }
+
+  private async settle(
+    request: Promise<RpcResult>,
+  ): Promise<{ ok: true; value: RpcResult } | { ok: false; value?: undefined }> {
+    try {
+      return { ok: true, value: await request };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  private setOptionalGauge(gauge: Gauge<string>, value: number): void {
+    this.registry.registerMetric(gauge);
+    gauge.set(value);
+  }
+
+  private setOptionalNumber(gauge: Gauge<string>, value: unknown): void {
+    const parsed = finiteNumber(value);
+    if (parsed !== null) this.setOptionalGauge(gauge, parsed);
+  }
+
+  private setVoteAccounts(value: VoteAccounts): void {
+    const { current, delinquent } = value;
+    const all = [...current, ...delinquent];
+    this.setOptionalGauge(this.validatorCountGauge, all.length);
+
+    const currentVotes = new Set(
+      current.map((account) => stringValue(account.votePubkey)).filter(Boolean),
+    );
+    for (const vote of this.votes
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)) {
+      const account = all.find((item) => item.votePubkey === vote);
+      if (!account) continue;
+      this.validatorActiveGauge.labels(vote).set(currentVotes.has(vote) ? 1 : 0);
+      const stake = finiteNumber(account.activatedStake);
+      if (stake !== null) this.activatedStakeGauge.labels(vote).set(stake / 1e9);
+      const commission = finiteNumber(account.commission);
+      if (commission !== null) this.commissionGauge.labels(vote).set(commission);
+      const lastVote = finiteNumber(account.lastVote);
+      if (lastVote !== null) this.lastVoteGauge.labels(vote).set(lastVote);
+    }
+  }
+}

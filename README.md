@@ -49,7 +49,7 @@ Use the new `CHAIN` variable when possible:
 | Family              | Recommended `CHAIN` values                                                                                                                                                  |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee`, `tendermint-tgrade`, `gnoland`, `gnoland-testnet`, `initia-testnet` |
-| Solana              | `solana`, `solana-testnet`                                                                                                                                                  |
+| Solana              | `solana`, `solana-testnet`, `spherenet-testnet`                                                                                                                             |
 | EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `ritual-testnet`, `canopy-testnet`, `hashkinetics-testnet`                            |
 
 Legacy `BLOCKCHAIN=./availables/...` values are still supported and mapped internally to `CHAIN`.
@@ -117,3 +117,5 @@ Pre-commit formatting and linting run through Husky + `lint-staged`. CI runs on 
 MIT. See [LICENSE](./LICENSE).
 
 Limonata testnet: `CHAIN=limonata-testnet` ([configuration](./docs/en/configuration.md)).
+
+SphereNet testnet: `CHAIN=spherenet-testnet` ([configuration](./docs/en/configuration.md)).
