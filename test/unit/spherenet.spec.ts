@@ -83,6 +83,16 @@ describe("SphereNet collector", () => {
     );
   });
 
+  it("rejects an invalid configured shred version", () => {
+    expect(() => new SphereNet("", "", RPC, VOTE, IDENTITY, GENESIS, "30454.5")).toThrow(
+      "SHRED_VERSION",
+    );
+    register.clear();
+    expect(() => new SphereNet("", "", RPC, VOTE, IDENTITY, GENESIS, "not-a-number")).toThrow(
+      "SHRED_VERSION",
+    );
+  });
+
   it("reports only values returned by SphereNet's own RPC", async () => {
     successfulRpc();
 

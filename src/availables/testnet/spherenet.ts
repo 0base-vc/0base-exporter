@@ -52,6 +52,17 @@ function isVoteAccounts(value: unknown): value is VoteAccounts {
   );
 }
 
+function parseExpectedShredVersion(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = finiteNumber(trimmed);
+  if (parsed === null || !Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+    throw new Error("SHRED_VERSION must be an integer between 0 and 65535");
+  }
+  return parsed;
+}
+
 /**
  * SphereNet's public testnet speaks the standard Solana JSON-RPC surface, but
  * it is a separate permissioned cluster. This collector deliberately uses
@@ -156,9 +167,7 @@ export default class SphereNet extends TargetAbstract {
   ) {
     super(existMetrics, apiUrl, rpcUrl, votes, identities);
     this.expectedGenesisHash = expectedGenesisHash.trim();
-    this.expectedShredVersion = expectedShredVersion.trim()
-      ? finiteNumber(expectedShredVersion)
-      : null;
+    this.expectedShredVersion = parseExpectedShredVersion(expectedShredVersion);
 
     this.registry.registerMetric(this.rpcUpGauge);
     this.registry.registerMetric(this.slotGauge);
