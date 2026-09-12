@@ -169,4 +169,24 @@ describe("SphereNet collector", () => {
     expect(result).toContain("spherenet_vote_accounts_up 0");
     expect(result).not.toContain(`spherenet_validator_active{vote="${VOTE}"}`);
   });
+
+  it("rejects vote-account entries without identity and metric fields", async () => {
+    rpc("getHealth", "ok");
+    rpc("getSlot", 123456);
+    rpc("getEpochInfo", { epoch: 24 });
+    rpc("getIdentity", { identity: IDENTITY });
+    rpc("getVersion", { "solana-core": "4.1.2" });
+    rpc("getGenesisHash", GENESIS);
+    rpc("getClusterNodes", []);
+    rpc("getVoteAccounts", {
+      current: [{ votePubkey: VOTE, activatedStake: "not-a-number" }],
+      delinquent: [],
+    });
+
+    const result = await collector().makeMetrics();
+
+    expect(result).toContain("spherenet_vote_accounts_up 0");
+    expect(result).toContain("spherenet_validator_count 0");
+    expect(result).not.toContain(`spherenet_validator_active{vote="${VOTE}"}`);
+  });
 });

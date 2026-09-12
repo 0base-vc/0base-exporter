@@ -37,7 +37,16 @@ function stringValue(value: unknown): string {
 }
 
 function isVoteAccount(value: unknown): value is VoteAccount {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const account = value as VoteAccount;
+  return (
+    stringValue(account.votePubkey).trim() !== "" &&
+    stringValue(account.nodePubkey).trim() !== "" &&
+    finiteNumber(account.activatedStake) !== null &&
+    finiteNumber(account.commission) !== null &&
+    finiteNumber(account.lastVote) !== null
+  );
 }
 
 function isVoteAccounts(value: unknown): value is VoteAccounts {
