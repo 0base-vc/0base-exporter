@@ -126,6 +126,20 @@ export default abstract class TargetAbstract {
     return this.httpClient.post(url, data, process, timeoutMs);
   }
 
+  /**
+   * Strict JSON-RPC POST helper for health and consensus checks. Unlike
+   * `post`, it never returns a cached success after the upstream request
+   * fails, so an exporter scrape cannot report stale node health.
+   */
+  protected async postFresh(
+    url: string,
+    data: { method: string; params?: unknown[] },
+    process: (response: { data: any }) => any,
+    timeoutMs: number,
+  ) {
+    return this.httpClient.postFresh(url, data, process, timeoutMs);
+  }
+
   protected async loadExistMetrics(): Promise<string> {
     if (this.existMetrics) {
       const urls = this.existMetrics

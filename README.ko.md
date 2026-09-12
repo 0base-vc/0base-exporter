@@ -49,7 +49,7 @@ curl http://localhost:27770/metrics
 | 계열                | 권장 `CHAIN` 값                                                                                                                                                             |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cosmos / Tendermint | `tendermint`, `tendermint-v1`, `tendermint-v1beta1`, `terra`, `terra-v2`, `atomone`, `tendermint-umee`, `tendermint-tgrade`, `gnoland`, `gnoland-testnet`, `initia-testnet` |
-| Solana              | `solana`, `solana-testnet`                                                                                                                                                  |
+| Solana              | `solana`, `solana-testnet`, `spherenet-testnet`                                                                                                                             |
 | EVM / Hybrid        | `monad`, `monad-testnet`, `berachain`, `mitosis`, `mitosis-testnet`, `story-testnet`, `ritual-testnet`, `canopy-testnet`, `hashkinetics-testnet`                            |
 
 기존 `BLOCKCHAIN=./availables/...` 값도 계속 지원됩니다.
@@ -108,3 +108,5 @@ npm run ci:verify
 MIT. 자세한 내용은 [LICENSE](./LICENSE)를 참고하세요.
 
 Limonata testnet: `CHAIN=limonata-testnet` ([configuration](./docs/ko/configuration.md)).
+
+SphereNet testnet: `CHAIN=spherenet-testnet` ([설정](./docs/ko/configuration.md)).

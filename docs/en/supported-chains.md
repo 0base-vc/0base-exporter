@@ -15,6 +15,7 @@
 | `initia-testnet`       | Cosmos | `./availables/testnet/initia.ts`       |
 | `solana`               | Solana | `./availables/solana.ts`               |
 | `solana-testnet`       | Solana | `./availables/testnet/solana.ts`       |
+| `spherenet-testnet`    | Solana | `./availables/testnet/spherenet.ts`    |
 | `monad`                | EVM    | `./availables/monad.ts`                |
 | `monad-testnet`        | EVM    | `./availables/testnet/monad.ts`        |
 | `berachain`            | Hybrid | `./availables/berachain.ts`            |
@@ -28,3 +29,12 @@
 ## Limonata
 
 `limonata-testnet` — Cosmos REST + CometBFT, 18-decimal aLIMO. [Configuration](./configuration.md).
+
+## SphereNet
+
+`spherenet-testnet` uses only SphereNet's own Solana-compatible JSON-RPC. It
+reports RPC health, slot/epoch, peer and validator-set counts, configured vote
+account stake/commission/last vote, client version, genesis hash match, and
+shred-version match. Missing vote-account data is left unavailable rather than
+being treated as inactive. Configure `GENESIS_HASH` and `SHRED_VERSION` when
+the network operator has published those values.

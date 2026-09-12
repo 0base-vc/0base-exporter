@@ -10,6 +10,9 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Added
 
+- SphereNet testnet collector: cluster-only JSON-RPC health, slot/epoch,
+  peer, validator, version, genesis, and shred-version metrics.
+
 - HashKinetics testnet collector: fresh RPC health, reference height/state checks, validator root identity, and one-time signing-key budget metrics.
 
 - Typed runtime configuration with `CHAIN`-based collector selection and legacy `BLOCKCHAIN` compatibility.

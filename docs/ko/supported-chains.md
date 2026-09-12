@@ -15,6 +15,7 @@
 | `initia-testnet`       | Cosmos | `./availables/testnet/initia.ts`       |
 | `solana`               | Solana | `./availables/solana.ts`               |
 | `solana-testnet`       | Solana | `./availables/testnet/solana.ts`       |
+| `spherenet-testnet`    | Solana | `./availables/testnet/spherenet.ts`    |
 | `monad`                | EVM    | `./availables/monad.ts`                |
 | `monad-testnet`        | EVM    | `./availables/testnet/monad.ts`        |
 | `berachain`            | Hybrid | `./availables/berachain.ts`            |
@@ -28,3 +29,11 @@
 ## Limonata
 
 `limonata-testnet` — Cosmos REST + CometBFT, aLIMO 소수점 18자리. [설정](./configuration.md).
+
+## SphereNet
+
+`spherenet-testnet`은 SphereNet 자체의 Solana 호환 JSON-RPC만 사용한다.
+RPC health, slot/epoch, peer·validator set 수, 설정한 vote account의 stake·수수료·
+마지막 투표, client version, genesis hash 일치와 shred-version 일치를 수집한다.
+vote account가 조회되지 않을 때는 비활성으로 단정하지 않고 unavailable로 둔다.
+네트워크 운영자가 값을 공개한 뒤 `GENESIS_HASH`, `SHRED_VERSION`을 설정한다.

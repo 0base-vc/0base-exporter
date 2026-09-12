@@ -22,6 +22,20 @@ VALIDATOR=cosmosvaloper1validator \
 npm start
 ```
 
+## SphereNet 테스트넷 예제
+
+env 템플릿: [`examples/env/spherenet-testnet.env`](../../examples/env/spherenet-testnet.env)
+
+```bash
+CHAIN=spherenet-testnet \
+RPC_URL=https://api.test.sphere.net \
+VOTE=Vote111111111111111111111111111111111111111 \
+IDENTITY=Identity1111111111111111111111111111111111 \
+GENESIS_HASH=9ZbRXYQ8kxmaWddozFNxu7dtV6KmfVbfXXQFaQQn8CLH \
+SHRED_VERSION=30454 \
+npm start
+```
+
 ## Solana 예제
 
 env 템플릿: [`examples/env/solana.env`](../../examples/env/solana.env)

@@ -66,6 +66,16 @@ Cosmos 공통 수집기를 재사용해 잔액·위임·언본딩·보상·커�
 
 Limonata 금액은 aLIMO만 수집한다. 선택 native endpoint 장애는 체인 메트릭을 유지하고 `limonata_native_metrics_up=0`으로 표시한다.
 
+## SphereNet 테스트넷
+
+`CHAIN=spherenet-testnet`과 `RPC_URL`, 하나 이상의 vote account 주소인 `VOTE`,
+validator identity인 `IDENTITY`를 설정한다. `GENESIS_HASH`, `SHRED_VERSION`은
+SphereNet 운영자가 제공한 검증 값일 때만 선택적으로 설정한다. collector는 설정한
+RPC에서 `getHealth`, `getSlot`, `getEpochInfo`, `getIdentity`, `getVersion`,
+`getGenesisHash`, `getClusterNodes`, `getVoteAccounts`만 호출하며 Solana mainnet
+indexer를 조회하지 않는다. 설정한 vote account가 없으면 unavailable로 두고,
+delinquent 계정은 `spherenet_validator_active=0`으로 명시한다.
+
 ## HashKinetics 테스트넷
 
 `CHAIN=hashkinetics-testnet`, `RPC_URL=http://127.0.0.1:26000`을 설정한다.

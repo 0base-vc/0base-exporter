@@ -108,3 +108,14 @@ A failed reference check is unknown, not a chain fork. No wallet balance,
 commission, or missed-vote metrics are fabricated. Existing metric contracts are unchanged.
 
 Limonata collection uses one shared four-second request deadline, including native endpoints. Partial native failures retain successful endpoint metrics and report `limonata_native_metrics_up=0`.
+
+## SphereNet testnet
+
+Use `CHAIN=spherenet-testnet` with `RPC_URL`, `VOTE` (one or more vote account
+addresses), and `IDENTITY` (the validator identity). `GENESIS_HASH` and
+`SHRED_VERSION` are optional verification inputs and should come from the
+SphereNet operator. The collector calls `getHealth`, `getSlot`, `getEpochInfo`,
+`getIdentity`, `getVersion`, `getGenesisHash`, `getClusterNodes`, and
+`getVoteAccounts` on the configured RPC only. It does not query Solana mainnet
+indexers. A missing configured vote account is unavailable, while a delinquent
+account is explicitly reported as `spherenet_validator_active=0`.
