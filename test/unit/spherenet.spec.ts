@@ -118,6 +118,15 @@ describe("SphereNet collector", () => {
     expect(result).not.toContain("whoearns.live");
   });
 
+  it("deduplicates concurrent scrapes", async () => {
+    successfulRpc();
+    const target = collector();
+
+    const [first, second] = await Promise.all([target.makeMetrics(), target.makeMetrics()]);
+
+    expect(first).toBe(second);
+  });
+
   it("does not reuse a previous health result after the RPC fails", async () => {
     successfulRpc();
     const target = collector();
@@ -150,8 +159,8 @@ describe("SphereNet collector", () => {
 
     const result = await collector().makeMetrics();
 
-    expect(result).toContain("spherenet_shred_version 30454");
     expect(result).not.toContain("spherenet_shred_version 0");
+    expect(result).not.toContain("spherenet_shred_version 30454");
   });
 
   it("marks malformed vote-account payloads unavailable", async () => {
@@ -186,7 +195,41 @@ describe("SphereNet collector", () => {
     const result = await collector().makeMetrics();
 
     expect(result).toContain("spherenet_vote_accounts_up 0");
-    expect(result).toContain("spherenet_validator_count 0");
+    expect(result).not.toContain("spherenet_validator_count 0");
     expect(result).not.toContain(`spherenet_validator_active{vote="${VOTE}"}`);
+  });
+
+  it("does not dereference malformed cluster-node entries", async () => {
+    rpc("getHealth", "ok");
+    rpc("getSlot", 123456);
+    rpc("getEpochInfo", { epoch: 24 });
+    rpc("getIdentity", { identity: IDENTITY });
+    rpc("getVersion", { "solana-core": "4.1.2" });
+    rpc("getGenesisHash", GENESIS);
+    rpc("getClusterNodes", [null, { pubkey: IDENTITY, shredVersion: 30454 }]);
+    rpc("getVoteAccounts", { current: [], delinquent: [] });
+
+    const result = await collector().makeMetrics();
+
+    expect(result).toContain("spherenet_rpc_up 1");
+    expect(result).not.toContain("spherenet_cluster_node_count");
+    expect(result).not.toContain("spherenet_shred_version");
+  });
+
+  it("omits comparison gauges when their expected values are not configured", async () => {
+    rpc("getHealth", "ok");
+    rpc("getSlot", 123456);
+    rpc("getEpochInfo", { epoch: 24 });
+    rpc("getIdentity", { identity: IDENTITY });
+    rpc("getVersion", { "solana-core": "4.1.2" });
+    rpc("getGenesisHash", GENESIS);
+    rpc("getClusterNodes", [{ pubkey: IDENTITY, shredVersion: 30454 }]);
+    rpc("getVoteAccounts", { current: [], delinquent: [] });
+
+    const result = await new SphereNet("", "", RPC, VOTE, IDENTITY, "", "").makeMetrics();
+
+    expect(result).not.toContain("spherenet_genesis_match");
+    expect(result).toContain("spherenet_shred_version 30454");
+    expect(result).not.toContain("spherenet_shred_version_match");
   });
 });
