@@ -281,8 +281,14 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     description: "SphereNet permissioned testnet validator collector",
     aliases: ["spherenet", "testnet/spherenet"],
     legacyModulePaths: ["./availables/testnet/spherenet.ts"],
-    requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "GENESIS_HASH", "SHRED_VERSION"],
+    requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES"],
+    optionalEnv: [
+      "EXISTING_METRICS_URL",
+      "COLLECTOR_VALIDATOR",
+      "IDENTITY",
+      "GENESIS_HASH",
+      "SHRED_VERSION",
+    ],
     factory: createSphereNetFactory(),
   },
   {

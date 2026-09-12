@@ -68,12 +68,15 @@ Limonata 금액은 aLIMO만 수집한다. 선택 native endpoint 장애는 체�
 
 ## SphereNet 테스트넷
 
-`CHAIN=spherenet-testnet`과 `RPC_URL`, 하나 이상의 vote account 주소인 `VOTE`,
-validator identity인 `IDENTITY`를 설정한다. `GENESIS_HASH`, `SHRED_VERSION`은
-SphereNet 운영자가 제공한 검증 값일 때만 선택적으로 설정한다. collector는 설정한
-RPC에서 `getHealth`, `getSlot`, `getEpochInfo`, `getIdentity`, `getVersion`,
-`getGenesisHash`, `getClusterNodes`, `getVoteAccounts`만 호출하며 Solana mainnet
-indexer를 조회하지 않는다. 설정한 vote account가 없으면 unavailable로 두고,
+`CHAIN=spherenet-testnet`과 `RPC_URL`, 하나 이상의 vote account 주소인 `VOTE`를
+설정한다. `IDENTITY`는 호환성을 위해 선택적으로 받을 수 있지만 collector는
+설정값으로 필터링하지 않고 RPC가 반환한 identity를 label로 사용한다.
+`GENESIS_HASH`, `SHRED_VERSION`은 SphereNet 운영자가 제공한 검증 값일 때만
+선택적으로 설정한다. collector는 설정한 RPC에서 `getHealth`, `getSlot`,
+`getEpochInfo`, `getIdentity`, `getVersion`, `getGenesisHash`, `getClusterNodes`,
+`getVoteAccounts`만 호출하며 Solana mainnet indexer를 조회하지 않는다.
+`spherenet_cluster_node_count`는 `getClusterNodes`가 반환한 클러스터 멤버 수이며
+직접 연결된 peer 수가 아니다. 설정한 vote account가 없으면 unavailable로 두고,
 delinquent 계정은 `spherenet_validator_active=0`으로 명시한다.
 
 ## HashKinetics 테스트넷

@@ -6,30 +6,50 @@ type RpcResult = unknown;
 type ClusterNode = {
   pubkey?: string;
   gossip?: string | null;
-  shredVersion?: number;
+  shredVersion?: unknown;
 };
 
 type VoteAccount = {
-  votePubkey?: string;
-  nodePubkey?: string;
-  activatedStake?: number;
-  commission?: number;
-  lastVote?: number;
+  votePubkey?: unknown;
+  nodePubkey?: unknown;
+  activatedStake?: unknown;
+  commission?: unknown;
+  lastVote?: unknown;
   epochCredits?: unknown;
 };
 
 type VoteAccounts = {
-  current?: VoteAccount[];
-  delinquent?: VoteAccount[];
+  current: VoteAccount[];
+  delinquent: VoteAccount[];
 };
 
 function finiteNumber(value: unknown): number | null {
-  const parsed = typeof value === "number" ? value : Number(value);
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.trim() === "") return null;
+
+  const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function isVoteAccount(value: unknown): value is VoteAccount {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isVoteAccounts(value: unknown): value is VoteAccounts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const payload = value as Partial<VoteAccounts>;
+  return (
+    Array.isArray(payload.current) &&
+    Array.isArray(payload.delinquent) &&
+    payload.current.every(isVoteAccount) &&
+    payload.delinquent.every(isVoteAccount)
+  );
 }
 
 /**
@@ -56,9 +76,9 @@ export default class SphereNet extends TargetAbstract {
     help: "Current SphereNet epoch",
   });
 
-  private readonly peerCountGauge = new Gauge({
-    name: "spherenet_peer_count",
-    help: "Number of nodes returned by getClusterNodes",
+  private readonly clusterNodeCountGauge = new Gauge({
+    name: "spherenet_cluster_node_count",
+    help: "Number of cluster nodes returned by getClusterNodes; this is not a connected-peer count",
   });
 
   private readonly validatorCountGauge = new Gauge({
@@ -143,7 +163,7 @@ export default class SphereNet extends TargetAbstract {
     this.registry.registerMetric(this.rpcUpGauge);
     this.registry.registerMetric(this.slotGauge);
     this.registry.registerMetric(this.epochGauge);
-    this.registry.registerMetric(this.peerCountGauge);
+    this.registry.registerMetric(this.clusterNodeCountGauge);
     this.registry.registerMetric(this.validatorCountGauge);
     this.registry.registerMetric(this.voteAccountsUpGauge);
     this.registry.registerMetric(this.validatorActiveGauge);
@@ -210,7 +230,7 @@ export default class SphereNet extends TargetAbstract {
       }
     }
     if (clusterNodes.ok && Array.isArray(clusterNodes.value)) {
-      this.peerCountGauge.set(clusterNodes.value.length);
+      this.clusterNodeCountGauge.set(clusterNodes.value.length);
       const firstNode = (clusterNodes.value as ClusterNode[]).find(
         (node) => finiteNumber(node.shredVersion) !== null,
       );
@@ -222,9 +242,9 @@ export default class SphereNet extends TargetAbstract {
         }
       }
     }
-    if (voteAccounts.ok && voteAccounts.value && typeof voteAccounts.value === "object") {
+    if (voteAccounts.ok && isVoteAccounts(voteAccounts.value)) {
       this.voteAccountsUpGauge.set(1);
-      this.setVoteAccounts(voteAccounts.value as VoteAccounts);
+      this.setVoteAccounts(voteAccounts.value);
     } else {
       this.voteAccountsUpGauge.set(0);
     }
@@ -236,7 +256,7 @@ export default class SphereNet extends TargetAbstract {
     this.rpcUpGauge.reset();
     this.slotGauge.reset();
     this.epochGauge.reset();
-    this.peerCountGauge.reset();
+    this.clusterNodeCountGauge.reset();
     this.validatorCountGauge.reset();
     this.voteAccountsUpGauge.reset();
     this.validatorActiveGauge.reset();
@@ -279,8 +299,7 @@ export default class SphereNet extends TargetAbstract {
   }
 
   private setVoteAccounts(value: VoteAccounts): void {
-    const current = Array.isArray(value.current) ? value.current : [];
-    const delinquent = Array.isArray(value.delinquent) ? value.delinquent : [];
+    const { current, delinquent } = value;
     const all = [...current, ...delinquent];
     this.validatorCountGauge.set(all.length);
 

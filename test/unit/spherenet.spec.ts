@@ -71,6 +71,13 @@ describe("SphereNet collector", () => {
         IDENTITY,
       }).chainId,
     ).toBe("spherenet-testnet");
+    expect(
+      loadRuntimeConfig({
+        CHAIN: "spherenet-testnet",
+        RPC_URL: RPC,
+        VOTE,
+      }).collectorValidator,
+    ).toBe("");
     expect(() => loadRuntimeConfig({ CHAIN: "spherenet-testnet", VOTE, IDENTITY })).toThrow(
       "RPC_URL",
     );
@@ -85,7 +92,7 @@ describe("SphereNet collector", () => {
       "spherenet_rpc_up 1",
       "spherenet_slot 123456",
       "spherenet_epoch 24",
-      "spherenet_peer_count 2",
+      "spherenet_cluster_node_count 2",
       "spherenet_validator_count 1",
       `spherenet_validator_active{vote="${VOTE}"} 1`,
       `spherenet_validator_activated_stake_sphr{vote="${VOTE}"} 10000`,
@@ -115,6 +122,41 @@ describe("SphereNet collector", () => {
     expect(result).toContain("spherenet_rpc_up 0");
     expect(result).toContain("spherenet_vote_accounts_up 0");
     expect(result).not.toContain("spherenet_slot 123456");
+    expect(result).not.toContain(`spherenet_validator_active{vote="${VOTE}"}`);
+  });
+
+  it("does not turn nullable shred versions into zero", async () => {
+    rpc("getHealth", "ok");
+    rpc("getSlot", 123456);
+    rpc("getEpochInfo", { epoch: 24 });
+    rpc("getIdentity", { identity: IDENTITY });
+    rpc("getVersion", { "solana-core": "4.1.2" });
+    rpc("getGenesisHash", GENESIS);
+    rpc("getClusterNodes", [
+      { pubkey: IDENTITY, shredVersion: null },
+      { pubkey: "peer-2", shredVersion: 30454 },
+    ]);
+    rpc("getVoteAccounts", { current: [], delinquent: [] });
+
+    const result = await collector().makeMetrics();
+
+    expect(result).toContain("spherenet_shred_version 30454");
+    expect(result).not.toContain("spherenet_shred_version 0");
+  });
+
+  it("marks malformed vote-account payloads unavailable", async () => {
+    rpc("getHealth", "ok");
+    rpc("getSlot", 123456);
+    rpc("getEpochInfo", { epoch: 24 });
+    rpc("getIdentity", { identity: IDENTITY });
+    rpc("getVersion", { "solana-core": "4.1.2" });
+    rpc("getGenesisHash", GENESIS);
+    rpc("getClusterNodes", []);
+    rpc("getVoteAccounts", {});
+
+    const result = await collector().makeMetrics();
+
+    expect(result).toContain("spherenet_vote_accounts_up 0");
     expect(result).not.toContain(`spherenet_validator_active{vote="${VOTE}"}`);
   });
 });
