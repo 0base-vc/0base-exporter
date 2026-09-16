@@ -386,8 +386,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     aliases: ["push", "testnet/push"],
     legacyModulePaths: ["./availables/testnet/push.ts"],
     requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
-    factory: createFactory(PushTestnet),
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL", "PUSH_REFERENCE_RPC_URL"],
+    factory: ({ config }) =>
+      new PushTestnet(
+        config.existingMetricsUrl,
+        config.apiUrl,
+        config.rpcUrl,
+        config.collectorAddresses,
+        config.collectorValidator,
+        config.env.PUSH_REFERENCE_RPC_URL,
+      ),
   },
   {
     id: "canopy-testnet",

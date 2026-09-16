@@ -32,6 +32,7 @@ API_URL=http://127.0.0.1:1317 \
 RPC_URL=http://127.0.0.1:26657 \
 ADDRESS=push1youraddress \
 VALIDATOR=pushvaloper1yourvalidator \
+PUSH_REFERENCE_RPC_URL=https://rpc-testnet-donut-node1.push.org \
 npm start
 ```
 

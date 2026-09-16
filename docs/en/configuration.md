@@ -34,8 +34,13 @@ the CometBFT endpoint, `ADDRESS` to the Push account, and `VALIDATOR` to the
 Push valoper address. The collector uses the shared Cosmos v1 profile, so the
 existing `tendermint_*` metric names and labels remain unchanged. It calls the
 standard bank, account, staking, distribution, governance, and CometBFT
-validator endpoints. The aliases `push`, `testnet/push`, and
-`BLOCKCHAIN=./availables/testnet/push.ts` remain available.
+validator endpoints. Push amounts always use 18 decimals regardless of
+`DECIMAL_PLACES`; unbonding balances without a denom are labeled `upc`, and
+rewards are read from the standard top-level `total` field. Set
+`PUSH_REFERENCE_RPC_URL` to compare local and reference `/status` and same-height
+`app_hash` values. The resulting `push_validator_*` health metrics are emitted
+from the same `/metrics` response as the Cosmos metrics. The aliases `push`,
+`testnet/push`, and `BLOCKCHAIN=./availables/testnet/push.ts` remain available.
 
 ## Address semantics
 
