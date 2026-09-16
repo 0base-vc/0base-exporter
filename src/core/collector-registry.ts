@@ -19,6 +19,7 @@ import CanopyTestnet from "../availables/testnet/canopy";
 import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
+import PushTestnet from "../availables/testnet/push";
 import RitualTestnet from "../availables/testnet/ritual";
 import SolanaTestnet from "../availables/testnet/solana";
 import StoryTestnet from "../availables/testnet/story";
@@ -377,6 +378,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
     factory: createFactory(InitiaTestnet),
+  },
+  {
+    id: "push-testnet",
+    family: "cosmos",
+    description: "Push Chain Donut testnet Cosmos v1 collector",
+    aliases: ["push", "testnet/push"],
+    legacyModulePaths: ["./availables/testnet/push.ts"],
+    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
+    factory: createFactory(PushTestnet),
   },
   {
     id: "canopy-testnet",

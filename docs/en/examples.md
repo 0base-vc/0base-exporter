@@ -22,6 +22,19 @@ VALIDATOR=cosmosvaloper1validator \
 npm start
 ```
 
+## Push Chain Donut testnet example
+
+Env template: [`examples/env/push-testnet.env`](../../examples/env/push-testnet.env)
+
+```bash
+CHAIN=push-testnet \
+API_URL=http://127.0.0.1:1317 \
+RPC_URL=http://127.0.0.1:26657 \
+ADDRESS=push1youraddress \
+VALIDATOR=pushvaloper1yourvalidator \
+npm start
+```
+
 ## Solana example
 
 Env template: [`examples/env/solana.env`](../../examples/env/solana.env)

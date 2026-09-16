@@ -10,6 +10,7 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Added
 
+- Push Chain Donut testnet collector using the shared Cosmos v1 profile.
 - HashKinetics testnet collector: fresh RPC health, reference height/state checks, validator root identity, and one-time signing-key budget metrics.
 
 - Typed runtime configuration with `CHAIN`-based collector selection and legacy `BLOCKCHAIN` compatibility.
