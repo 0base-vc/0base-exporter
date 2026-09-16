@@ -10,7 +10,14 @@ interface PushStatus {
 }
 
 function rpcUrl(baseUrl: string, path: string): string {
-  return new URL(path, `${baseUrl.replace(/\/$/, "")}/`).toString();
+  const base = new URL(baseUrl);
+  base.search = "";
+  base.hash = "";
+  if (!base.pathname.endsWith("/")) {
+    base.pathname += "/";
+  }
+
+  return new URL(path.replace(/^\/+/, ""), base).toString();
 }
 
 function nonNegativeInteger(value: unknown): number {
@@ -69,6 +76,7 @@ export default class PushTestnet extends CosmosCollectorBase {
   });
   private readonly referenceRpcUrl: string;
   private pending?: Promise<string>;
+  private baseMetricsPending?: Promise<string>;
 
   public constructor(
     protected readonly existMetrics: string,
@@ -106,8 +114,39 @@ export default class PushTestnet extends CosmosCollectorBase {
   }
 
   private async collect(): Promise<string> {
-    const metrics = await super.makeMetrics();
-    return `${metrics}\n${await this.collectHealthMetrics()}`;
+    const baseMetrics = this.collectBaseMetrics();
+    const healthMetrics = this.collectHealthMetrics();
+    const [metrics, health] = await Promise.all([baseMetrics, healthMetrics]);
+    return `${metrics}\n${health}`;
+  }
+
+  private async collectBaseMetrics(): Promise<string> {
+    if (!this.baseMetricsPending) {
+      const pending = super.makeMetrics().catch((error) => {
+        console.error("Push base metrics", error);
+        return "";
+      });
+      this.baseMetricsPending = pending.finally(() => {
+        this.baseMetricsPending = undefined;
+      });
+    }
+
+    return this.withTimeout(this.baseMetricsPending, HEALTH_TIMEOUT_MS, "");
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
   }
 
   private resetHealthMetrics(): void {
@@ -130,7 +169,7 @@ export default class PushTestnet extends CosmosCollectorBase {
     this.healthRegistry.registerMetric(metric);
   }
 
-  private async readStatus(baseUrl: string): Promise<PushStatus> {
+  private async readStatus(baseUrl: string, timeoutMs = HEALTH_TIMEOUT_MS): Promise<PushStatus> {
     return this.getFresh(
       rpcUrl(baseUrl, "/status"),
       (response) => {
@@ -143,21 +182,25 @@ export default class PushTestnet extends CosmosCollectorBase {
         }
         return { height, catchingUp };
       },
-      HEALTH_TIMEOUT_MS,
+      timeoutMs,
     );
   }
 
-  private async readPeers(): Promise<number> {
+  private async readPeers(timeoutMs = HEALTH_TIMEOUT_MS): Promise<number> {
     return this.getFresh(
       rpcUrl(this.rpcUrl, "/net_info"),
       (response) => {
         return nonNegativeInteger(response.data?.result?.n_peers);
       },
-      HEALTH_TIMEOUT_MS,
+      timeoutMs,
     );
   }
 
-  private async readAppHash(baseUrl: string, height: number): Promise<string> {
+  private async readAppHash(
+    baseUrl: string,
+    height: number,
+    timeoutMs = HEALTH_TIMEOUT_MS,
+  ): Promise<string> {
     return this.getFresh(
       rpcUrl(baseUrl, `/block?height=${height}`),
       (response) => {
@@ -167,47 +210,55 @@ export default class PushTestnet extends CosmosCollectorBase {
         }
         return appHash;
       },
-      HEALTH_TIMEOUT_MS,
+      timeoutMs,
     );
   }
 
   private async collectHealthMetrics(): Promise<string> {
+    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+    const remainingTimeout = (): number => Math.max(1, deadline - Date.now());
     this.resetHealthMetrics();
+
+    const localStatusRequest = this.readStatus(this.rpcUrl, remainingTimeout());
+    const peersRequest = this.readPeers(remainingTimeout());
+    const referenceStatusRequest = this.referenceRpcUrl
+      ? this.readStatus(this.referenceRpcUrl, remainingTimeout())
+      : Promise.resolve<PushStatus | undefined>(undefined);
+
+    const [localStatusResult, peersResult, referenceStatusResult] = await Promise.allSettled([
+      localStatusRequest,
+      peersRequest,
+      referenceStatusRequest,
+    ]);
+
+    const localStatus =
+      localStatusResult.status === "fulfilled" ? localStatusResult.value : undefined;
+    const peers = peersResult.status === "fulfilled" ? peersResult.value : undefined;
+    const referenceStatus =
+      referenceStatusResult.status === "fulfilled" ? referenceStatusResult.value : undefined;
+
     this.enableHealthMetric(this.localRpcUpGauge);
-    this.localRpcUpGauge.set(0);
+    this.localRpcUpGauge.set(Number(localStatus !== undefined));
 
-    let localStatus: PushStatus | undefined;
-    let referenceStatus: PushStatus | undefined;
-
-    try {
-      localStatus = await this.readStatus(this.rpcUrl);
-      this.localRpcUpGauge.set(1);
+    if (localStatus !== undefined) {
       this.enableHealthMetric(this.catchingUpGauge);
       this.catchingUpGauge.set(Number(localStatus.catchingUp));
       this.enableHealthMetric(this.localHeightGauge);
       this.localHeightGauge.set(localStatus.height);
-    } catch {
-      // Keep local_rpc_up=0; an unavailable height is omitted.
     }
 
-    try {
-      const peers = await this.readPeers();
+    if (peers !== undefined) {
       this.enableHealthMetric(this.localPeersGauge);
       this.localPeersGauge.set(peers);
-    } catch {
-      // Leave the peer gauge absent so a failed query is not reported as zero peers.
     }
 
     if (this.referenceRpcUrl) {
       this.enableHealthMetric(this.referenceRpcUpGauge);
-      this.referenceRpcUpGauge.set(0);
-      try {
-        referenceStatus = await this.readStatus(this.referenceRpcUrl);
-        this.referenceRpcUpGauge.set(1);
+      this.referenceRpcUpGauge.set(Number(referenceStatus !== undefined));
+
+      if (referenceStatus !== undefined) {
         this.enableHealthMetric(this.referenceHeightGauge);
         this.referenceHeightGauge.set(referenceStatus.height);
-      } catch {
-        // Keep reference_rpc_up=0; an unavailable height is omitted.
       }
 
       const comparable =
@@ -217,16 +268,20 @@ export default class PushTestnet extends CosmosCollectorBase {
       this.enableHealthMetric(this.appHashComparableGauge);
       this.appHashComparableGauge.set(Number(comparable));
 
-      if (comparable && localStatus && referenceStatus) {
-        try {
-          const [localAppHash, referenceAppHash] = await Promise.all([
-            this.readAppHash(this.rpcUrl, localStatus.height),
-            this.readAppHash(this.referenceRpcUrl, referenceStatus.height),
-          ]);
+      if (comparable && deadline > Date.now()) {
+        const [localAppHashResult, referenceAppHashResult] = await Promise.allSettled([
+          this.readAppHash(this.rpcUrl, localStatus.height, remainingTimeout()),
+          this.readAppHash(this.referenceRpcUrl, referenceStatus.height, remainingTimeout()),
+        ]);
+
+        if (
+          localAppHashResult.status === "fulfilled" &&
+          referenceAppHashResult.status === "fulfilled"
+        ) {
           this.enableHealthMetric(this.appHashMatchGauge);
-          this.appHashMatchGauge.set(Number(localAppHash === referenceAppHash));
-        } catch {
-          // An unavailable app hash is unknown, so omit app_hash_match.
+          this.appHashMatchGauge.set(
+            Number(localAppHashResult.value === referenceAppHashResult.value),
+          );
         }
       }
     }

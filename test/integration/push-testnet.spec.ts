@@ -1,5 +1,6 @@
 import nock from "nock";
 import { register } from "prom-client";
+import CosmosCollectorBase from "../../src/availables/shared/cosmos-base";
 import PushTestnet from "../../src/availables/testnet/push";
 
 describe("Push Chain testnet metrics contract", () => {
@@ -179,5 +180,73 @@ describe("Push Chain testnet metrics contract", () => {
     expect(metrics).not.toContain("push_validator_reference_height 0");
     expect(metrics).not.toContain("push_validator_app_hash_comparable 0");
     expect(metrics).not.toContain("push_validator_app_hash_match 0");
+  });
+
+  it("keeps reverse-proxy path prefixes on health requests", async () => {
+    nock.cleanAll();
+    register.clear();
+
+    nock(apiUrl)
+      .get(`/cosmos/distribution/v1beta1/validators//commission`)
+      .reply(200, { commission: { commission: [] } })
+      .get("/cosmos/staking/v1beta1/validators")
+      .query({ status: "BOND_STATUS_BONDED", "pagination.limit": "256" })
+      .reply(200, { validators: [] })
+      .get("/cosmos/staking/v1beta1/params")
+      .reply(200, { params: { max_validators: 100 } })
+      .get("/cosmos/gov/v1/proposals")
+      .query({ proposal_status: "2" })
+      .reply(200, { proposals: [] });
+
+    const prefixedRpcUrl = `${rpcUrl}/push-rpc`;
+    nock(rpcUrl)
+      .get("/push-rpc/validators")
+      .query({ per_page: "100" })
+      .reply(200, { result: { validators: [] } })
+      .get("/push-rpc/status")
+      .reply(200, {
+        result: {
+          node_info: { network: "push_42101-1" },
+          sync_info: { latest_block_height: "100", catching_up: false },
+        },
+      })
+      .get("/push-rpc/net_info")
+      .reply(200, { result: { n_peers: "4" } });
+
+    const collector = new PushTestnet("", apiUrl, prefixedRpcUrl, "", "");
+    const metrics = await collector.makeMetrics();
+
+    expect(metrics).toContain("push_validator_local_rpc_up 1");
+    expect(metrics).toContain("push_validator_local_height 100");
+    expect(metrics).toContain("push_validator_local_peers 4");
+  });
+
+  it("returns health metrics when base collection does not settle", async () => {
+    nock.cleanAll();
+    register.clear();
+
+    nock(rpcUrl)
+      .get("/status")
+      .reply(200, {
+        result: {
+          node_info: { network: "push_42101-1" },
+          sync_info: { latest_block_height: "100", catching_up: false },
+        },
+      })
+      .get("/net_info")
+      .reply(200, { result: { n_peers: "4" } });
+
+    const originalMakeMetrics = CosmosCollectorBase.prototype.makeMetrics;
+    CosmosCollectorBase.prototype.makeMetrics = () => new Promise<string>(() => undefined);
+
+    try {
+      const collector = new PushTestnet("", apiUrl, rpcUrl, "", "");
+      const metrics = await collector.makeMetrics();
+
+      expect(metrics).toContain("push_validator_local_rpc_up 1");
+      expect(metrics).toContain("push_validator_local_height 100");
+    } finally {
+      CosmosCollectorBase.prototype.makeMetrics = originalMakeMetrics;
+    }
   });
 });
