@@ -22,6 +22,20 @@ VALIDATOR=cosmosvaloper1validator \
 npm start
 ```
 
+## Push Chain Donut 테스트넷 예제
+
+env 템플릿: [`examples/env/push-testnet.env`](../../examples/env/push-testnet.env)
+
+```bash
+CHAIN=push-testnet \
+API_URL=http://127.0.0.1:1317 \
+RPC_URL=http://127.0.0.1:26657 \
+ADDRESS=push1youraddress \
+VALIDATOR=pushvaloper1yourvalidator \
+PUSH_REFERENCE_RPC_URL=https://rpc-testnet-donut-node1.push.org \
+npm start
+```
+
 ## Solana 예제
 
 env 템플릿: [`examples/env/solana.env`](../../examples/env/solana.env)

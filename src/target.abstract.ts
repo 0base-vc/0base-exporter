@@ -69,6 +69,15 @@ export default abstract class TargetAbstract {
     return this.httpClient.get(url, process, timeoutMs);
   }
 
+  /** Strict GET helper for health checks; it never returns a stale fallback value. */
+  protected async getFresh(
+    url: string,
+    process: (response: { data: any }) => any,
+    timeoutMs?: number,
+  ) {
+    return this.httpClient.getFresh(url, process, timeoutMs);
+  }
+
   /**
    * Cached POST helper supporting both JSON-RPC payloads and plain JSON bodies.
    * Returns cached data immediately, even when stale, and refreshes it in the background.
