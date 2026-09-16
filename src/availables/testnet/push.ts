@@ -123,6 +123,11 @@ export default class PushTestnet extends CosmosCollectorBase {
     ]) {
       metric.reset();
     }
+    this.healthRegistry.clear();
+  }
+
+  private enableHealthMetric(metric: Gauge): void {
+    this.healthRegistry.registerMetric(metric);
   }
 
   private async readStatus(baseUrl: string): Promise<PushStatus> {
@@ -168,11 +173,8 @@ export default class PushTestnet extends CosmosCollectorBase {
 
   private async collectHealthMetrics(): Promise<string> {
     this.resetHealthMetrics();
+    this.enableHealthMetric(this.localRpcUpGauge);
     this.localRpcUpGauge.set(0);
-    this.referenceRpcUpGauge.set(0);
-    this.catchingUpGauge.set(1);
-    this.appHashComparableGauge.set(0);
-    this.appHashMatchGauge.set(0);
 
     let localStatus: PushStatus | undefined;
     let referenceStatus: PushStatus | undefined;
@@ -180,46 +182,52 @@ export default class PushTestnet extends CosmosCollectorBase {
     try {
       localStatus = await this.readStatus(this.rpcUrl);
       this.localRpcUpGauge.set(1);
+      this.enableHealthMetric(this.catchingUpGauge);
       this.catchingUpGauge.set(Number(localStatus.catchingUp));
+      this.enableHealthMetric(this.localHeightGauge);
       this.localHeightGauge.set(localStatus.height);
     } catch {
-      this.localHeightGauge.set(0);
+      // Keep local_rpc_up=0; an unavailable height is omitted.
     }
 
     try {
       const peers = await this.readPeers();
+      this.enableHealthMetric(this.localPeersGauge);
       this.localPeersGauge.set(peers);
     } catch {
       // Leave the peer gauge absent so a failed query is not reported as zero peers.
     }
 
     if (this.referenceRpcUrl) {
+      this.enableHealthMetric(this.referenceRpcUpGauge);
+      this.referenceRpcUpGauge.set(0);
       try {
         referenceStatus = await this.readStatus(this.referenceRpcUrl);
         this.referenceRpcUpGauge.set(1);
+        this.enableHealthMetric(this.referenceHeightGauge);
         this.referenceHeightGauge.set(referenceStatus.height);
       } catch {
-        this.referenceHeightGauge.set(0);
+        // Keep reference_rpc_up=0; an unavailable height is omitted.
       }
-    } else {
-      this.referenceHeightGauge.set(0);
-    }
 
-    const comparable =
-      localStatus !== undefined &&
-      referenceStatus !== undefined &&
-      localStatus.height === referenceStatus.height;
-    this.appHashComparableGauge.set(Number(comparable));
+      const comparable =
+        localStatus !== undefined &&
+        referenceStatus !== undefined &&
+        localStatus.height === referenceStatus.height;
+      this.enableHealthMetric(this.appHashComparableGauge);
+      this.appHashComparableGauge.set(Number(comparable));
 
-    if (comparable && localStatus && referenceStatus) {
-      try {
-        const [localAppHash, referenceAppHash] = await Promise.all([
-          this.readAppHash(this.rpcUrl, localStatus.height),
-          this.readAppHash(this.referenceRpcUrl, referenceStatus.height),
-        ]);
-        this.appHashMatchGauge.set(Number(localAppHash === referenceAppHash));
-      } catch {
-        this.appHashMatchGauge.set(0);
+      if (comparable && localStatus && referenceStatus) {
+        try {
+          const [localAppHash, referenceAppHash] = await Promise.all([
+            this.readAppHash(this.rpcUrl, localStatus.height),
+            this.readAppHash(this.referenceRpcUrl, referenceStatus.height),
+          ]);
+          this.enableHealthMetric(this.appHashMatchGauge);
+          this.appHashMatchGauge.set(Number(localAppHash === referenceAppHash));
+        } catch {
+          // An unavailable app hash is unknown, so omit app_hash_match.
+        }
       }
     }
 

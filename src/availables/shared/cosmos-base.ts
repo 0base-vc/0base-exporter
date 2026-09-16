@@ -339,12 +339,14 @@ export default abstract class CosmosCollectorBase extends TargetAbstract {
     selector: AmountSelector,
     decimal: number,
   ): Promise<Array<{ denom: string; amount: number }>> {
-    return this.get(url, (response) => {
+    const amounts = await this.get(url, (response) => {
       return selector(response.data).map((entry) => ({
         denom: entry.denom ?? "undefined",
         amount: normalizeAmount(entry.amount, decimal),
       }));
     });
+
+    return Array.isArray(amounts) ? amounts : [];
   }
 
   protected async updateAccountSequence(address: string): Promise<void> {

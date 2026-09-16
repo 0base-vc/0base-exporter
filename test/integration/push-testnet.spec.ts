@@ -1,4 +1,5 @@
 import nock from "nock";
+import { register } from "prom-client";
 import PushTestnet from "../../src/availables/testnet/push";
 
 describe("Push Chain testnet metrics contract", () => {
@@ -118,5 +119,65 @@ describe("Push Chain testnet metrics contract", () => {
     expect(metrics).toContain("push_validator_reference_height 100");
     expect(metrics).toContain("push_validator_app_hash_comparable 1");
     expect(metrics).toContain("push_validator_app_hash_match 1");
+  });
+
+  it("keeps health metrics when the validator API is not ready", async () => {
+    nock.cleanAll();
+    register.clear();
+
+    nock(apiUrl).get(/.*/).times(9).reply(500, { code: 3, message: "validator does not exist" });
+
+    nock(rpcUrl)
+      .get("/validators")
+      .query({ per_page: "100" })
+      .reply(200, { result: { validators: [] } })
+      .get("/status")
+      .reply(200, {
+        result: {
+          node_info: { network: "push_42101-1" },
+          sync_info: { latest_block_height: "100", catching_up: false },
+        },
+      })
+      .get("/net_info")
+      .reply(200, { result: { n_peers: "4" } });
+
+    nock(referenceRpcUrl).get("/status").reply(500, { code: 14, message: "reference unavailable" });
+
+    const collector = new PushTestnet("", apiUrl, rpcUrl, address, validator, referenceRpcUrl);
+    const metrics = await collector.makeMetrics();
+
+    expect(metrics).toContain("push_validator_local_rpc_up 1");
+    expect(metrics).toContain("push_validator_reference_rpc_up 0");
+    expect(metrics).toContain("push_validator_app_hash_comparable 0");
+    expect(metrics).not.toContain("push_validator_reference_height 0");
+    expect(metrics).not.toContain("push_validator_app_hash_match 0");
+    expect(metrics).not.toContain(`tendermint_address_commission{address="${validator}"`);
+  });
+
+  it("omits unknown health values when local RPC or reference is unconfigured", async () => {
+    nock.cleanAll();
+    register.clear();
+
+    nock(apiUrl).get(/.*/).times(9).reply(500, { code: 3, message: "validator does not exist" });
+
+    nock(rpcUrl)
+      .get("/validators")
+      .query({ per_page: "100" })
+      .reply(200, { result: { validators: [] } })
+      .get("/status")
+      .reply(500, { code: 14, message: "local RPC unavailable" })
+      .get("/net_info")
+      .reply(500, { code: 14, message: "local RPC unavailable" });
+
+    const collector = new PushTestnet("", apiUrl, rpcUrl, address, validator);
+    const metrics = await collector.makeMetrics();
+
+    expect(metrics).toContain("push_validator_local_rpc_up 0");
+    expect(metrics).not.toContain("push_validator_local_height 0");
+    expect(metrics).not.toContain("push_validator_catching_up 1");
+    expect(metrics).not.toContain("push_validator_reference_rpc_up 0");
+    expect(metrics).not.toContain("push_validator_reference_height 0");
+    expect(metrics).not.toContain("push_validator_app_hash_comparable 0");
+    expect(metrics).not.toContain("push_validator_app_hash_match 0");
   });
 });
