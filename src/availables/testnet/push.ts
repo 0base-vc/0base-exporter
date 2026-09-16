@@ -113,6 +113,14 @@ export default class PushTestnet extends CosmosCollectorBase {
     return this.pending;
   }
 
+  protected override get(
+    url: string,
+    process: (response: { data: any }) => any,
+    timeoutMs = HEALTH_TIMEOUT_MS,
+  ) {
+    return super.get(url, process, timeoutMs);
+  }
+
   private async collect(): Promise<string> {
     const baseMetrics = this.collectBaseMetrics();
     const healthMetrics = this.collectHealthMetrics();
