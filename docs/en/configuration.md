@@ -27,6 +27,21 @@ For `ritual-testnet`, set `API_URL` to the Ritual CL JSON-RPC endpoint and
 the node-native EL/CL Prometheus endpoints that should be merged into the
 exporter output.
 
+## Push Chain Donut testnet
+
+Set `CHAIN=push-testnet`, `API_URL` to the Cosmos REST endpoint, `RPC_URL` to
+the CometBFT endpoint, `ADDRESS` to the Push account, and `VALIDATOR` to the
+Push valoper address. The collector uses the shared Cosmos v1 profile, so the
+existing `tendermint_*` metric names and labels remain unchanged. It calls the
+standard bank, account, staking, distribution, governance, and CometBFT
+validator endpoints. Push amounts always use 18 decimals regardless of
+`DECIMAL_PLACES`; unbonding balances without a denom are labeled `upc`, and
+rewards are read from the standard top-level `total` field. Set
+`PUSH_REFERENCE_RPC_URL` to compare local and reference `/status` and same-height
+`app_hash` values. The resulting `push_validator_*` health metrics are emitted
+from the same `/metrics` response as the Cosmos metrics. The aliases `push`,
+`testnet/push`, and `BLOCKCHAIN=./availables/testnet/push.ts` remain available.
+
 ## Address semantics
 
 | Family       | Address field | Validator field |

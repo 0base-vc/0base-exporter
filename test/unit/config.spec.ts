@@ -1,6 +1,7 @@
 import { loadRuntimeConfig } from "../../src/core/config";
 import { createCollector, resolveLegacyCustomModulePath } from "../../src/core/collector-registry";
 import { logger } from "../../src/core/logger";
+import PushTestnet from "../../src/availables/testnet/push";
 import * as path from "path";
 
 describe("loadRuntimeConfig", () => {
@@ -84,6 +85,32 @@ describe("loadRuntimeConfig", () => {
 
     expect(config.collectorAddresses).toBe("cosmos1vote");
     expect(config.collectorValidator).toBe("cosmosvaloper1identity");
+  });
+
+  it("resolves Push Chain testnet to the shared Cosmos v1 collector", () => {
+    const config = loadRuntimeConfig({
+      CHAIN: "push-testnet",
+      API_URL: "http://127.0.0.1:1317",
+      RPC_URL: "http://127.0.0.1:26657",
+      ADDRESS: "push1address",
+      VALIDATOR: "pushvaloper1validator",
+    });
+    const collector = createCollector({ config, logger });
+
+    expect(config.chainId).toBe("push-testnet");
+    expect(collector).toBeInstanceOf(PushTestnet);
+  });
+
+  it("maps the Push Chain legacy module path to push-testnet", () => {
+    const config = loadRuntimeConfig({
+      BLOCKCHAIN: "./availables/testnet/push.ts",
+      API_URL: "http://127.0.0.1:1317",
+      ADDRESS: "push1address",
+      VALIDATOR: "pushvaloper1validator",
+    });
+
+    expect(config.chainId).toBe("push-testnet");
+    expect(config.chainSource).toBe("BLOCKCHAIN");
   });
 
   it("preserves legacy VOTE and IDENTITY precedence for the default collector", () => {

@@ -13,6 +13,7 @@
 | `gnoland`              | Cosmos | `./availables/gnoland.ts`              |
 | `gnoland-testnet`      | Cosmos | `./availables/testnet/gnoland.ts`      |
 | `initia-testnet`       | Cosmos | `./availables/testnet/initia.ts`       |
+| `push-testnet`         | Cosmos | `./availables/testnet/push.ts`         |
 | `solana`               | Solana | `./availables/solana.ts`               |
 | `solana-testnet`       | Solana | `./availables/testnet/solana.ts`       |
 | `spherenet-testnet`    | Solana | `./availables/testnet/spherenet.ts`    |

@@ -27,6 +27,21 @@
 `EXISTING_METRICS_URL`에는 exporter `/metrics` 응답에 함께 합칠 EL/CL
 Prometheus endpoint를 넣습니다.
 
+## Push Chain Donut 테스트넷
+
+`CHAIN=push-testnet`, `API_URL`에는 Cosmos REST endpoint, `RPC_URL`에는
+CometBFT endpoint, `ADDRESS`에는 Push account, `VALIDATOR`에는 Push valoper
+주소를 지정합니다. 공통 Cosmos v1 profile을 사용하므로 기존
+`tendermint_*` metric 이름과 label을 유지합니다. 표준 bank, account, staking,
+distribution, governance 및 CometBFT validator endpoint를 호출합니다.
+Push 금액은 `DECIMAL_PLACES`와 관계없이 18자리로 처리합니다. denom이 없는
+unbonding balance에는 `upc` label을 사용하고, rewards는 표준 응답의 최상위
+`total` field에서 읽습니다. `PUSH_REFERENCE_RPC_URL`을 지정하면 local과
+reference `/status` 및 같은 높이의 `app_hash`를 비교합니다. 결과
+`push_validator_*` health metric은 Cosmos metric과 같은 `/metrics` 응답에
+포함됩니다. `push`, `testnet/push`, `BLOCKCHAIN=./availables/testnet/push.ts`
+alias도 계속 사용할 수 있습니다.
+
 ## 주소 의미
 
 | 계열         | 주소 필드 | validator 필드 |

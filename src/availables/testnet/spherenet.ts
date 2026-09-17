@@ -40,6 +40,11 @@ function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+function nonNegativeInteger(value: unknown): number | null {
+  const parsed = finiteNumber(value);
+  return parsed !== null && Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function isClusterNode(value: unknown): value is ClusterNode {
   return isRecord(value);
 }
@@ -52,12 +57,15 @@ function isVoteAccount(value: unknown): value is VoteAccount {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 
   const account = value as VoteAccount;
+  const commission = finiteNumber(account.commission);
   return (
     stringValue(account.votePubkey).trim() !== "" &&
     stringValue(account.nodePubkey).trim() !== "" &&
-    finiteNumber(account.activatedStake) !== null &&
-    finiteNumber(account.commission) !== null &&
-    finiteNumber(account.lastVote) !== null
+    nonNegativeInteger(account.activatedStake) !== null &&
+    commission !== null &&
+    commission >= 0 &&
+    commission <= 100 &&
+    nonNegativeInteger(account.lastVote) !== null
   );
 }
 
