@@ -6,11 +6,38 @@ const EXISTING_METRIC_PREFIX_REPLACEMENTS = [
   ["mytumbler_", "multi_proposer_consensus_"],
 ] as const;
 
-function normalizeExistingMetrics(metrics: string): string {
+const METRIC_NAME_PATTERN = "[a-zA-Z_:][a-zA-Z0-9_:]*";
+
+function normalizeMetricIdentifier(identifier: string): string {
   return EXISTING_METRIC_PREFIX_REPLACEMENTS.reduce(
     (normalized, [from, to]) => normalized.split(from).join(to),
-    metrics,
+    identifier,
   );
+}
+
+function normalizeExistingMetrics(metrics: string): string {
+  const metadataPattern = new RegExp(
+    `^(#\\s+(?:HELP|TYPE|UNIT)\\s+)(${METRIC_NAME_PATTERN})(?=\\s|$)`,
+  );
+  const samplePattern = new RegExp(`^(${METRIC_NAME_PATTERN})(?=\\{|[\\t ]|$)`);
+
+  return metrics
+    .split("\n")
+    .map((line) => {
+      const metadataMatch = line.match(metadataPattern);
+      if (metadataMatch) {
+        return line.replace(
+          metadataPattern,
+          (_match: string, prefix: string, identifier: string) =>
+            `${prefix}${normalizeMetricIdentifier(identifier)}`,
+        );
+      }
+
+      return line.replace(samplePattern, (identifier: string) =>
+        normalizeMetricIdentifier(identifier),
+      );
+    })
+    .join("\n");
 }
 
 export default abstract class TargetAbstract {
