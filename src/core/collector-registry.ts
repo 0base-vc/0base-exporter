@@ -22,6 +22,7 @@ import MonadTestnet from "../availables/testnet/monad";
 import PushTestnet from "../availables/testnet/push";
 import RitualTestnet from "../availables/testnet/ritual";
 import SolanaTestnet from "../availables/testnet/solana";
+import SphereNetTestnet from "../availables/testnet/spherenet";
 import StoryTestnet from "../availables/testnet/story";
 import type TargetAbstract from "../target.abstract";
 import type { ChainProfile, CollectorContext } from "./types";
@@ -84,6 +85,19 @@ function createSolanaFactory(
       config.collectorAddresses,
       config.collectorValidator,
       config.env.ADDRESS?.trim() ?? "",
+    );
+}
+
+function createSphereNetFactory() {
+  return ({ config }: CollectorContext) =>
+    new SphereNetTestnet(
+      config.existingMetricsUrl,
+      config.apiUrl,
+      config.rpcUrl,
+      config.collectorAddresses,
+      config.collectorValidator,
+      config.env.GENESIS_HASH ?? "",
+      config.env.SHRED_VERSION ?? "",
     );
 }
 
@@ -261,6 +275,22 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "ADDRESS", "VOTE", "IDENTITY"],
     factory: createSolanaFactory(SolanaTestnet),
+  },
+  {
+    id: "spherenet-testnet",
+    family: "solana",
+    description: "SphereNet permissioned testnet validator collector",
+    aliases: ["spherenet", "testnet/spherenet"],
+    legacyModulePaths: ["./availables/testnet/spherenet.ts"],
+    requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES"],
+    optionalEnv: [
+      "EXISTING_METRICS_URL",
+      "COLLECTOR_VALIDATOR",
+      "IDENTITY",
+      "GENESIS_HASH",
+      "SHRED_VERSION",
+    ],
+    factory: createSphereNetFactory(),
   },
   {
     id: "monad",

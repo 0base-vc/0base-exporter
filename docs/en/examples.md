@@ -22,6 +22,20 @@ VALIDATOR=cosmosvaloper1validator \
 npm start
 ```
 
+## SphereNet testnet example
+
+Env template: [`examples/env/spherenet-testnet.env`](../../examples/env/spherenet-testnet.env)
+
+```bash
+CHAIN=spherenet-testnet \
+RPC_URL=https://api.test.sphere.net \
+VOTE=Vote111111111111111111111111111111111111111 \
+IDENTITY=Identity1111111111111111111111111111111111 \
+GENESIS_HASH=9ZbRXYQ8kxmaWddozFNxu7dtV6KmfVbfXXQFaQQn8CLH \
+SHRED_VERSION=30454 \
+npm start
+```
+
 ## Push Chain Donut testnet example
 
 Env template: [`examples/env/push-testnet.env`](../../examples/env/push-testnet.env)
