@@ -22,6 +22,10 @@
 | `EXISTING_METRICS_URL` | 선택                | 합쳐서 노출할 Prometheus endpoint 목록           |
 | `ENABLE_PROM_PERF`     | 선택                | 내부 gauge timing 계측 활성화                    |
 
+네이티브 Prometheus 메트릭을 병합할 때 exporter는 기존 `cometbft` 접두사를
+`tendermint`로, Pharos의 기존 consensus `mytumbler_` 접두사를
+`multi_proposer_consensus_`로 변환합니다.
+
 `ritual-testnet`에서는 `API_URL`에 Ritual CL JSON-RPC endpoint를 넣고,
 `EVM_API_URL`에 Ritual EL JSON-RPC endpoint를 넣습니다.
 `EXISTING_METRICS_URL`에는 exporter `/metrics` 응답에 함께 합칠 EL/CL

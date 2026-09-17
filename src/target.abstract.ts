@@ -1,6 +1,18 @@
 import type * as express from "express";
 import CachedHttpClient from "./core/http/cached-http-client";
 
+const EXISTING_METRIC_PREFIX_REPLACEMENTS = [
+  ["cometbft", "tendermint"],
+  ["mytumbler_", "multi_proposer_consensus_"],
+] as const;
+
+function normalizeExistingMetrics(metrics: string): string {
+  return EXISTING_METRIC_PREFIX_REPLACEMENTS.reduce(
+    (normalized, [from, to]) => normalized.split(from).join(to),
+    metrics,
+  );
+}
+
 export default abstract class TargetAbstract {
   abstract makeMetrics(): Promise<string>;
 
@@ -160,9 +172,7 @@ export default abstract class TargetAbstract {
         await Promise.all(
           urls.map(async (url: string) => {
             return this.get(url, (response) => {
-              let currentResponse = response.data;
-              currentResponse = currentResponse.replaceAll("cometbft", "tendermint");
-              return currentResponse;
+              return normalizeExistingMetrics(response.data);
             });
           }),
         )

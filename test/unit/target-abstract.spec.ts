@@ -73,4 +73,20 @@ describe("TargetAbstract transport helpers", () => {
     expect(mockedAxios.get).toHaveBeenNthCalledWith(1, "https://a.example/metrics", {});
     expect(mockedAxios.get).toHaveBeenNthCalledWith(2, "https://b.example/metrics", {});
   });
+
+  it("normalizes the legacy Pharos consensus metric prefix", async () => {
+    collector = new TestCollector("https://pharos.example/metrics");
+    mockedAxios.get.mockResolvedValueOnce({
+      data:
+        "# HELP mytumbler_validator_number Number of validators\n" +
+        "# TYPE mytumbler_validator_number gauge\n" +
+        "mytumbler_validator_number 19\n",
+    });
+
+    await expect(collector.fetchExistingMetrics()).resolves.toBe(
+      "# HELP multi_proposer_consensus_validator_number Number of validators\n" +
+        "# TYPE multi_proposer_consensus_validator_number gauge\n" +
+        "multi_proposer_consensus_validator_number 19\n",
+    );
+  });
 });
