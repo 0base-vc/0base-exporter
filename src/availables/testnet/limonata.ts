@@ -87,7 +87,7 @@ export default class Limonata extends CosmosCollectorBase {
                 .filter(Boolean);
               const results = await Promise.allSettled(
                 urls.map((url) =>
-                  this.get(url, ({ data }) => String(data).replace(/cometbft/g, "tendermint")),
+                  this.get(url, ({ data }) => this.normalizeExistingMetrics(String(data))),
                 ),
               );
               native = results

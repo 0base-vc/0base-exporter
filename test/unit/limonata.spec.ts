@@ -106,12 +106,24 @@ describe("Limonata", () => {
   it("reuses Cosmos metrics with fixed 18 decimals and appends native metrics", async () => {
     cosmos();
     health();
-    nock("http://native.example").get("/metrics").reply(200, "cometbft_consensus_height 100\n");
+    nock("http://native.example")
+      .get("/metrics")
+      .reply(
+        200,
+        "# HELP mytumbler_consensus_height cometbft height for mytumbler_worker\n" +
+          "# TYPE mytumbler_consensus_height gauge\n" +
+          'mytumbler_consensus_height{component="mytumbler_worker"} 100\n',
+      );
     const out = await collector("http://native.example/metrics").makeMetrics();
     expect(out).toContain(`tendermint_address_available{address="${account}",denom="aLIMO"} 2`);
     expect(out).toContain("limonata_validator_tokens 1");
     expect(out).toContain("limonata_catching_up 0");
-    expect(out).toContain("tendermint_consensus_height 100");
+    expect(out).toContain(
+      "# HELP multi_proposer_consensus_consensus_height tendermint height for mytumbler_worker",
+    );
+    expect(out).toContain(
+      'multi_proposer_consensus_consensus_height{component="mytumbler_worker"} 100',
+    );
     expect(out).toContain("limonata_cosmos_up 1");
   });
   it("does not replay health or balances after a failed scrape", async () => {

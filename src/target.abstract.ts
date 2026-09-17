@@ -1,18 +1,15 @@
 import type * as express from "express";
 import CachedHttpClient from "./core/http/cached-http-client";
 
-const EXISTING_METRIC_PREFIX_REPLACEMENTS = [
-  ["cometbft", "tendermint"],
-  ["mytumbler_", "multi_proposer_consensus_"],
-] as const;
+const PHAROS_LEGACY_METRIC_PREFIX = "mytumbler_";
+const PHAROS_METRIC_PREFIX = "multi_proposer_consensus_";
 
 const METRIC_NAME_PATTERN = "[a-zA-Z_:][a-zA-Z0-9_:]*";
 
 function normalizeMetricIdentifier(identifier: string): string {
-  return EXISTING_METRIC_PREFIX_REPLACEMENTS.reduce(
-    (normalized, [from, to]) => normalized.split(from).join(to),
-    identifier,
-  );
+  if (!identifier.startsWith(PHAROS_LEGACY_METRIC_PREFIX)) return identifier;
+
+  return `${PHAROS_METRIC_PREFIX}${identifier.slice(PHAROS_LEGACY_METRIC_PREFIX.length)}`;
 }
 
 function normalizeExistingMetrics(metrics: string): string {
@@ -21,23 +18,29 @@ function normalizeExistingMetrics(metrics: string): string {
   );
   const samplePattern = new RegExp(`^(${METRIC_NAME_PATTERN})(?=\\{|[\\t ]|$)`);
 
-  return metrics
-    .split("\n")
-    .map((line) => {
-      const metadataMatch = line.match(metadataPattern);
-      if (metadataMatch) {
-        return line.replace(
-          metadataPattern,
-          (_match: string, prefix: string, identifier: string) =>
-            `${prefix}${normalizeMetricIdentifier(identifier)}`,
-        );
-      }
+  return (
+    metrics
+      // Preserve the pre-existing exporter behavior for CometBFT's metric and
+      // label text while keeping the newer Pharos mapping identifier-scoped.
+      .split("cometbft")
+      .join("tendermint")
+      .split("\n")
+      .map((line: string) => {
+        const metadataMatch = line.match(metadataPattern);
+        if (metadataMatch) {
+          return line.replace(
+            metadataPattern,
+            (_match: string, prefix: string, identifier: string) =>
+              `${prefix}${normalizeMetricIdentifier(identifier)}`,
+          );
+        }
 
-      return line.replace(samplePattern, (identifier: string) =>
-        normalizeMetricIdentifier(identifier),
-      );
-    })
-    .join("\n");
+        return line.replace(samplePattern, (identifier: string) =>
+          normalizeMetricIdentifier(identifier),
+        );
+      })
+      .join("\n")
+  );
 }
 
 export default abstract class TargetAbstract {
@@ -115,6 +118,10 @@ export default abstract class TargetAbstract {
     timeoutMs?: number,
   ) {
     return this.httpClient.getFresh(url, process, timeoutMs);
+  }
+
+  protected normalizeExistingMetrics(metrics: string): string {
+    return normalizeExistingMetrics(metrics);
   }
 
   /**
@@ -199,7 +206,7 @@ export default abstract class TargetAbstract {
         await Promise.all(
           urls.map(async (url: string) => {
             return this.get(url, (response) => {
-              return normalizeExistingMetrics(response.data);
+              return this.normalizeExistingMetrics(String(response.data));
             });
           }),
         )

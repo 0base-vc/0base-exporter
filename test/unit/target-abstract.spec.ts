@@ -78,15 +78,17 @@ describe("TargetAbstract transport helpers", () => {
     collector = new TestCollector("https://pharos.example/metrics");
     mockedAxios.get.mockResolvedValueOnce({
       data:
-        "# HELP mytumbler_validator_number Number of validators for mytumbler_worker\n" +
+        "# HELP mytumbler_validator_number Number of cometbft validators for mytumbler_worker\n" +
         "# TYPE mytumbler_validator_number gauge\n" +
-        'mytumbler_validator_number{component="mytumbler_worker"} 19\n',
+        'mytumbler_validator_number{component="mytumbler_worker"} 19\n' +
+        'service_mytumbler_requests_total{component="cometbft_worker"} 7\n',
     });
 
     await expect(collector.fetchExistingMetrics()).resolves.toBe(
-      "# HELP multi_proposer_consensus_validator_number Number of validators for mytumbler_worker\n" +
+      "# HELP multi_proposer_consensus_validator_number Number of tendermint validators for mytumbler_worker\n" +
         "# TYPE multi_proposer_consensus_validator_number gauge\n" +
-        'multi_proposer_consensus_validator_number{component="mytumbler_worker"} 19\n',
+        'multi_proposer_consensus_validator_number{component="mytumbler_worker"} 19\n' +
+        'service_mytumbler_requests_total{component="tendermint_worker"} 7\n',
     );
   });
 });
