@@ -299,8 +299,8 @@ export default class Solana extends TargetAbstract {
 
   private readonly clusterRequiredVersionGauge = new Gauge({
     name: `${this.metricPrefix}_cluster_required_versions`,
-    help: "Cluster required client versions (Agave/Frankendancer) labeled as strings; value equals epoch",
-    labelNames: ["min_version_agave", "min_version_frankendancer"],
+    help: "Cluster required client versions (Agave/Firedancer) labeled as strings; value equals epoch",
+    labelNames: ["min_version_agave", "min_version_firedancer"],
   });
 
   private readonly validatorReleaseVersionGauge = new Gauge({
