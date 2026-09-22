@@ -1,5 +1,8 @@
 import { Gauge, Registry, register } from "prom-client";
-import { updateSolanaVoteAccounts } from "../../src/availables/shared/solana-common";
+import {
+  updateSolanaClusterRequiredVersions,
+  updateSolanaVoteAccounts,
+} from "../../src/availables/shared/solana-common";
 
 type Selector = (response: { data: unknown }) => unknown;
 type PostFn = (url: string, data: unknown, selector: Selector) => Promise<unknown>;
@@ -105,5 +108,58 @@ describe("updateSolanaVoteAccounts", () => {
     expect(secondMetrics).toContain('test_solana_validator_active{vote="vote-1"} 0');
     expect(secondMetrics).toContain('test_solana_validator_commission{vote="vote-1"} 7');
     expect(secondMetrics).toContain('test_solana_validator_last_vote{vote="vote-1"} 43');
+  });
+});
+
+describe("updateSolanaClusterRequiredVersions", () => {
+  beforeEach(() => {
+    register.clear();
+  });
+
+  afterEach(() => {
+    register.clear();
+  });
+
+  it("uses the Firedancer minimum version from the Solana API", async () => {
+    const registry = new Registry();
+    const clusterRequiredVersionGauge = new Gauge({
+      name: "test_solana_cluster_required_versions",
+      help: "cluster required versions",
+      labelNames: ["min_version_agave", "min_version_firedancer"],
+      registers: [registry],
+    });
+
+    const getWithCache = jest.fn(
+      async (_url: string, selector: Selector): Promise<unknown> =>
+        selector({
+          data: {
+            data: [
+              {
+                epoch: 800,
+                agave_min_version: "2.2.0",
+                firedancer_min_version: "0.1.0",
+                frankendancer_min_version: "0.9.0",
+              },
+            ],
+          },
+        }),
+    );
+
+    await updateSolanaClusterRequiredVersions({
+      cluster: "mainnet-beta",
+      clusterRequiredVersionGauge,
+      getWithCache,
+    });
+
+    const metrics = await registry.metrics();
+    expect(metrics).toContain(
+      'test_solana_cluster_required_versions{min_version_agave="2.2.0",min_version_firedancer="0.1.0"} 800',
+    );
+    expect(metrics).not.toContain("min_version_frankendancer");
+    expect(getWithCache).toHaveBeenCalledWith(
+      "https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=mainnet-beta",
+      expect.any(Function),
+      60000,
+    );
   });
 });

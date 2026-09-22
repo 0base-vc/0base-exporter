@@ -23,6 +23,7 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 - Prometheus metric timing instrumentation is opt-in through `ENABLE_PROM_PERF`.
 - Berachain ERC20 discovery now skips gracefully when `ALCHEMY_API_KEY` is not configured.
 - Solana collectors now receive wallet addresses through the factory instead of reading `process.env` directly.
+- **Breaking:** `solana_cluster_required_versions` now exposes the Firedancer minimum version as `min_version_firedancer`; update queries that use `min_version_frankendancer`.
 
 ### Fixed
 
