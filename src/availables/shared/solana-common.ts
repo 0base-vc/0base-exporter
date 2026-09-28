@@ -320,7 +320,10 @@ export async function updateSolanaClusterRequiredVersions(params: {
     if (!Number.isFinite(epoch)) return;
 
     params.clusterRequiredVersionGauge
-      .labels(String(latest?.agave_min_version ?? ""), String(latest?.firedancer_min_version ?? ""))
+      .labels(
+        String(latest?.agave_min_version ?? ""),
+        String(latest?.firedancer_full_min_version ?? ""),
+      )
       .set(epoch);
   } catch (error) {
     console.error("updateClusterRequiredVersions", error);

@@ -38,5 +38,6 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Fixed
 
+- Solana cluster required version metrics now read the full Firedancer minimum version instead of the Frankendancer-compatible version field.
 - `/metrics` now returns HTTP 500 when collection fails instead of silently masking request errors.
 - Concurrent cached HTTP requests are deduplicated to reduce duplicate network calls.

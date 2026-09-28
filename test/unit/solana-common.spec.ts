@@ -137,7 +137,8 @@ describe("updateSolanaClusterRequiredVersions", () => {
               {
                 epoch: 800,
                 agave_min_version: "2.2.0",
-                firedancer_min_version: "0.1.0",
+                firedancer_min_version: "0.1204.40300",
+                firedancer_full_min_version: "26.8.5",
                 frankendancer_min_version: "0.9.0",
               },
             ],
@@ -153,8 +154,9 @@ describe("updateSolanaClusterRequiredVersions", () => {
 
     const metrics = await registry.metrics();
     expect(metrics).toContain(
-      'test_solana_cluster_required_versions{min_version_agave="2.2.0",min_version_firedancer="0.1.0"} 800',
+      'test_solana_cluster_required_versions{min_version_agave="2.2.0",min_version_firedancer="26.8.5"} 800',
     );
+    expect(metrics).not.toContain('min_version_firedancer="0.1204.40300"');
     expect(metrics).not.toContain("min_version_frankendancer");
     expect(getWithCache).toHaveBeenCalledWith(
       "https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=mainnet-beta",
