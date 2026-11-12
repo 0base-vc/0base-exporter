@@ -15,6 +15,7 @@ type TestCollector = {
   updateEpochIncomeFromVx(validators: string): Promise<void>;
   updateEpochMedianFeesAverages(): Promise<void>;
   updateMarinadeSelectBonds(validators: string): Promise<void>;
+  updateGlobalEffectiveBid(): Promise<void>;
   updateValidatorReleaseVersions(): Promise<void>;
   applyEffBidToVotes(
     winningTotalPmpe: number,
@@ -250,7 +251,7 @@ describe("Solana vx.tools fallbacks", () => {
     );
   });
 
-  it("emits Marinade effective bid using only the (5,0) commission case", async () => {
+  it("emits separate Marinade bid references for the (5,10) and (5,0) commission cases", async () => {
     const collector = new Solana(
       "",
       "https://rpc.example",
@@ -269,7 +270,45 @@ describe("Solana vx.tools fallbacks", () => {
     expect(metrics).toContain(
       'solana_marinade_min_effective_bid_sol{vote="vote-2",commission="5",mev_commission="0"} 23',
     );
+    expect(metrics).toContain(
+      'solana_marinade_min_effective_bid_sol{vote="vote-1",commission="5",mev_commission="10"} 25',
+    );
+    expect(metrics).toContain(
+      'solana_marinade_min_effective_bid_sol{vote="vote-2",commission="5",mev_commission="10"} 25',
+    );
     expect(metrics).not.toContain('mev_commission="2"');
+  });
+
+  it("collects published bid references without requiring upstream validator credits", async () => {
+    const collector = createCollector();
+    collector.getWithCache = jest.fn(async (_url, selector) =>
+      selector({
+        data: [
+          {
+            epoch: 1083,
+            marinadeSamTargetSol: 1000,
+            revShare: { totalPmpe: 100, inflationPmpe: 60, mevPmpe: 20 },
+            values: { commissions: { inflationCommissionDec: 0, mevCommissionDec: 0 } },
+          },
+        ],
+      }),
+    );
+    await collector.updateGlobalEffectiveBid();
+    const metrics = await collector.registry.metrics();
+    expect(metrics).toContain('commission="5",mev_commission="10"} 25');
+    expect(metrics).toContain("solana_marinade_bid_reference_epoch 1083");
+
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      collector.getWithCache.mockResolvedValue([]);
+      await collector.updateGlobalEffectiveBid();
+      const unavailable = await collector.registry.metrics();
+      expect(unavailable).not.toContain("solana_marinade_min_effective_bid_sol{");
+      expect(unavailable).toMatch(/^solana_marinade_bid_reference_epoch nan$/im);
+      expect(unavailable).not.toContain("solana_marinade_bid_reference_epoch 0");
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it("emits the effective Marinade Select bond balance for configured validators", async () => {

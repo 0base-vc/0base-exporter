@@ -158,3 +158,24 @@ delinquent 계정은 `spherenet_validator_active=0`으로 명시한다.
 기존 지표 계약은 변경하지 않는다.
 
 Limonata 수집은 native endpoint를 포함한 모든 요청에 하나의 4초 제한을 공유한다. native endpoint 일부가 실패해도 정상 응답 지표는 유지하며 `limonata_native_metrics_up=0`으로 표시한다.
+
+## Marinade bid 기준값
+
+`solana_marinade_min_effective_bid_sol`은 최신 공식 Marinade scoring 결과를
+사용하며 `commission="5", mev_commission="10"`과
+`commission="5", mev_commission="0"`을 각각 제공합니다. 단위는 위임된 1,000 SOL당
+에포크별 SOL입니다. `solana_marinade_bid_reference_epoch`은 원본 결과의 에포크이며,
+기준값을 구할 수 없으면 `NaN`입니다.
+이는 마지막 발표 경매의 기준값이며 다음 경매 예측이나 검증인의 온체인 수수료
+설정이 아닙니다. Grafana 수익 추정의 스테이킹·MEV 수수료는 검증인별로 별도 설정해야 합니다.
+
+위임을 받은 검증인 중 최소 총 수익 공유값을 낙찰 기준으로 사용하고, 같은 에포크의
+수익 공유값과 수수료율에서 원래 inflation·MEV 보상값을 복원합니다. 상위 API의
+검증인 credit 데이터가 없으면 실패하는 Marinade SDK 재실행에는 의존하지 않습니다.
+scoring 데이터가 없거나 유효하지 않으면 bid를 0으로 표시하지 않습니다.
+
+마이그레이션: bid 메트릭의 이름과 label은 유지하지만, 새로 시뮬레이션한 경매 대신
+마지막 발표 경매를 의미합니다. 대시보드와 경보의 기준값은 원본 에포크와 함께
+해석해야 합니다. 설정된 모든 vote 계정에 두 수수료 시나리오를 제공하므로,
+시나리오 전체의 최댓값을 쓰지 말고 `vote`, `commission`, `mev_commission`을
+명시적으로 필터링해야 합니다.

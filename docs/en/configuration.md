@@ -169,3 +169,26 @@ configured RPC only. It does not query Solana mainnet indexers. The
 `getClusterNodes`, not the number of directly connected peers. A missing
 configured vote account is unavailable, while a delinquent account is
 explicitly reported as `spherenet_validator_active=0`.
+
+## Marinade bid reference
+
+`solana_marinade_min_effective_bid_sol` uses the latest published Marinade scoring
+results, with separate `commission="5", mev_commission="10"` and
+`commission="5", mev_commission="0"` scenarios. Values are SOL per 1,000 delegated
+SOL per epoch. `solana_marinade_bid_reference_epoch` identifies the source epoch
+and is `NaN` when the reference is unavailable.
+This is a published auction reference, not a prediction of the next auction or a
+validator's on-chain commission setting. Staking and MEV percentages in Grafana
+profit estimates must be configured separately for each validator.
+
+The collector derives the winning cutoff from the lowest total revenue share
+among validators awarded stake, and recovers gross inflation and MEV rewards
+from the same epoch's scored revenue shares and commission rates. It does not
+rerun the Marinade SDK, which requires upstream validator credit data that may
+be unavailable. Missing or invalid scoring data does not produce a zero bid.
+
+Migration: the bid metric keeps its name and labels, but now describes the latest
+published auction instead of a freshly simulated auction. Interpret dashboard
+and alert thresholds together with the reference epoch. Both commission scenarios
+are published for every configured vote account; filter `vote`, `commission`, and
+`mev_commission` explicitly rather than taking a maximum across scenarios.
