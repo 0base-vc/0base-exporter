@@ -1,6 +1,7 @@
 import TargetAbstract from "../target.abstract";
 import { Gauge, Registry } from "prom-client";
 import * as _ from "lodash";
+import { publishedMarinadeAuction } from "./shared/solana-marinade";
 import FirebamMetrics from "./shared/firebam-metrics";
 import {
   createSolanaEpochLabelResolver,
@@ -16,6 +17,7 @@ import {
 
 const LAMPORTS_PER_SOL = 1e9;
 const SOLANA_INDEXER_BASE_URL = "https://whoearns.live";
+const MARINADE_SCORING_URL = "https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4";
 
 type SolanaIndexerValidatorRecord = {
   vote?: string;
@@ -140,8 +142,13 @@ export default class Solana extends TargetAbstract {
 
   private readonly marinadeMinEffectiveBidGauge = new Gauge({
     name: `${this.metricPrefix}_marinade_min_effective_bid_sol`,
-    help: "Minimum effective bid required to receive delegation from Marinade (pmpe)",
+    help: "Minimum bid at the latest published Marinade auction cutoff (SOL per 1000 SOL per epoch)",
     labelNames: ["vote", "commission", "mev_commission"],
+  });
+
+  private readonly marinadeBidReferenceEpochGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_bid_reference_epoch`,
+    help: "Published scoring epoch used for the Marinade minimum bid reference (NaN if unavailable)",
   });
 
   private readonly marinadeMyBidGauge = new Gauge({
@@ -348,15 +355,6 @@ export default class Solana extends TargetAbstract {
   private readonly VX_CACHE_TTL_MS = 60000;
   private readonly INDEXER_CACHE_TTL_MS = 30000;
 
-  // Cache for effective bid values computed from the Marinade SDK.
-  private sdkEffBidCache: {
-    ts: number;
-    winningTotalPmpe: number;
-    inflationPmpe: number;
-    mevPmpe: number;
-  } | null = null;
-  private readonly SDK_CACHE_TTL_MS = 30 * 60 * 1000;
-
   private toUniqueList(csv: string): string[] {
     return Array.from(
       new Set(
@@ -417,6 +415,7 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.pendingActivationBySourceGauge);
     this.registry.registerMetric(this.pendingDeactivationBySourceGauge);
     this.registry.registerMetric(this.marinadeMinEffectiveBidGauge);
+    this.registry.registerMetric(this.marinadeBidReferenceEpochGauge);
     this.registry.registerMetric(this.marinadeMyBidGauge);
     this.registry.registerMetric(this.marinadeMaxStakeWantedGauge);
     this.registry.registerMetric(this.slotsAssignedGauge);
@@ -819,7 +818,7 @@ export default class Solana extends TargetAbstract {
       this.validatorBondsGauge.reset();
 
       // 1. Fetch the scoring API with cache protection to avoid repeated requests.
-      const scoringUrl = "https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4";
+      const scoringUrl = MARINADE_SCORING_URL;
       const scoringList = await this.getWithCache(
         scoringUrl,
         (response: { data: any }) => response.data,
@@ -914,7 +913,7 @@ export default class Solana extends TargetAbstract {
       this.marinadeEffectiveBidEpochGauge.reset();
       const configuredVotes = this.toUniqueList(this.votes);
       if (configuredVotes.length === 0) return;
-      const url = "https://scoring.marinade.finance/api/v1/scores/sam?lastEpochs=4";
+      const url = MARINADE_SCORING_URL;
       const rows = await this.getWithCache(
         url,
         (response: { data: any }) => response.data,
@@ -946,96 +945,53 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Compute the global effective bid and expose it with commission and mev_commission labels.
+  // Use published auction scores; rerunning the SDK depends on upstream vote credits,
+  // which can be unavailable even while official scoring results remain available.
   private async updateGlobalEffectiveBid(): Promise<void> {
+    this.marinadeMinEffectiveBidGauge.reset();
+    this.marinadeBidReferenceEpochGauge.set(NaN);
     try {
-      this.marinadeMinEffectiveBidGauge.reset();
-
-      const now = Date.now();
-      let winningTotalPmpe: number;
-      let baseInflPmpe: number;
-      let baseMevPmpe: number;
-
-      // 1) Reuse cached SDK output when it is still fresh.
-      if (this.sdkEffBidCache && now - this.sdkEffBidCache.ts < this.SDK_CACHE_TTL_MS) {
-        ({
-          winningTotalPmpe,
-          inflationPmpe: baseInflPmpe,
-          mevPmpe: baseMevPmpe,
-        } = this.sdkEffBidCache);
-        await this.applyEffBidToVotes(winningTotalPmpe, baseInflPmpe, baseMevPmpe);
-        return;
-      }
-
-      // 2) Run the SDK to compute fresh values.
-      const configUrl =
-        "https://raw.githubusercontent.com/marinade-finance/ds-sam-pipeline/main/auction-config.json";
-      const config = await this.getWithCache(
-        configUrl,
-        (response: { data: any }) => response.data,
-        60000,
-        10000,
+      const rows = await this.getWithCache(
+        MARINADE_SCORING_URL,
+        (response: { data: unknown }) => response.data,
+        30 * 60 * 1000,
+        25000,
       );
-      const req: any = (global as any).require ? (global as any).require : eval("require");
-      const sdkMod: any = req("@marinade.finance/ds-sam-sdk");
-      const dsSam = new sdkMod.DsSamSDK({
-        ...config,
-        inputsSource: sdkMod.InputsSource.APIS,
-        cacheInputs: false,
-      });
-
-      const origLog = console.log;
-      const origWarn = console.warn;
-      try {
-        console.log = () => {};
-        console.warn = () => {};
-        const runRes = await dsSam.runFinalOnly();
-        winningTotalPmpe = Number(runRes?.winningTotalPmpe ?? 0);
-        const aggregated = await dsSam.getAggregatedData();
-        baseInflPmpe = Number(aggregated?.rewards?.inflationPmpe ?? 0);
-        baseMevPmpe = Number(aggregated?.rewards?.mevPmpe ?? 0);
-      } finally {
-        console.log = origLog;
-        console.warn = origWarn;
-      }
-
-      // Debug log for Marinade SDK output values.
-      console.log(
-        "[Marinade SDK] winningTotalPmpe:",
-        winningTotalPmpe,
-        "inflationPmpe:",
-        baseInflPmpe,
-        "mevPmpe:",
-        baseMevPmpe,
+      const reference = publishedMarinadeAuction(rows);
+      await this.applyEffBidToVotes(
+        reference.winningTotalPmpe,
+        reference.inflationPmpe,
+        reference.mevPmpe,
       );
-
-      // 3) Refresh the cache and apply the computed values.
-      this.sdkEffBidCache = {
-        ts: now,
-        winningTotalPmpe,
-        inflationPmpe: baseInflPmpe,
-        mevPmpe: baseMevPmpe,
-      };
-      await this.applyEffBidToVotes(winningTotalPmpe, baseInflPmpe, baseMevPmpe);
+      this.marinadeBidReferenceEpochGauge.set(reference.epoch);
     } catch (e) {
       console.error("updateGlobalEffectiveBid", e);
     }
   }
 
-  // Apply the (5,0) case to every configured vote account.
   private async applyEffBidToVotes(
     winningTotalPmpe: number,
     baseInflPmpe: number,
     baseMevPmpe: number,
   ): Promise<void> {
-    // (5,0): commission 5%, mev_commission 0%
-    const eff50 = Math.max(
-      0,
-      Number(winningTotalPmpe) - (baseInflPmpe * (1 - 0.05) + baseMevPmpe * (1 - 0)),
-    );
-
-    for (const vote of this.toUniqueList(this.votes)) {
-      this.marinadeMinEffectiveBidGauge.labels(vote, "5", "0").set(eff50);
+    if (![winningTotalPmpe, baseInflPmpe, baseMevPmpe].every(Number.isFinite)) {
+      throw new Error("Invalid Marinade bid reference");
+    }
+    // Publish separate references for validators with and without MEV commission.
+    for (const [commission, mevCommission] of [
+      [5, 0],
+      [5, 10],
+    ]) {
+      const bid = Math.max(
+        0,
+        winningTotalPmpe -
+          (baseInflPmpe * (1 - commission / 100) + baseMevPmpe * (1 - mevCommission / 100)),
+      );
+      for (const vote of this.toUniqueList(this.votes)) {
+        this.marinadeMinEffectiveBidGauge
+          .labels(vote, String(commission), String(mevCommission))
+          .set(bid);
+      }
     }
   }
 

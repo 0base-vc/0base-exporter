@@ -32,6 +32,11 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Changed
 
+- Restore Solana Marinade bid references from the latest published auction when
+  validator credits are unavailable; add the 5% staking / 10% MEV scenario and
+  expose the reference epoch. The bid reference now describes a published auction,
+  not a live auction prediction; update dashboard and alert interpretations.
+
 - Collector bootstrap now validates required environment variables before startup.
 - README and issue / pull request templates now guide contributors through compatibility, safety, and validation expectations.
 - Prometheus metric timing instrumentation is opt-in through `ENABLE_PROM_PERF`.
