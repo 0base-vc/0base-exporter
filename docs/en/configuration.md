@@ -53,6 +53,37 @@ Multiple values are comma-separated.
 
 For backward compatibility, the runtime still checks `VOTE` before `ADDRESS` and `IDENTITY` before `VALIDATOR`. Prefer the family-specific fields above for new deployments, and avoid setting both aliases unless you intentionally want the legacy value to win.
 
+## FireBAM native metrics
+
+For `CHAIN=solana` or `CHAIN=solana-testnet`, optionally set
+`FIREBAM_METRICS_URL=http://validator-host:27770/metrics`. Legacy Solana
+`BLOCKCHAIN` selectors support the same option. Each scrape uses a fresh
+four-second request independent of Solana RPC collection. All native names,
+labels, HELP/TYPE metadata, counters and histograms are preserved, including
+snapshot, replay, `bam_*` and `pack_bam_*` metrics. The endpoint must expose
+`bam_enabled`, so enable the BAM tile at validator startup.
+
+`solana_firebam_metrics_up` is 1 for a successful current native scrape and 0
+for a failure; it is not `bam_healthy`. Failures omit native values instead of
+replaying cached healthy state. Without the option, no FireBAM request or new
+health metric is emitted. Existing metric contracts are unchanged.
+
+Use this option instead of `EXISTING_METRICS_URL` for FireBAM, because the
+latter retains legacy stale-fallback behavior. The same canonical URL is
+automatically excluded from the legacy merge to avoid duplicate/stale samples.
+Do not configure the same source under different aliases in both settings, or
+point the option at another exporter.
+
+On the same host, keep FireBAM on 27770 and set exporter `PORT=27771`. In
+Kubernetes, keep exporter port 27770 and use the remote validator's reachable
+address, not the Pod's localhost. Allow TCP 27770 from the observed cluster
+egress IP at the validator firewall. No keys or SSH access are required.
+See [the env example](../../examples/env/firebam.env).
+
+Alert on `solana_firebam_metrics_up == 0` for scrape failure. Interpret
+`bam_healthy` separately: startup and unstaked identities may not connect;
+a live stream alone does not prove fresh work arrived for a leader slot.
+
 ## Solana mainnet current-epoch metrics
 
 The `solana` collector reads current-epoch slot, fee, and tip income data from `https://whoearns.live`. Numeric metrics are emitted whenever the indexer returns a finite value. Completeness is exposed through boolean gauges such as `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, and `solana_validator_epoch_final`.

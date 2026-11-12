@@ -56,6 +56,12 @@ curl http://localhost:27770/metrics
 
 ## 주요 설정
 
+Solana mainnet/testnet에서 `FIREBAM_METRICS_URL`을 지정하면 FireBAM 원본
+메트릭의 이름, label, 타입을 유지하여 함께 수집합니다.
+`solana_firebam_metrics_up`으로 이번 수집 성공 여부를 확인합니다.
+[설정 설명](./docs/ko/configuration.md#firebam-원본-메트릭)과
+[env 예제](./examples/env/firebam.env)를 참고하세요.
+
 | 변수                   | 설명                                                |
 | ---------------------- | --------------------------------------------------- |
 | `PORT`                 | HTTP listen port. 기본값은 `27770`입니다.           |

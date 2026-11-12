@@ -75,6 +75,8 @@ function createSolanaFactory(
     votes: string,
     identities: string,
     walletAddresses?: string,
+    firebamMetricsUrl?: string,
+    exporterPort?: number,
   ) => TargetAbstract,
 ) {
   return ({ config }: CollectorContext) =>
@@ -85,6 +87,8 @@ function createSolanaFactory(
       config.collectorAddresses,
       config.collectorValidator,
       config.env.ADDRESS?.trim() ?? "",
+      config.env.FIREBAM_METRICS_URL?.trim() ?? "",
+      config.port,
     );
 }
 
@@ -263,7 +267,7 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     aliases: ["solana-mainnet"],
     legacyModulePaths: ["./availables/solana.ts"],
     requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "ADDRESS", "VOTE", "IDENTITY"],
+    optionalEnv: ["EXISTING_METRICS_URL", "FIREBAM_METRICS_URL", "ADDRESS", "VOTE", "IDENTITY"],
     factory: createSolanaFactory(Solana),
   },
   {
@@ -273,7 +277,7 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     aliases: ["testnet/solana", "solana-test"],
     legacyModulePaths: ["./availables/testnet/solana.ts"],
     requiredEnv: ["RPC_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
-    optionalEnv: ["EXISTING_METRICS_URL", "ADDRESS", "VOTE", "IDENTITY"],
+    optionalEnv: ["EXISTING_METRICS_URL", "FIREBAM_METRICS_URL", "ADDRESS", "VOTE", "IDENTITY"],
     factory: createSolanaFactory(SolanaTestnet),
   },
   {

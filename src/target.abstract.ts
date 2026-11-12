@@ -149,12 +149,21 @@ export default abstract class TargetAbstract {
     return this.httpClient.postFresh(url, data, process, timeoutMs);
   }
 
-  protected async loadExistMetrics(): Promise<string> {
+  protected async loadExistMetrics(excludedUrls: readonly string[] = []): Promise<string> {
+    const canonicalUrl = (url: string): string => {
+      try {
+        return new URL(url).href;
+      } catch {
+        return url;
+      }
+    };
+    const excluded = new Set(excludedUrls.filter(Boolean).map(canonicalUrl));
     if (this.existMetrics) {
       const urls = this.existMetrics
         .split(",")
         .map((url) => url.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter((url) => !excluded.has(canonicalUrl(url)));
 
       return (
         await Promise.all(

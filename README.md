@@ -77,6 +77,12 @@ The Solana mainnet collector uses the hosted 0Base validator indexer for current
 
 ## Documentation
 
+FireBAM native metrics can be merged by setting `FIREBAM_METRICS_URL` on the
+Solana mainnet/testnet collectors. Native metric names, labels and types are
+preserved; `solana_firebam_metrics_up` reports fresh scrape success.
+See [configuration](./docs/en/configuration.md#firebam-native-metrics) and the
+[env example](./examples/env/firebam.env).
+
 - [Quickstart](./docs/en/quickstart.md)
 - [Configuration](./docs/en/configuration.md)
 - [Supported chains](./docs/en/supported-chains.md)

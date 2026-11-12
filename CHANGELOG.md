@@ -10,6 +10,9 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Added
 
+- Optional fresh FireBAM native metrics for Solana mainnet/testnet through
+  `FIREBAM_METRICS_URL`, preserving native names and exposing scrape health.
+
 - SphereNet testnet collector: cluster-only JSON-RPC health, slot/epoch,
   peer, validator, version, genesis, and shred-version metrics.
 

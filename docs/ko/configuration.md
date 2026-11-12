@@ -1,5 +1,32 @@
 # 설정 레퍼런스
 
+## FireBAM 원본 메트릭
+
+`CHAIN=solana` 또는 `CHAIN=solana-testnet`에서
+`FIREBAM_METRICS_URL=http://validator-host:27770/metrics`를 선택적으로 지정합니다.
+기존 Solana `BLOCKCHAIN` 설정도 지원합니다. Solana RPC 수집과 독립적으로
+매 요청마다 4초 제한으로 원본을 수집합니다. Snapshot, replay, `bam_*`,
+`pack_bam_*`를 포함한 이름, label, HELP/TYPE, counter, histogram을 유지합니다.
+BAM tile을 기동 시 활성화하여 `bam_enabled`가 노출되어야 합니다.
+
+`solana_firebam_metrics_up`은 이번 수집 성공이면 1, 실패하면 0입니다.
+`bam_healthy`와 의미가 다르며 실패 시 이전 성공 값을 재사용하지 않습니다.
+미설정 시 기존 출력과 필수 환경변수는 바뀌지 않습니다.
+
+FireBAM은 기존 stale fallback이 있는 `EXISTING_METRICS_URL` 대신 이 옵션을
+사용하세요. 두 설정에 같은 정규화 URL이 있으면 기존 merge에서 제외합니다.
+같은 원본을 서로 다른 별칭으로 중복 등록하거나 exporter를 가리키지 마세요.
+
+동일 서버에서는 exporter `PORT=27771`, FireBAM `27770`을 사용합니다.
+Kubernetes에서는 exporter의 27770을 유지하고 원격 validator 주소를 지정합니다.
+Pod의 localhost는 원격 validator가 아닙니다. 서버 방화벽에서 실제 cluster
+egress IP의 TCP 27770을 허용합니다. 수집에 키파일이나 SSH 접근은 필요 없습니다.
+[env 예제](../../examples/env/firebam.env)를 참고하세요.
+
+수집 장애는 `solana_firebam_metrics_up == 0`, BAM 상태는 `bam_healthy`로
+구분합니다. 기동 중이거나 unstaked identity이면 BAM 연결이 없을 수 있으며,
+stream 정상만으로 leader 작업 수신을 보장하지 않습니다.
+
 ## Collector 선택
 
 - 권장 방식: `CHAIN=<collector-id>`
