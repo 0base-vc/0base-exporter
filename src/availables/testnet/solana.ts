@@ -4,6 +4,7 @@
 import TargetAbstract from "../../target.abstract";
 import { Gauge, Registry } from "prom-client";
 import * as _ from "lodash";
+import FirebamMetrics from "../shared/firebam-metrics";
 import {
   updateSolanaBalances,
   updateSolanaClusterRequiredVersions,
@@ -12,6 +13,7 @@ import {
 } from "../shared/solana-common";
 
 export default class Solana extends TargetAbstract {
+  private readonly firebamMetrics: FirebamMetrics;
   private readonly metricPrefix = "solana";
 
   private readonly registry = new Registry();
@@ -150,8 +152,11 @@ export default class Solana extends TargetAbstract {
     protected readonly votes: string,
     protected readonly identities: string,
     protected readonly walletAddresses: string = "",
+    firebamMetricsUrl: string = "",
+    exporterPort: number = 27770,
   ) {
     super(existMetrics, apiUrl, rpcUrl, votes, identities);
+    this.firebamMetrics = new FirebamMetrics(firebamMetricsUrl, exporterPort);
 
     this.registry.registerMetric(this.balanceGauge);
     this.registry.registerMetric(this.availableGauge);
@@ -172,6 +177,7 @@ export default class Solana extends TargetAbstract {
   }
 
   public async makeMetrics(): Promise<string> {
+    const firebamMetrics = this.firebamMetrics.collect();
     let customMetrics = "";
     try {
       await Promise.all([
@@ -191,7 +197,11 @@ export default class Solana extends TargetAbstract {
       console.error("makeMetrics", e);
     }
 
-    return customMetrics + "\n" + (await this.loadExistMetrics());
+    return [
+      customMetrics,
+      await this.loadExistMetrics([this.firebamMetrics.url]),
+      await firebamMetrics,
+    ].join("\n");
   }
 
   // merged into updateLeaderWindowsAndEpochEnd

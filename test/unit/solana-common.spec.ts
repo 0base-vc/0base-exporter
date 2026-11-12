@@ -129,21 +129,20 @@ describe("updateSolanaClusterRequiredVersions", () => {
       registers: [registry],
     });
 
-    const getWithCache = jest.fn(
-      async (_url: string, selector: Selector): Promise<unknown> =>
-        selector({
-          data: {
-            data: [
-              {
-                epoch: 800,
-                agave_min_version: "2.2.0",
-                firedancer_min_version: "0.1204.40300",
-                firedancer_full_min_version: "26.8.5",
-                frankendancer_min_version: "0.9.0",
-              },
-            ],
-          },
-        }),
+    const getWithCache = jest.fn(async (_url: string, selector: Selector): Promise<unknown> =>
+      selector({
+        data: {
+          data: [
+            {
+              epoch: 800,
+              agave_min_version: "2.2.0",
+              firedancer_min_version: "0.1204.40300",
+              firedancer_full_min_version: "26.8.5",
+              frankendancer_min_version: "0.9.0",
+            },
+          ],
+        },
+      }),
     );
 
     await updateSolanaClusterRequiredVersions({

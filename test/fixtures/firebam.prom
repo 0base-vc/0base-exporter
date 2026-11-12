@@ -1,0 +1,27 @@
+# HELP bam_enabled Whether BAM is enabled
+# TYPE bam_enabled gauge
+bam_enabled{kind="bam",kind_id="0"} 1
+# HELP bam_healthy Whether BAM is healthy
+# TYPE bam_healthy gauge
+bam_healthy{kind="bam",kind_id="0"} 1
+# HELP bam_stream_live Whether the scheduler stream is live
+# TYPE bam_stream_live gauge
+bam_stream_live{kind="bam",kind_id="0"} 1
+# HELP bam_transaction_published_total Transactions published by BAM
+# TYPE bam_transaction_published_total counter
+bam_transaction_published_total{kind="bam",kind_id="0"} 1234
+# HELP pack_bam_work_items_total Work items by stage
+# TYPE pack_bam_work_items_total counter
+pack_bam_work_items_total{kind="pack",kind_id="0",stage="scheduled"} 42
+# HELP bam_keepalive_rtt_sample Keepalive RTT in nanoseconds
+# TYPE bam_keepalive_rtt_sample gauge
+bam_keepalive_rtt_sample{kind="bam",kind_id="0"} 150000
+# HELP net_rx_bytes_total Received bytes
+# TYPE net_rx_bytes_total counter
+net_rx_bytes_total{kind="net",kind_id="0"} 9999
+# HELP bam_scheduler_pong_send_nanos Scheduler pong processing time
+# TYPE bam_scheduler_pong_send_nanos histogram
+bam_scheduler_pong_send_nanos_bucket{kind="bam",kind_id="0",le="1000"} 7
+bam_scheduler_pong_send_nanos_bucket{kind="bam",kind_id="0",le="+Inf"} 9
+bam_scheduler_pong_send_nanos_sum{kind="bam",kind_id="0"} 2e4
+bam_scheduler_pong_send_nanos_count{kind="bam",kind_id="0"} 9
