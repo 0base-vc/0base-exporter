@@ -120,6 +120,7 @@ describe("FireBAM native metrics", () => {
         "updateMarinadeScoring",
         "updateMarinadeSelectBonds",
         "updateGlobalEffectiveBid",
+        "updateMarinadeLiveAuction",
         "updateClusterRequiredVersions",
         "updateValidatorReleaseVersions",
         "updateLeaderWindowsAndEpochEnd",
