@@ -192,3 +192,45 @@ published auction instead of a freshly simulated auction. Interpret dashboard
 and alert thresholds together with the reference epoch. Both commission scenarios
 are published for every configured vote account; filter `vote`, `commission`, and
 `mev_commission` explicitly rather than taking a maximum across scenarios.
+
+### Live PSR bid alerts
+
+Do not use the published scoring reference above as a current bid-shortfall alarm.
+A current bid can clear PSR's live auction even while below an older scoring
+snapshot. The collector also runs the official Marinade SDK 0.6.7 with fresh API
+inputs, including support for Alpenglow vote rewards when credits are null.
+
+| Metric                                           | Meaning                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `solana_marinade_live_bid_sol`                   | Static bid used in the live calculation.                                        |
+| `solana_marinade_live_min_bid_sol`               | Winning total minus non-bid revenue from the same calculation, clamped at zero. |
+| `solana_marinade_live_bid_margin_sol`            | Total revenue share minus winning total; negative means below the live price.   |
+| `solana_marinade_live_auction_up`                | 1 only while a successful live result is available and under 180 seconds old.   |
+| `solana_marinade_live_auction_timestamp_seconds` | Last successful calculation time, zero before the first success.                |
+| `solana_marinade_live_auction_epoch`             | Live calculation epoch, NaN when unavailable.                                   |
+
+The first three metrics carry `vote`, `commission`, and `mev_commission` labels
+from the SDK's effective commission settings, rather than hardcoded scenarios.
+Non-bid revenue includes shared block rewards as well as inflation and MEV.
+Clearing the price does not guarantee allocation: max stake wanted, bond limits,
+concentration and redelegation priority still apply. It is not a penalty alarm.
+
+A single background calculation refreshes every 60 seconds, with a shared
+20-second network deadline. It does not block Prometheus scrapes. Failure or
+expiry removes live bid samples and sets live availability to 0; a published
+reference is never substituted. Alert queries must gate the margin on both
+availability and timestamp age. For example, apply the same deployment selectors
+to each metric in this expression:
+
+```promql
+max by (vote) (solana_marinade_live_bid_margin_sol)
+and on() (max(solana_marinade_live_auction_up) == 1)
+and on() (time() - max(solana_marinade_live_auction_timestamp_seconds) < 180)
+```
+
+Migration: keep published reference lines informational. Switch bid-shortfall
+alerts to the live margin, with a small floating-point tolerance (for example,
+below -0.000000001 for five minutes). Missing data is unavailable, not a zero
+margin, and query errors must not become a bid-shortfall alert. When deploying
+the exporter and dashboard separately, pause the bid alert until fresh live
+metrics have been verified, then resume evaluation.

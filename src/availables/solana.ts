@@ -2,6 +2,7 @@ import TargetAbstract from "../target.abstract";
 import { Gauge, Registry } from "prom-client";
 import * as _ from "lodash";
 import { publishedMarinadeAuction } from "./shared/solana-marinade";
+import { fetchLiveMarinadeAuction, MARINADE_LIVE_MAX_AGE_MS } from "./shared/solana-marinade-live";
 import FirebamMetrics from "./shared/firebam-metrics";
 import {
   createSolanaEpochLabelResolver,
@@ -149,6 +150,39 @@ export default class Solana extends TargetAbstract {
   private readonly marinadeBidReferenceEpochGauge = new Gauge({
     name: `${this.metricPrefix}_marinade_bid_reference_epoch`,
     help: "Published scoring epoch used for the Marinade minimum bid reference (NaN if unavailable)",
+  });
+
+  private readonly marinadeLiveBidGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_bid_sol`,
+    help: "Static bid in the latest live PSR auction simulation (SOL per 1000 SOL per epoch)",
+    labelNames: ["vote", "commission", "mev_commission"],
+  });
+
+  private readonly marinadeLiveMinBidGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_min_bid_sol`,
+    help: "Static bid needed to clear the live auction price; does not guarantee stake allocation",
+    labelNames: ["vote", "commission", "mev_commission"],
+  });
+
+  private readonly marinadeLiveBidMarginGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_bid_margin_sol`,
+    help: "Live PSR total revenue share minus winning total (SOL per 1000 SOL per epoch)",
+    labelNames: ["vote", "commission", "mev_commission"],
+  });
+
+  private readonly marinadeLiveAuctionUpGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_auction_up`,
+    help: "Whether a successful live PSR calculation is available and less than 180 seconds old",
+  });
+
+  private readonly marinadeLiveAuctionTimestampGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_auction_timestamp_seconds`,
+    help: "Unix time of the last successful live PSR auction calculation; zero before first success",
+  });
+
+  private readonly marinadeLiveAuctionEpochGauge = new Gauge({
+    name: `${this.metricPrefix}_marinade_live_auction_epoch`,
+    help: "Epoch of the live PSR auction calculation; NaN if unavailable",
   });
 
   private readonly marinadeMyBidGauge = new Gauge({
@@ -355,6 +389,10 @@ export default class Solana extends TargetAbstract {
   private readonly VX_CACHE_TTL_MS = 60000;
   private readonly INDEXER_CACHE_TTL_MS = 30000;
 
+  private liveAuctionRefresh: Promise<void> | null = null;
+  private liveAuctionLastAttempt = Number.NEGATIVE_INFINITY;
+  private liveAuctionLastSuccess = 0;
+
   private toUniqueList(csv: string): string[] {
     return Array.from(
       new Set(
@@ -416,6 +454,13 @@ export default class Solana extends TargetAbstract {
     this.registry.registerMetric(this.pendingDeactivationBySourceGauge);
     this.registry.registerMetric(this.marinadeMinEffectiveBidGauge);
     this.registry.registerMetric(this.marinadeBidReferenceEpochGauge);
+    this.registry.registerMetric(this.marinadeLiveBidGauge);
+    this.registry.registerMetric(this.marinadeLiveMinBidGauge);
+    this.registry.registerMetric(this.marinadeLiveBidMarginGauge);
+    this.registry.registerMetric(this.marinadeLiveAuctionUpGauge);
+    this.registry.registerMetric(this.marinadeLiveAuctionTimestampGauge);
+    this.registry.registerMetric(this.marinadeLiveAuctionEpochGauge);
+    this.marinadeLiveAuctionEpochGauge.set(NaN);
     this.registry.registerMetric(this.marinadeMyBidGauge);
     this.registry.registerMetric(this.marinadeMaxStakeWantedGauge);
     this.registry.registerMetric(this.slotsAssignedGauge);
@@ -469,6 +514,7 @@ export default class Solana extends TargetAbstract {
         this.updateMarinadeScoring(this.votes),
         this.updateMarinadeSelectBonds(this.votes),
         this.updateGlobalEffectiveBid(),
+        this.updateMarinadeLiveAuction(),
         this.updateClusterRequiredVersions(),
         this.updateValidatorReleaseVersions(),
         this.updateLeaderWindowsAndEpochEnd(),
@@ -945,8 +991,50 @@ export default class Solana extends TargetAbstract {
     }
   }
 
-  // Use published auction scores; rerunning the SDK depends on upstream vote credits,
-  // which can be unavailable even while official scoring results remain available.
+  private clearLiveMarinadeReference(): void {
+    this.marinadeLiveBidGauge.reset();
+    this.marinadeLiveMinBidGauge.reset();
+    this.marinadeLiveBidMarginGauge.reset();
+    this.marinadeLiveAuctionEpochGauge.set(NaN);
+    this.marinadeLiveAuctionUpGauge.set(0);
+  }
+
+  // Background refresh keeps SDK network latency out of the Prometheus scrape.
+  // One shared run at a time; never fall back to published scoring for alerts.
+  private updateMarinadeLiveAuction(): void {
+    if (Date.now() - this.liveAuctionLastSuccess >= MARINADE_LIVE_MAX_AGE_MS) {
+      this.clearLiveMarinadeReference();
+    }
+    if (this.liveAuctionRefresh || Date.now() - this.liveAuctionLastAttempt < 60_000) return;
+    const votes = this.toUniqueList(this.votes);
+    if (votes.length === 0) return;
+    this.liveAuctionLastAttempt = Date.now();
+    this.liveAuctionRefresh = this.refreshMarinadeLiveAuction(votes).finally(() => {
+      this.liveAuctionRefresh = null;
+    });
+  }
+
+  private async refreshMarinadeLiveAuction(votes: string[]): Promise<void> {
+    try {
+      const reference = await fetchLiveMarinadeAuction(votes);
+      this.clearLiveMarinadeReference();
+      for (const row of reference.validators) {
+        const labels = [row.vote, row.commission, row.mevCommission];
+        this.marinadeLiveBidGauge.labels(...labels).set(row.bid);
+        this.marinadeLiveMinBidGauge.labels(...labels).set(row.minimumBid);
+        this.marinadeLiveBidMarginGauge.labels(...labels).set(row.margin);
+      }
+      this.liveAuctionLastSuccess = Date.now();
+      this.marinadeLiveAuctionTimestampGauge.set(this.liveAuctionLastSuccess / 1000);
+      this.marinadeLiveAuctionEpochGauge.set(reference.epoch);
+      this.marinadeLiveAuctionUpGauge.set(1);
+    } catch (error) {
+      this.clearLiveMarinadeReference();
+      console.error("updateMarinadeLiveAuction", error);
+    }
+  }
+
+  // Published scores remain an informational reference, not an actionable live cutoff.
   private async updateGlobalEffectiveBid(): Promise<void> {
     this.marinadeMinEffectiveBidGauge.reset();
     this.marinadeBidReferenceEpochGauge.set(NaN);

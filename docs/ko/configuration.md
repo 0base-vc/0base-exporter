@@ -179,3 +179,34 @@ scoring 데이터가 없거나 유효하지 않으면 bid를 0으로 표시하�
 해석해야 합니다. 설정된 모든 vote 계정에 두 수수료 시나리오를 제공하므로,
 시나리오 전체의 최댓값을 쓰지 말고 `vote`, `commission`, `mev_commission`을
 명시적으로 필터링해야 합니다.
+
+### 실시간 PSR bid 알림
+
+위의 발표된 scoring 기준값을 현재 bid 부족 경보로 사용하면 안 됩니다.
+현재 bid가 과거 스냅샷 기준값보다 낮아도 PSR의 실시간 경매에서는 통과할 수 있습니다.
+collector는 공식 Marinade SDK 0.6.7로 API 입력을 새로 읽어 경매를 계산합니다.
+credits가 null인 Alpenglow 환경에서는 vote reward를 사용합니다.
+
+- `solana_marinade_live_bid_sol`: 실시간 계산에 사용한 static bid.
+- `solana_marinade_live_min_bid_sol`: 같은 계산의 낙찰 총수익에서 bid 외 수익을 뺀 값, 최솟값 0.
+- `solana_marinade_live_bid_margin_sol`: 총 수익 공유값에서 낙찰 총수익을 뺀 값. 음수면 실시간 가격 미달.
+- `solana_marinade_live_auction_up`: 성공한 계산이 있고 180초 미만일 때만 1.
+- `solana_marinade_live_auction_timestamp_seconds`: 마지막 계산 성공 시각. 최초 성공 전에는 0.
+- `solana_marinade_live_auction_epoch`: 실시간 계산의 에포크. 사용할 수 없으면 NaN.
+
+앞의 세 지표는 SDK의 실제 적용 수수료를 `vote`, `commission`, `mev_commission`
+label로 제공합니다. bid 외 수익은 inflation·MEV와 공유된 block reward를 포함합니다.
+가격을 통과해도 위임을 보장하지 않습니다. max stake wanted, bond, 집중도, 재위임
+우선순위 등은 별도 조건이며, 이 지표는 페널티 경보가 아닙니다.
+
+60초마다 한 번씩 백그라운드에서 계산하며 전체 네트워크 작업의 제한은 20초입니다.
+Prometheus scrape를 기다리게 하지 않습니다. 실패하거나 180초 이상 오래되면 실시간
+bid 지표를 제거하고 availability를 0으로 표시합니다. 발표된 과거 기준으로 대체하지 않습니다.
+알림 쿼리는 margin과 함께 availability 및 timestamp 경과 시간을 확인해야 합니다.
+영문 설정 문서의 PromQL 예제를 참고하고 모든 지표에 동일한 배포 selector를 적용하세요.
+
+마이그레이션: 발표 기준선은 참고 표시로 남기고 bid 부족 알림은 실시간 margin으로
+바꾸세요. 예를 들어 부동소수점 오차를 허용해 -0.000000001 미만이 5분 지속될 때
+경고합니다. 데이터 없음은 margin 0이 아니며 조회 오류를 bid 부족으로 알리면 안 됩니다.
+exporter와 대시보드를 별도로 배포할 때는 새 실시간 지표를 확인할 때까지 bid 알림을
+일시정지하고, 정상 수집을 확인한 뒤 재개하세요.
