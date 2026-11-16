@@ -25,6 +25,7 @@
 | `story-testnet`        | EVM    | `./availables/testnet/story.ts`        |
 | `ritual-testnet`       | Hybrid | `./availables/testnet/ritual.ts`       |
 | `hashkinetics-testnet` | Hybrid | `./availables/testnet/hashkinetics.ts` |
+| `canopy`               | Hybrid | `./availables/canopy.ts`               |
 | `canopy-testnet`       | Hybrid | `./availables/testnet/canopy.ts`       |
 
 ## Limonata

@@ -1,5 +1,6 @@
 import Limonata from "../availables/testnet/limonata";
 import AtomOne from "../availables/atomone";
+import Canopy from "../availables/canopy";
 import Berachain from "../availables/berachain";
 import Hashkinetics from "../availables/testnet/hashkinetics";
 import Gnoland from "../availables/gnoland";
@@ -15,7 +16,6 @@ import TendermintV1 from "../availables/tendermint-v1";
 import TendermintV1beta1 from "../availables/tendermint-v1beta1";
 import TerraV2 from "../availables/terra-v2";
 import Terra from "../availables/terra";
-import CanopyTestnet from "../availables/testnet/canopy";
 import InitiaTestnet from "../availables/testnet/initia";
 import MitosisTestnet from "../availables/testnet/mitosis";
 import MonadTestnet from "../availables/testnet/monad";
@@ -432,6 +432,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
       ),
   },
   {
+    id: "canopy",
+    family: "hybrid",
+    description: "Canopy mainnet collector",
+    aliases: ["canopy-mainnet"],
+    legacyModulePaths: ["./availables/canopy.ts"],
+    requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
+    factory: createFactory(Canopy),
+  },
+  {
     id: "canopy-testnet",
     family: "hybrid",
     description: "Canopy testnet collector",
@@ -439,7 +449,7 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     legacyModulePaths: ["./availables/testnet/canopy.ts"],
     requiredEnv: ["API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES"],
-    factory: createFactory(CanopyTestnet),
+    factory: createFactory(Canopy),
   },
 ];
 

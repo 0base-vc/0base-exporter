@@ -1,8 +1,8 @@
-import TargetAbstract from "../../target.abstract";
+import TargetAbstract from "../target.abstract";
 import { Gauge, Registry } from "prom-client";
 import axios from "axios";
-import { toDecimal } from "../../core/decimal";
-import { getDecimalPlaces } from "../../core/runtime-env";
+import { toDecimal } from "../core/decimal";
+import { getDecimalPlaces } from "../core/runtime-env";
 
 function scaleAmount(value: string | number | undefined, decimals: number): number {
   return toDecimal(String(value ?? 0), decimals);
