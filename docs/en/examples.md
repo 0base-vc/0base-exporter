@@ -77,6 +77,21 @@ ALCHEMY_API_KEY=your-key \
 npm start
 ```
 
+## Pharos mainnet example
+
+Env template: [`examples/env/pharos.env`](../../examples/env/pharos.env)
+
+```bash
+CHAIN=pharos \
+EVM_API_URL=https://rpc.pharos.xyz \
+VALIDATOR=0x<64-hex-character-validator-pool-id> \
+npm start
+```
+
+`VALIDATOR` accepts multiple comma-separated pool IDs. The exporter resolves
+each pool owner and reports that owner's combined unclaimed commission and
+self-stake rewards in PROS.
+
 ## Ritual testnet example
 
 Env template: [`examples/env/ritual-testnet.env`](../../examples/env/ritual-testnet.env)

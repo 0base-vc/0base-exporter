@@ -77,6 +77,21 @@ ALCHEMY_API_KEY=your-key \
 npm start
 ```
 
+## Pharos 메인넷 예제
+
+env 템플릿: [`examples/env/pharos.env`](../../examples/env/pharos.env)
+
+```bash
+CHAIN=pharos \
+EVM_API_URL=https://rpc.pharos.xyz \
+VALIDATOR=0x<64자리-hex-validator-pool-id> \
+npm start
+```
+
+`VALIDATOR`에는 쉼표로 구분한 pool ID를 여러 개 지정할 수 있다. exporter는
+pool owner를 조회하고 해당 owner의 미청구 commission 및 자기 stake 보상 합계를
+PROS 단위로 내보낸다.
+
 ## Ritual testnet 예제
 
 env 템플릿: [`examples/env/ritual-testnet.env`](../../examples/env/ritual-testnet.env)

@@ -44,6 +44,10 @@ patch 릴리스에서는 잘못되었거나 위험한 데이터를 막기 위한
 
 Solana current-epoch metrics에서는 `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, `solana_validator_epoch_final` 같은 availability gauge로 관련 값의 완전성을 확인합니다.
 
+Pharos의 `pharos_validator_owner_unclaimed_rewards_pros`는 staking contract의
+조회 결과가 합산값이므로 validator commission과 owner 자기 stake 보상을 함께
+포함합니다. 값 해석 전에 `pharos_validator_unclaimed_rewards_available`을 확인하세요.
+
 ## 리뷰 기준
 
 Metric을 건드리는 PR은 다음 중 하나를 명시해야 합니다.

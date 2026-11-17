@@ -42,6 +42,23 @@ rewards are read from the standard top-level `total` field. Set
 from the same `/metrics` response as the Cosmos metrics. The aliases `push`,
 `testnet/push`, and `BLOCKCHAIN=./availables/testnet/push.ts` remain available.
 
+## Pharos mainnet staking rewards
+
+Set `CHAIN=pharos`, `EVM_API_URL` to a Pharos mainnet JSON-RPC endpoint, and
+`VALIDATOR` to one or more comma-separated validator pool IDs (`bytes32` hex).
+For example, use `https://rpc.pharos.xyz` as the public endpoint. The collector
+looks up each validator owner and reads that owner's unclaimed rewards and the
+pool commission rate from the staking contract. The reward value is in PROS and
+combines validator commission with any rewards from the owner's own stake; the
+contract view does not expose those components separately. It only reads the
+chain and never sends a claim transaction. See
+[the environment example](../../examples/env/pharos.env).
+
+The collector exports `pharos_validator_owner_unclaimed_rewards_pros`,
+`pharos_validator_commission_rate_percent`, and
+`pharos_validator_unclaimed_rewards_available`, each labeled by `pool_id`.
+When availability is 0, the value and rate samples are omitted for that pool.
+
 ## Address semantics
 
 | Family       | Address field | Validator field |
@@ -52,6 +69,9 @@ from the same `/metrics` response as the Cosmos metrics. The aliases `push`,
 Multiple values are comma-separated.
 
 For backward compatibility, the runtime still checks `VOTE` before `ADDRESS` and `IDENTITY` before `VALIDATOR`. Prefer the family-specific fields above for new deployments, and avoid setting both aliases unless you intentionally want the legacy value to win.
+
+Pharos is an EVM exception: `VALIDATOR` contains staking pool IDs, and
+`ADDRESS` is not used.
 
 ## FireBAM native metrics
 

@@ -19,6 +19,7 @@
 | `spherenet-testnet`    | Solana | `./availables/testnet/spherenet.ts`    |
 | `monad`                | EVM    | `./availables/monad.ts`                |
 | `monad-testnet`        | EVM    | `./availables/testnet/monad.ts`        |
+| `pharos`               | EVM    | `./availables/pharos.ts`               |
 | `berachain`            | Hybrid | `./availables/berachain.ts`            |
 | `mitosis`              | Hybrid | `./availables/mitosis.ts`              |
 | `mitosis-testnet`      | Hybrid | `./availables/testnet/mitosis.ts`      |
@@ -39,3 +40,10 @@ RPC health, slot/epoch, peer·validator set 수, 설정한 vote account의 stake
 마지막 투표, client version, genesis hash 일치와 shred-version 일치를 수집한다.
 vote account가 조회되지 않을 때는 비활성으로 단정하지 않고 unavailable로 둔다.
 네트워크 운영자가 값을 공개한 뒤 `GENESIS_HASH`, `SHRED_VERSION`을 설정한다.
+
+## Pharos 메인넷
+
+`pharos`는 Pharos staking contract에서 validator 소유자의 미청구 보상과
+commission rate를 읽는다. `EVM_API_URL`에는 Pharos 메인넷 JSON-RPC endpoint,
+`VALIDATOR`에는 쉼표로 구분한 validator pool ID(`bytes32` hex)를 지정한다.
+각 pool의 owner는 contract에서 조회하며 지갑 주소나 서명 키는 필요하지 않다.
