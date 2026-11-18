@@ -69,6 +69,21 @@ reference `/status` 및 같은 높이의 `app_hash`를 비교합니다. 결과
 포함됩니다. `push`, `testnet/push`, `BLOCKCHAIN=./availables/testnet/push.ts`
 alias도 계속 사용할 수 있습니다.
 
+## Pharos 메인넷 staking 보상
+
+`CHAIN=pharos`, Pharos 메인넷 JSON-RPC endpoint인 `EVM_API_URL`, 하나 이상의
+validator pool ID(`bytes32` hex)를 쉼표로 구분한 `VALIDATOR`를 지정한다.
+공개 endpoint 예시는 `https://rpc.pharos.xyz`다. collector는 contract에서 pool별
+owner를 조회한 뒤 해당 owner의 미청구 보상과 commission rate를 읽는다. 보상 단위는
+PROS이며 validator commission과 owner의 자기 stake 보상이 합산된다. contract view는
+두 항목을 따로 제공하지 않는다. chain 읽기만 수행하며 claim transaction은 보내지 않는다.
+[환경 예시](../../examples/env/pharos.env)를 참고한다.
+
+`pharos_validator_owner_unclaimed_rewards_pros`,
+`pharos_validator_commission_rate_percent`,
+`pharos_validator_unclaimed_rewards_available` 지표를 내보내며 모두 `pool_id`로
+label한다. availability가 0이면 해당 pool의 보상과 수수료율 sample은 생략한다.
+
 ## 주소 의미
 
 | 계열         | 주소 필드 | validator 필드 |
@@ -79,6 +94,8 @@ alias도 계속 사용할 수 있습니다.
 여러 값은 쉼표로 구분합니다.
 
 하위 호환성을 위해 런타임은 여전히 `VOTE`를 `ADDRESS`보다, `IDENTITY`를 `VALIDATOR`보다 먼저 확인합니다. 새 배포에서는 위 표의 계열별 필드를 권장하며, 두 alias를 동시에 설정하면 레거시 값이 이긴다는 점을 명시적으로 의도해야 합니다.
+
+Pharos는 EVM 예외로 `VALIDATOR`에 staking pool ID를 지정하며 `ADDRESS`는 사용하지 않는다.
 
 ## Solana 메인넷 current epoch 메트릭
 

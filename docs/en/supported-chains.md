@@ -19,6 +19,7 @@
 | `spherenet-testnet`    | Solana | `./availables/testnet/spherenet.ts`    |
 | `monad`                | EVM    | `./availables/monad.ts`                |
 | `monad-testnet`        | EVM    | `./availables/testnet/monad.ts`        |
+| `pharos`               | EVM    | `./availables/pharos.ts`               |
 | `berachain`            | Hybrid | `./availables/berachain.ts`            |
 | `mitosis`              | Hybrid | `./availables/mitosis.ts`              |
 | `mitosis-testnet`      | Hybrid | `./availables/testnet/mitosis.ts`      |
@@ -40,3 +41,11 @@ account stake/commission/last vote, client version, genesis hash match, and
 shred-version match. Missing vote-account data is left unavailable rather than
 being treated as inactive. Configure `GENESIS_HASH` and `SHRED_VERSION` when
 the network operator has published those values.
+
+## Pharos mainnet
+
+`pharos` reads validator owner rewards and commission rates from the Pharos
+staking contract. Set `EVM_API_URL` to a Pharos mainnet JSON-RPC endpoint and
+`VALIDATOR` to one or more comma-separated validator pool IDs (`bytes32` hex).
+The collector resolves each pool's owner from the contract. It does not need a
+wallet address or signing key.

@@ -44,6 +44,11 @@ Some upstream sources do not provide complete current-epoch data. Collectors may
 
 For Solana current-epoch metrics, availability gauges such as `solana_slots_available`, `solana_income_available`, `solana_validator_epoch_current`, and `solana_validator_epoch_final` tell operators how complete the related values are.
 
+For Pharos, `pharos_validator_owner_unclaimed_rewards_pros` includes both
+validator commission and any rewards from the owner's own stake because the
+staking contract view returns one combined amount. Check
+`pharos_validator_unclaimed_rewards_available` before interpreting the value.
+
 ## Review Requirements
 
 Pull requests that touch metrics must state one of:

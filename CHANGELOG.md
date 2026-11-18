@@ -10,6 +10,8 @@ The format follows Keep a Changelog and this repository uses Semantic Versioning
 
 ### Added
 
+- Pharos mainnet validator owner unclaimed rewards and commission-rate metrics.
+
 - Live PSR auction bid, minimum bid, margin, epoch, timestamp and availability
   metrics using SDK 0.6.7. Fresh background calculations support Alpenglow vote
   rewards and do not use published scoring as a live-alert fallback.

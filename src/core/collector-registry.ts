@@ -2,6 +2,7 @@ import Limonata from "../availables/testnet/limonata";
 import AtomOne from "../availables/atomone";
 import Canopy from "../availables/canopy";
 import Berachain from "../availables/berachain";
+import Pharos from "../availables/pharos";
 import Hashkinetics from "../availables/testnet/hashkinetics";
 import Gnoland from "../availables/gnoland";
 import { createRequire } from "module";
@@ -102,6 +103,18 @@ function createSphereNetFactory() {
       config.collectorValidator,
       config.env.GENESIS_HASH ?? "",
       config.env.SHRED_VERSION ?? "",
+    );
+}
+
+function createPharosFactory() {
+  return ({ config }: CollectorContext) =>
+    new Pharos(
+      config.existingMetricsUrl,
+      config.apiUrl,
+      config.rpcUrl,
+      config.collectorAddresses,
+      config.collectorValidator,
+      config.env.EVM_API_URL?.trim() ?? "",
     );
 }
 
@@ -324,6 +337,16 @@ export const CHAIN_PROFILES: ChainProfile[] = [
     requiredEnv: ["API_URL", "EVM_API_URL", "COLLECTOR_ADDRESSES", "COLLECTOR_VALIDATOR"],
     optionalEnv: ["EXISTING_METRICS_URL", "DECIMAL_PLACES", "RPC_URL"],
     factory: createFactory(MonadTestnet),
+  },
+  {
+    id: "pharos",
+    family: "evm",
+    description: "Pharos mainnet validator owner unclaimed rewards and commission rate",
+    aliases: ["pharos-mainnet"],
+    legacyModulePaths: ["./availables/pharos.ts"],
+    requiredEnv: ["EVM_API_URL", "COLLECTOR_VALIDATOR"],
+    optionalEnv: ["EXISTING_METRICS_URL"],
+    factory: createPharosFactory(),
   },
   {
     id: "berachain",
